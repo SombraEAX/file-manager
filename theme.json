@@ -1,0 +1,8 @@
+{
+	"background":  "#fff",
+	"fontColor":   "#000",
+	"borderColor": "#ccc",
+	"font":        "sans-serif",
+	"linkHover":   "red",
+	"selected":    "blue"
+}

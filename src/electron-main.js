@@ -1,7 +1,7 @@
-const { app, BrowserWindow } = require('electron');
+const { app, BrowserWindow } = require('electron')
 
-const url = require("url");
-const path = require("path");
+const url = require("url")
+const path = require("path")
 
 let mainWindow
 
@@ -10,7 +10,8 @@ function createWindow() {
     width: 800,
     height: 600,
     webPreferences: {
-      nodeIntegration: true
+      nodeIntegration: true,
+      preload: path.join(__dirname, 'preload.js')
     }
   })
 
@@ -20,15 +21,16 @@ function createWindow() {
       protocol: "file:",
       slashes: true
     })
-  );
+  )
 
-//  mainWindow.webContents.openDevTools();
+  //mainWindow.webContents.openDevTools();
 
   mainWindow.on('closed', function () {
     mainWindow = null
   })
 }
-console.log(app);
+
+console.log(app)
 app.on('ready', createWindow)
 
 app.on('window-all-closed', function () {
