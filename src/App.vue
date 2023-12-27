@@ -1,12 +1,20 @@
 <template>
   <div class="global-wrapper">
-    <div class="top-panel"></div>
+    <top-panel
+      :address="currentDir"
+      :history="history"
+      :historyIndex="historyIndex"
+      @back="back"
+      @forward="forward"
+      @up="up"
+      @jump="jump"
+    />
     <div class="main">
       <directory-tree
         :dirs="dirs" 
         class="tree" 
         :selected="currentDir"
-        @select="(ev) => currentDir = ev"
+        @select="jump"
       />
       <div class="workzone"></div>
     </div>
@@ -18,24 +26,52 @@
   import StatusBar from './components/StatusBar.vue'
   import DirectoryTree from './components/DirectoryTree.vue'
   import theme from '../theme.json'
+  import TopPanel from './components/TopPanel.vue'
+
+  const username = window.electron.getUserName()
+  const homedir  = `/home/${username}`
 
   export default {
     name: 'App',
     components: {
       StatusBar,
-      DirectoryTree
+      DirectoryTree,
+      TopPanel
     },
-    data(){
-      let username = window.electron.getUserName()
-      let homedir  = `/home/${username}`
-      
+    data(){      
       return {
-        currentDir: homedir,
         theme,
         dirs: [
           { name: username, pathname: homedir, caption:username },
           { name: '/', pathname: '/', caption: 'System root' }
-        ]
+        ],
+        history: [],
+        historyIndex: -1
+      }
+    },
+    methods:{
+      jump(pathname){
+        this.history[++this.historyIndex] = pathname
+        if(this.history.length > this.historyIndex + 1){
+          this.history.splice(this.historyIndex + 1)
+        }
+      },
+      back(){
+        this.historyIndex--
+      },
+      forward(){
+      	this.historyIndex++
+      },
+      up(){
+        this.jump(this.currentDir.replace(/\/[^/]+\/?$/,'') || '/')
+      }
+    },
+    mounted(){
+      this.jump(homedir)
+    },
+    computed:{
+      currentDir(){
+        return this.history[this.historyIndex]
       }
     }
   }
@@ -58,11 +94,6 @@
     max-height:100%;
     display:flex;
     flex-direction:column
-  }
-
-  .top-panel{
-    height:50px;
-    border-bottom:1px solid v-bind('theme.borderColor')
   }
 
   .main{
