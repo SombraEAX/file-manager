@@ -19,7 +19,13 @@
       />
       <div class="workzone"></div>
     </div>
-    <status-bar :items="100" :dirs="60" :files="40"/>
+    <status-bar
+      :items="100" 
+      :dirs="60" 
+      :files="40" 
+      :view="view"
+      @changeView="ev => view = ev"
+    />
   </div>
 </template>
 
@@ -47,7 +53,8 @@
           { name: '/', pathname: '/', caption: 'System root' }
         ],
         history: [],
-        historyIndex: -1
+        historyIndex: -1,
+        view: 'table'
       }
     },
     methods:{
