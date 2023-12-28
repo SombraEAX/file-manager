@@ -5,7 +5,11 @@
       @click="$emit('back')" 
       :disabled="!historyIndex"
     ></button>
-    <button class="history"></button>
+    <button
+      class="history"
+      ref="historyButton"
+      @click="showHistory"
+    ></button>
     <button
       class="forward"
       @click="$emit('forward')"
@@ -58,6 +62,22 @@
         if(pathname !== '/') pathname = pathname.replace(/\/$/,'')
         this.$emit('jump', pathname)
         this.blur()
+      },
+      showHistory(){
+        let { ipcRenderer } = window.electron
+        let rect = this.$refs.historyButton.getBoundingClientRect()
+
+        ipcRenderer.send('show-history-menu', {
+          history: [...this.history], 
+          current: this.historyIndex, 
+          x:       rect.x, 
+          y:       rect.y + rect.height
+        })
+
+        ipcRenderer.once(
+          'show-history-menu-reply',
+          (_, index) => this.$emit('changeHistoryIndex', index)
+        )
       }
     },
     watch: {

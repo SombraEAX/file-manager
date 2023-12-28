@@ -1,4 +1,4 @@
-const { app, BrowserWindow } = require('electron')
+const { app, BrowserWindow, ipcMain, Menu, MenuItem } = require('electron')
 
 const url = require("url")
 const path = require("path")
@@ -30,7 +30,6 @@ function createWindow() {
   })
 }
 
-console.log(app)
 app.on('ready', createWindow)
 
 app.on('window-all-closed', function () {
@@ -39,4 +38,19 @@ app.on('window-all-closed', function () {
 
 app.on('activate', function () {
   if (mainWindow === null) createWindow()
+})
+
+ipcMain.on('show-history-menu', (event, { history, current, x, y }) => {
+  let menu = new Menu()
+
+  history.forEach((pathname, index) =>
+    menu.append(new MenuItem({
+      checked: index == current,
+      type:    'radio',
+      label:   pathname,
+      click: _ => event.reply('show-history-menu-reply', index)
+    }))
+  )
+
+  menu.popup({x,y})
 })

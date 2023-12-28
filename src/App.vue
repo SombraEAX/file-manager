@@ -8,6 +8,7 @@
       @forward="forward"
       @up="up"
       @jump="jump"
+      @changeHistoryIndex="changeHistoryIndex"
     />
     <div class="main">
       <directory-tree
@@ -30,7 +31,7 @@
 
   const username = window.electron.getUserName()
   const homedir  = `/home/${username}`
-
+  
   export default {
     name: 'App',
     components: {
@@ -61,6 +62,9 @@
       },
       forward(){
       	this.historyIndex++
+      },
+      changeHistoryIndex(newIndex){
+        this.historyIndex = newIndex
       },
       up(){
         this.jump(this.currentDir.replace(/\/[^/]+\/?$/,'') || '/')
