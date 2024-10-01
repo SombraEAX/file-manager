@@ -3,6 +3,8 @@ const { app, BrowserWindow, ipcMain, Menu, MenuItem } = require('electron')
 const url = require("url")
 const path = require("path")
 
+const isDev = process.env.NODE_ENV === 'development'
+
 let mainWindow
 
 function createWindow() {
@@ -15,13 +17,13 @@ function createWindow() {
     }
   })
 
-  mainWindow.loadURL(
-    url.format({
-      pathname: path.join(__dirname, `../dist/index.html`),
-      protocol: "file:",
-      slashes: true
-    })
-  )
+  const localPath = url.format({
+    pathname: path.join(__dirname, `../dist/index.html`),
+    protocol: "file:",
+    slashes: true
+  })
+
+  mainWindow.loadURL(isDev ? 'http://localhost:8080/' : localPath)
 
   //mainWindow.webContents.openDevTools();
 

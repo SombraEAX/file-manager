@@ -37,6 +37,8 @@
 
   const username = window.electron.getUserName()
   const homedir  = `/home/${username}`
+
+  alert(process.env.NODE_ENV)
   
   export default {
     name: 'App',

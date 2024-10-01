@@ -4,8 +4,8 @@
   "main": "src/electron-main.js",
   "private": true,
   "scripts": {
-    "start": "vue-cli-service build && electron .",
-    "serve": "vue-cli-service serve",
+    "start": "vue-cli-service build && npx cross-env NODE_ENV=production electron .",
+    "serve": "concurrently \"vue-cli-service serve\" \"npx wait-on http://localhost:8080 && npx cross-env NODE_ENV=development electron .\"",
     "build": "vue-cli-service build",
     "lint": "vue-cli-service lint"
   },
@@ -36,5 +36,9 @@
     "electron": "^28.1.0",
     "pretty-bytes": "^6.1.1",
     "vue": "^3.2.13"
+  },
+  "devDependencies": {
+    "concurrently": "^9.0.1",
+    "wait-on": "^8.0.1"
   }
 }
