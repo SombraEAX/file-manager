@@ -6,5 +6,47 @@
 	"linkHover":                  "red",
 	"selected":                   "blue",
 	"textBoxesBorderColor":       "lightblue",
-	"textBoxesBorderColorActive": "orange"
+	"textBoxesBorderColorActive": "orange",
+	"fileIcon":{
+		"hover":{
+			"background":"lightblue",
+			"fontColor":"#fff"
+		},
+		"selected":{
+			"background":"blue",
+			"fontColor":"#fff"			
+		}	
+	},
+	"tableRow":{
+		"name":   "#000",
+		"params": "grey"
+	},
+	"groupTitle":{
+		"fontColor":"#000",
+		"hoverFontColor":"#000",
+		"hoverBackgroundColor":"#ccc"
+	},
+	"tableHeader":{
+		"bottomBorder":"#ccc",
+		"button":{
+			"normal":{
+				"background": "#faffcb",
+				"fontColor":  "#000"
+			},
+			"hover":{
+				"background": "#faff98",
+				"fontColor":  "#000"
+			},
+			"active":{
+				"background": "#d0d37e",
+				"fontColor":  "#fff"
+			}
+		},
+		"delimiter":{
+			"normal":"#ccc",
+			"hover":"orange",
+			"active":"red",
+			"insert":"red"
+		}
+	}
 }

@@ -1,0 +1,30 @@
+{
+  "image":[
+    "bmp","dib","rle","gif","ico","cur","iff","lbm","bbm","ilbm",
+    "pic","jpg","jpeg","jpe","jp2","j2k","jpf","jpm","jpg2","j2c",
+    "jpc","jpx","mj2","sid","pcx","pcc","png","psd","tga","tpic","vda",
+    "vst","icb","tif","tiff","jxr","hdp","wdp","webp","xbm","pnm","svg",
+    "svgz","wmf","emf","cdr","cmx","ai","xar"
+  ],
+  "3d object":["collada","skp","stl","u3d","vrml","x3d","3ds","3dxm","blend"],
+  "audio":[
+    "wav","wave","aiff","aif","aifc","au","snd","l16","pcm","flac",
+    "ape","wv","tta","aa3","at3","at9","atp","hma","oma","omg","m4a",
+    "caf","wma","shn","opus","mp3","bit","ogg","mpc","mp+","mpp",
+    "mp4","3gp","m4b","m4p","m4r","m4v","aac","aa","aax","act",
+    "alac","amr","awb","dss","dvf","gsm","iklax","ivs","mmf","movpkg","msv",
+    "nmf","oga","mogg","ra","rm","rf64","sln","voc","vox","8svx","cda"
+  ],
+  "video":[
+    "webm","mkv","flv","vob","ogv","ogg","drc","gifv","mng","avi",
+    "mts","m2ts","ts","mov","qt","wmv","yuv","rmvb","viv","asf","amv",
+    "mp4","m4p","m4v","mpg","mp2","mpeg","mpe","mpv","m2v","m4v","svi",
+    "3gp","3g2","mxf","roq","nsv","flv","f4v","f4p","f4a","f4b"
+  ],
+  "document":[
+    "txt","md","doc","dot","wbk","docx","docm","dotx","dotm","docb","djvu",
+    "djv","dbk","xml","html","htm","fb2","odt","fodt","sxw","sxc","sxd",
+    "sxi","sxm","sxg","stw","oxps","xps","pages","pdf","ps","rtf","tex","uof",
+    "uot","uos","uop","wpd","wp","wp7","doc"
+  ]
+}

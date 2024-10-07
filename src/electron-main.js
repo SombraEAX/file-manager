@@ -30,6 +30,7 @@ function createWindow() {
   mainWindow.on('closed', function () {
     mainWindow = null
   })
+
 }
 
 app.on('ready', createWindow)
@@ -40,6 +41,35 @@ app.on('window-all-closed', function () {
 
 app.on('activate', function () {
   if (mainWindow === null) createWindow()
+})
+
+function menuProcessing(event,menu){
+  for(let item of menu){
+    if(item.id){
+      item.click = _ => event.reply('menu-bar-click', item.id)
+    }
+    if(item.submenu){
+      menuProcessing(event,item.submenu)
+    }
+  }
+}
+
+ipcMain.on('update-menu-bar', (event, template) => {
+  menuProcessing(event,template)
+  mainWindow.setMenu(Menu.buildFromTemplate(template))
+})
+
+ipcMain.on('show-menu', (event, {items,x,y}) => {
+  let menu = new Menu()
+
+  items.forEach((item, index) =>
+    menu.append(new MenuItem({
+      ...item,
+      click: _ => event.reply('show-menu-reply', index)
+    }))
+  )
+
+  menu.popup({x,y})	
 })
 
 ipcMain.on('show-history-menu', (event, { history, current, x, y }) => {
