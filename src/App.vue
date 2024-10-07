@@ -16,6 +16,8 @@
         class="tree" 
         :selected="currentDir"
         @select="jump"
+        :width="leftPanelWidth"
+        @resize="w => leftPanelResize(w)"
       />
       <WorkZone
         :sortColumn="sortColumn"
@@ -64,6 +66,7 @@
     
     data(){      
       return {
+        leftPanelWidth: 200,
         theme,
         dirs: [
           { name: username, pathname: homedir, caption:username },
@@ -83,6 +86,9 @@
     },
     
     methods:{
+      leftPanelResize(w){
+        this.leftPanelWidth = w
+      },
       openDir(dirname){
         this.jump(window.electron.join(this.currentDir, dirname))
       },
