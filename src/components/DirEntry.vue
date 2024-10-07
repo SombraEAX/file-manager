@@ -57,7 +57,7 @@
       },
       columnStyle(col,index){
         if(this.view !== 'table') return {width:'auto'}
-        let w = (index ? col.width : col.width - 16) + 'px'
+        let w = (index ? col.width : col.width - 21) + 'px'
         return {width: w, minWidth: w}
       },
       stringify(val,colname){
@@ -94,6 +94,9 @@
     max-width:150px;
     width:150px;
     display:inline-flex;
+    margin-left:5px
+  }
+  [data-variant="table"] .icon{
     margin-left:5px
   }
   [data-variant="icons"] .label{
