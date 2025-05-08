@@ -35,6 +35,7 @@
   import theme from '../../theme.json'
   
   export default {
+    emits: ['back', 'forward', 'up', 'jump', 'changeHistoryIndex'],
     props: {
       address: String,
       history: {

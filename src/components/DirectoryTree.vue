@@ -20,6 +20,7 @@
   import DirectoryList from './DirectoryList.vue'
 
   export default {
+    emits: ['select', 'resize'],
     props: {
       width: Number,
       dirs: {

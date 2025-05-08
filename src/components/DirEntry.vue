@@ -20,6 +20,7 @@
   import prettyBytes from 'pretty-bytes'
   
   export default {
+    emits: ['openDir'],
     props: {
       view:String,
       columns:{
@@ -61,6 +62,7 @@
         return {width: w, minWidth: w}
       },
       stringify(val,colname){
+        if(val === undefined) return ''
         switch(colname){
           case 'modified': return val.toISOString().replace('T',' ').replace(/:[^:]+$/,'')
           case 'size':     return prettyBytes(val)

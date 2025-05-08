@@ -33,6 +33,7 @@
   import TableHeaderButton from './TableHeaderButton.vue'
   
   export default {
+    emits: ['toggleColumnVisible', 'moveColumn', 'changeSort', 'changeWidth'],
     components:{
       TableHeaderButton
     },

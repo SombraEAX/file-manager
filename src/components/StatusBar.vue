@@ -27,6 +27,7 @@
   import theme from '../../theme'
 
   export default {
+    emits: ['changeView'],
     name:'StatusBar',
     props: {
       items:    Number,

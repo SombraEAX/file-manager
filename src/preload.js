@@ -32,6 +32,7 @@ contextBridge.exposeInMainWorld(
         stats[i].name     = files[i]
         stats[i].type     = typeId
         stats[i].filetype = typeLabel
+        stats[i].modified = new Date(stats[i].mtimeMs)
 
         if(stats[i].type !== 'file') continue
 
@@ -51,6 +52,7 @@ contextBridge.exposeInMainWorld(
     readdirSync, join,
     ipcRenderer: {
       ...ipcRenderer,
+      send: ipcRenderer.send.bind(ipcRenderer),
       on: ipcRenderer.on.bind(ipcRenderer),
       once: ipcRenderer.once.bind(ipcRenderer),
       removeListener: ipcRenderer.removeListener.bind(ipcRenderer)

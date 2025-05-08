@@ -22,8 +22,8 @@ function createWindow() {
     protocol: "file:",
     slashes: true
   })
-
-  mainWindow.loadURL(isDev ? 'http://localhost:8080/' : localPath)
+  let urlAddress = isDev ? 'http://localhost:8080/' : localPath
+  mainWindow.loadURL(urlAddress)
 
   //mainWindow.webContents.openDevTools();
 

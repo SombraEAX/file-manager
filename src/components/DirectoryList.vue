@@ -24,6 +24,7 @@
   import theme from '../../theme.json'
 
   export default {
+    emits: ['select'],
     props: {
       dirs: {
         type: Array,

@@ -34,6 +34,7 @@
   import EntriesGroup from './EntriesGroup.vue'
   
   export default {
+    emits: ['openDir', 'changeSort'],
     components:{
       EntriesGroup,
       TableHeader,
@@ -69,7 +70,7 @@
             width:150, 
             visible: true,
             colname: 'modified',
-            field: 'mtime'
+            field: 'modified'
           },
           {
             caption:'Size',

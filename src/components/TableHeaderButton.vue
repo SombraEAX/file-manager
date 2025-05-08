@@ -24,6 +24,7 @@
   import theme from '../../theme.json'
   
   export default {
+    emits: ['resizeend', 'resize', 'resizestart', 'moveend', 'movestart', 'move', 'changeSort'],
     props: {
       redLine:     String,
       width:       Number,
