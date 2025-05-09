@@ -7,10 +7,10 @@
       @click.right="menu"
     >
       <TableHeaderButton
-        v-for="(column,index) in visibleColumns"
+        v-for="[index,column] in visibleColumns"
         :ref="'button' + index"
         :key="index"
-        :redLine="index == this.insert - 1 ? 'right' : !index && insert === 0 && 'left'"
+        :redLine="index == this.insert - 1 ? 'right' : index == visibleColumns[0][0] && insert == 0 && 'left'"
         :status="status"
         :sort="column.colname == sortColumn && sortOrder"
         :caption="column.caption"
@@ -20,7 +20,7 @@
         @resizestart="resizestart"
         @resizeend="resizeend"
         @move="move"
-        @movestart="moveStart(index)"
+        @movestart="moveStart"
         @moveend="moveEnd(index)"
       />
       <div class="end"></div>
@@ -56,7 +56,8 @@
     },
     computed:{
       visibleColumns(){
-        return this.columns.filter(col => col.visible)
+        return Object.entries(this.columns)
+        .filter(entry => entry[1].visible)
       }
     },
     methods: {
@@ -71,7 +72,7 @@
         let pos = 0
         let i = 0
         let distance = x
-        for(let [index,{width}] of Object.entries(this.columns)){
+        for(let [index,{width}] of this.visibleColumns){
           pos+=width
           let dist = Math.abs(pos-x)
           if(dist < distance){
@@ -114,7 +115,7 @@
       changeSort(index, sort){
         this.$emit("changeSort",index,sort)
       },
-      changeWidth(index,width){ 
+      changeWidth(index,width){
         this.$emit("changeWidth",index,width)
       }
     }
