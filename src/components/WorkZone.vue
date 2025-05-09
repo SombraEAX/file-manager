@@ -1,12 +1,11 @@
 <template>
   <div class="outer">
-    <div class="inner" @scroll="scroll" ref="scrollbox">
+    <div class="inner" ref="scrollbox">
       <TableHeader
         v-if="view == 'table'"
         :columns="columns"
         :sortColumn="sortColumn"
         :sortOrder="sortOrder"
-        :top="top"
         @changeWidth="changeWidth"
         @changeSort="changeSort"
         @moveColumn="moveColumn"
@@ -52,8 +51,6 @@
     },
     data(){
       return {
-        top: 0,
-        left: 0,
         width:100,
         theme,
         files: [],
@@ -98,10 +95,6 @@
     methods: {
       openDir(dir){
         this.$emit('openDir',dir)
-      },
-      scroll(){
-        this.left = this.$refs.scrollbox.scrollLeft
-        this.top  = this.$refs.scrollbox.scrollTop
       },
       changeSort(col,sort){
         this.$emit('changeSort',col,sort)

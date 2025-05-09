@@ -4,7 +4,6 @@
       class="header"
       ref="header" 
       :data-status="status"         
-      :style="{ top: top + 'px' }"
       @click.right="menu"
     >
       <TableHeaderButton
@@ -38,7 +37,6 @@
       TableHeaderButton
     },
     props: {
-      top: Number,
       sortColumn: String,
       sortOrder: String,
       columns:{
@@ -124,7 +122,10 @@
 </script>
 <style scoped>
   .placeholder{
-    height:21px
+    height:21px;
+    position:sticky;
+    top:0px;
+    z-index:100
   }
   .end{
     background:v-bind("theme.tableHeader.button.normal.background");
@@ -141,7 +142,6 @@
     border-bottom:1px solid v-bind("theme.tableHeader.bottomBorder");
     height:21px;
     box-sizing:border-box;
-    position:absolute;
   }
   .header[data-status="resize"]{
     cursor:col-resize
