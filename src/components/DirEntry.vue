@@ -30,14 +30,14 @@
       params:{
         type: Object,
         default: () => []
-      } 
+      },
+      selected:Boolean
     },
     data(){
       return {
         clicked:null,
         iconSize:200,
-        theme,
-        selected:false,
+        theme
       }
     },
     computed:{

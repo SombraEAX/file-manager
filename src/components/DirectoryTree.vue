@@ -1,7 +1,9 @@
 <template>
-  <div
-    class="wrapper"
-    :style="{width: width+'px', minWidth: width+'px'}"
+  <side-bar
+    @resize="(ev) => $emit('resize',ev)"
+    :width="width"
+    minWidth="150"
+    position="left"
   >
     <div class="outer">
       <div class="inner">
@@ -12,12 +14,12 @@
         />
       </div>
     </div>
-    <div class="line" @mousedown="ev => mousedown(ev)"></div>
-  </div>
+  </side-bar>
 </template>
 <script>
   import theme from '../../theme.json'
   import DirectoryList from './DirectoryList.vue'
+  import SideBar from './SideBar.vue'
 
   export default {
     emits: ['select', 'resize'],
@@ -30,24 +32,10 @@
       selected: String	
     },
     methods:{
-      mousemove(event){
-        this.$emit('resize', this.width + event.clientX - this.x)
-        this.x = event.clientX
-      },
-      mousedown(event){
-        this.x = event.clientX
-        window.addEventListener('mousemove', this.mousemove)
-        window.addEventListener('mouseup',   this.mouseup)
-      },
-      mouseup(){
-        window.removeEventListener('mousemove', this.mousemove)
-        window.removeEventListener('mouseup',   this.mouseup)
-      }
     },
-    components: { DirectoryList },
+    components: { DirectoryList, SideBar },
     data(){			
       return {
-        x:0,
         theme
       }
     }
@@ -64,22 +52,10 @@
     box-sizing:border-box;
   }
   .outer{
+    height:100%;
     flex:1;
     display: block;
     position:relative;
     overflow-y:auto;
-    border-right:1px solid v-bind('theme.borderColor')
-  }
-  .wrapper{
-    display:flex;
-    flex-direction:row;
-  }
-  .line{
-    width:6px;
-    margin-left:-3px;
-    margin-right:-3px;
-    cursor:col-resize;
-    z-index:300;
-    height:100%;
   }  
 </style>

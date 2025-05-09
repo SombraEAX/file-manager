@@ -8,5 +8,12 @@ module.exports = defineConfig({
 			nodeIntegration: true
 		}
 	},
-	transpileDependencies: true
+	transpileDependencies: true,
+	configureWebpack: {
+		resolve: {
+			fallback: {
+				util: require.resolve("util/")
+			}
+		}
+	}
 })

@@ -1,8 +1,9 @@
 const { contextBridge, ipcRenderer } = require('electron')
 const { readdirSync, lstatSync } = require('fs')
 const { join } = require('path')
-const {readdir, lstat} = require('fs/promises')
+const {readdir, lstat, readFile, access, constants} = require('fs/promises')
 const filetypes = Object.entries(require('../filetypes'))
+const path = require('path')
 
 function type(entry){
   switch(true){
@@ -14,6 +15,43 @@ function type(entry){
     case entry.isSocket():          return ['socket','Socket']
     case entry.isSymbolicLink():    return ['symlink','Symlink']
     default:                        return [null,'Unknown format']
+  }
+}
+
+
+async function getImageDataUri(imagePath) {
+  try {
+    await access(imagePath, constants.F_OK);
+    const fileBuffer = await readFile(imagePath);
+    const extname = path.extname(imagePath).toLowerCase();
+    let mimeType = 'image/jpeg'; 
+
+    switch (extname) {
+      case '.png':
+        mimeType = 'image/png';
+        break;
+      case '.gif':
+        mimeType = 'image/gif';
+        break;
+      case '.bmp':
+        mimeType = 'image/bmp';
+        break;
+      case '.webp':
+        mimeType = 'image/webp';
+        break;
+      case '.svg':
+        mimeType = 'image/svg+xml';
+        break;
+    }
+
+    const base64String = fileBuffer.toString('base64');
+
+    const dataUri = `data:${mimeType};base64,${base64String}`;
+
+    return dataUri;
+  } catch (error) {
+    console.error('Ошибка при чтении файла изображения:', error);
+    throw error; 
   }
 }
 
@@ -57,6 +95,7 @@ contextBridge.exposeInMainWorld(
       once: ipcRenderer.once.bind(ipcRenderer),
       removeListener: ipcRenderer.removeListener.bind(ipcRenderer)
     },
+    readFile,getImageDataUri,
     getUserName: _ => require("os").userInfo().username,
     isDir: pathname => lstatSync(pathname).isDirectory()
   }

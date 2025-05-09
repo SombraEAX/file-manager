@@ -27,6 +27,12 @@
         :address="currentDir"
         @changeSort="changeSort"
         @openDir="openDir"
+        @select="select"
+      />
+      <preview-panel
+        :path="previewPath"
+        :width="rightPanelWidth"
+        @resize="w => rightPanelResize(w)"
       />
     </div>
     <status-bar
@@ -40,11 +46,13 @@
 </template>
 
 <script>
+  import SideBar from './components/SideBar.vue'
   import StatusBar from './components/StatusBar.vue'
   import DirectoryTree from './components/DirectoryTree.vue'
   import theme from '../theme.json'
   import TopPanel from './components/TopPanel.vue'
   import WorkZone from './components/WorkZone.vue'
+  import PreviewPanel from './components/PreviewPanel.vue'
   import prettyBytes from 'pretty-bytes'
 
   const username = window.electron.getUserName()
@@ -58,15 +66,19 @@
     name: 'App',
     
     components: {
+      SideBar,
       WorkZone,
       StatusBar,
       DirectoryTree,
-      TopPanel
+      TopPanel,
+      PreviewPanel
     },
     
     data(){      
       return {
+        previewPath: null,
         leftPanelWidth: 200,
+        rightPanelWidth: 300,
         theme,
         dirs: [
           { name: username, pathname: homedir, caption:username },
@@ -86,8 +98,14 @@
     },
     
     methods:{
+      select(pathname){
+        this.previewPath = pathname
+      },
       leftPanelResize(w){
         this.leftPanelWidth = w
+      },
+      rightPanelResize(w){
+        this.rightPanelWidth = w
       },
       openDir(dirname){
         this.jump(window.electron.join(this.currentDir, dirname))
@@ -391,7 +409,6 @@
     flex-direction:row;
     align-items:stretch
   }
-  
   .tree{
     width:200px
   }

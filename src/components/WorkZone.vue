@@ -20,7 +20,9 @@
           :columns="visibleColumns"
           :params="entry"
           :view="view"
+          :selected="entry.selected"
           @openDir="openDir"
+          @click="select(entry)"
         />
       </EntriesGroup>
     </div>
@@ -31,6 +33,7 @@
   import TableHeader from './TableHeader.vue'
   import DirEntry from './DirEntry.vue'
   import EntriesGroup from './EntriesGroup.vue'
+ 
   
   export default {
     emits: ['openDir', 'changeSort'],
@@ -93,6 +96,10 @@
       }
     },
     methods: {
+      select(entry){
+        let pathname = window.electron.join(this.address,entry.name)
+        this.$emit('select', pathname)
+      },
       openDir(dir){
         this.$emit('openDir',dir)
       },
