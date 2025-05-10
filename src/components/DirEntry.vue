@@ -1,5 +1,10 @@
 <template>
-  <div class="main" :data-variant="view" :data-selected="selected" @click="click">
+  <div
+    class="main"
+    :data-variant="view" 
+    :data-selected="selected" 
+    @click="click"
+  >
     <div
       class="icon" 
       :style="{width:actualIconSize, height:actualIconSize, minWidth:actualIconSize}"
@@ -31,12 +36,12 @@
         type: Object,
         default: () => []
       },
-      selected:Boolean
+      selected:Boolean,
+      iconSize:Number
     },
     data(){
       return {
         clicked:null,
-        iconSize:200,
         theme
       }
     },
@@ -78,6 +83,7 @@
     display:flex;
     flex-direction:row;
     cursor:pointer;
+    min-width:120px;
     background: v-bind('theme.background');
     color:      v-bind('theme.fontColor');
   }
@@ -106,11 +112,11 @@
     height:50px;
     word-wrap: break-word;
     white-space:wrap;
-    width:200px;
-    max-width:200px;
+    width:     v-bind('actualIconSize');
+    min-width:120px;
+    max-width: v-bind('actualIconSize');
   }
   [data-variant="icons"]{
-    width:200px;
     margin:10px;
     display:inline-flex;
     flex-direction:column !important;

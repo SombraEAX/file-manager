@@ -21,6 +21,7 @@
           :params="entry"
           :view="view"
           :selected="entry.selected"
+          :iconSize="iconSize"
           @openDir="openDir"
           @click="select(entry)"
         />
@@ -50,7 +51,8 @@
       groups: {
         type: Array,
         default: () => []
-      }
+      },
+      iconSize: Number
     },
     data(){
       return {
