@@ -20,6 +20,7 @@
         @resize="w => leftPanelResize(w)"
       />
       <WorkZone
+        :iconSize="iconSize"
         :sortColumn="sortColumn"
         :sortOrder="sortOrder"
         :groups="groups"
@@ -40,13 +41,14 @@
       :dirs="folders" 
       :files="files" 
       :view="view"
+      :scale="iconSize"
+      @scaling="ev => scaling(ev)"
       @changeView="ev => view = ev"
     />
   </div>
 </template>
 
 <script>
-  import SideBar from './components/SideBar.vue'
   import StatusBar from './components/StatusBar.vue'
   import DirectoryTree from './components/DirectoryTree.vue'
   import theme from '../theme.json'
@@ -66,7 +68,6 @@
     name: 'App',
     
     components: {
-      SideBar,
       WorkZone,
       StatusBar,
       DirectoryTree,
@@ -86,6 +87,7 @@
         ],
         history: [],
         historyIndex: -1,
+        iconSize: 200,
         view: 'table',
         entries: [],
         files: 0,
@@ -98,6 +100,9 @@
     },
     
     methods:{
+      scaling(value){
+        this.iconSize = value
+      },
       select(pathname){
         this.previewPath = pathname
       },
