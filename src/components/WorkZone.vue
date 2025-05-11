@@ -1,6 +1,6 @@
 <template>
   <div class="outer">
-    <div class="inner" ref="scrollbox">
+    <div class="inner scrollbox">
       <TableHeader
         v-if="view == 'table'"
         :columns="columns"
@@ -139,6 +139,5 @@
     right:0px;
     top:0px;
     bottom:0px;
-    overflow:auto;
   }
 </style>

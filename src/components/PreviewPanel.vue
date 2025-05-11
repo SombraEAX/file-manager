@@ -22,7 +22,7 @@
       <!-- plain text -->
       <div
         v-if="type === 'text'"
-        class="outer"
+        class="outer scrollbox"
       >
         <pre class="inner">{{text}}</pre>
       </div>
@@ -30,7 +30,7 @@
       <!-- markdown -->
       <div
         v-if="type === 'markdown'"
-        class="outer"
+        class="outer scrollbox"
       >
         <div v-html="text" class="inner markdown"></div>
       </div>
@@ -38,7 +38,7 @@
       <!-- source -->
       <div
         v-if="type === 'source'"
-        class="outer"
+        class="outer scrollbox"
       >
         <pre v-html="text" class="inner source"></pre>
       </div>
@@ -217,7 +217,6 @@
     width:100%;
     flex:1;
     display: flex;
-    overflow:auto
   }  
   .unknown{
     height:100%;

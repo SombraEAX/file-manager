@@ -93,8 +93,7 @@
 </script>
 <style scoped>
   .wrapper{
-    background:v-bind("theme.tableHeader.button.normal.background");
-    border-bottom:1px solid v-bind("theme.tableHeader.bottomBorder");
+    background:v-bind("theme.background");
     user-select:none;
     font-family:v-bind("theme.font");
   	display:flex;

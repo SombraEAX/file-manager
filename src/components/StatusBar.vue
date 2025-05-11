@@ -72,7 +72,6 @@
   .status-bar{
     display:flex;
     flex-direction:row;
-    border-top:1px solid v-bind('theme.borderColor');
     font-family:v-bind('theme.font');
     font-size:14px;
     line-height:14px;

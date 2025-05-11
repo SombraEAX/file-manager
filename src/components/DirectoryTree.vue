@@ -5,7 +5,7 @@
     minWidth="150"
     position="left"
   >
-    <div class="outer">
+    <div class="outer scrollbox">
       <div class="inner">
         <directory-list
           :dirs="dirs" 
@@ -56,6 +56,5 @@
     flex:1;
     display: block;
     position:relative;
-    overflow-y:auto;
   }  
 </style>

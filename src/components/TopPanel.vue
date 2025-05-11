@@ -91,7 +91,6 @@
 <style scoped>
   .top-panel{
     height:50px;
-    border-bottom:1px solid v-bind('theme.borderColor');
     display:flex;
     flex-direction:row;
   }

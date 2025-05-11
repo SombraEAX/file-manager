@@ -417,4 +417,34 @@
   .tree{
     width:200px
   }
+  ::-webkit-scrollbar {
+    width: 12px; 
+    height: 12px; 
+  }
+
+  ::-webkit-scrollbar-track {
+    background-color: rgba(0, 0, 0, 0);
+  }
+
+  ::-webkit-scrollbar-thumb {
+    background-color: rgba(150, 150, 150, 0.6);
+    border: 2px solid rgba(0, 0, 0, 0);
+    background-clip: padding-box;
+    border-radius: 6px; 
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    background-color: rgba(100, 100, 100, 0.8);
+  }
+
+  ::-webkit-scrollbar-corner {
+    background-color: rgba(0, 0, 0, 0);
+  }
+
+  .scrollbox{
+    overflow:hidden
+  }
+  .scrollbox:hover{
+    overflow:auto
+  }
 </style>

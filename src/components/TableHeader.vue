@@ -126,11 +126,10 @@
     height:21px;
     position:sticky;
     top:0px;
-    z-index:100
+    z-index:100;
+    background:v-bind("theme.background");
   }
   .end{
-    background:v-bind("theme.tableHeader.button.normal.background");
-    border-bottom:1px solid v-bind("theme.tableHeader.bottomBorder");
     height:21px;
     width:5px;
     min-width:5px;
@@ -139,8 +138,6 @@
   .header{
     display:flex;
     width:100%;
-    background:v-bind("theme.tableHeader.button.normal.background");
-    border-bottom:1px solid v-bind("theme.tableHeader.bottomBorder");
     height:21px;
     box-sizing:border-box;
   }

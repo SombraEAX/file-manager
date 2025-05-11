@@ -67,19 +67,14 @@
 <style scoped>
   .sidebar{
     display: flex;
-    border-color: v-bind('theme.borderColor');
-    border-style: solid;
-    border-width:0px;
     position: relative; 
   }
 
   .sidebar-left { 
-    border-right-width: 1px;
     flex-direction: row; 
   }
 
   .sidebar-right { 
-    border-left-width: 1px;
     flex-direction: row-reverse; 
   }
 
@@ -89,11 +84,16 @@
   }
 
   .line{
-    width:8px;
+    box-sizing:border-box;
+    border-width: 10px 4px;
+    border-style: solid;
+    border-color: transparent;
+    width:9px;
+    background-clip: padding-box;
     cursor:col-resize;
     z-index:300;
     height:100%;
-    background-color: rgba(0,0,0,0); 
+    background-color: v-bind('theme.borderColor'); 
     position: absolute; 
     top: 0;
   }
