@@ -1,60 +1,60 @@
 <template>
   <div class="global-wrapper">
     <menu-bar
-      :view="view"
-      :sortColumn="sortColumn"
-      :sortOrder="sortOrder"
-      :groupBy="groupBy"
-      :isDev="isDev"
+      :view             = "view"
+      :sortColumn       = "sortColumn"
+      :sortOrder        = "sortOrder"
+      :groupBy          = "groupBy"
+      :isDev            = "isDev"
       @changeView       = "ev => view = ev"
       @changeSortColumn = "ev => sortColumn = ev"
       @changeSortOrder  = "ev => sortOrder = ev"
       @changeGroup      = "ev => groupBy = ev"
     />
     <top-panel
-      :address="currentDir"
-      :history="history"
-      :historyIndex="historyIndex"
-      @back="back"
-      @forward="forward"
-      @up="up"
-      @jump="jump"
-      @changeHistoryIndex="changeHistoryIndex"
+      :address            = "currentDir"
+      :history            = "history"
+      :historyIndex       = "historyIndex"
+      @back               = "ev => historyIndex--"
+      @forward            = "ev => historyIndex++"
+      @up                 = "up"
+      @jump               = "jump"
+      @changeHistoryIndex = "ev => historyIndex = ev"
     />
     <div class="main">
       <directory-tree
-        :dirs="dirs" 
-        class="tree" 
-        :selected="currentDir"
-        @select="jump"
-        :width="leftPanelWidth"
-        @resize="w => leftPanelResize(w)"
+        class     = "tree" 
+        :dirs     = "dirs" 
+        :selected = "currentDir"
+        :width    = "leftPanelWidth"
+        @resize   = "w => leftPanelWidth = w"
+        @select   = "jump"
       />
-      <WorkZone
-        :iconSize="iconSize"
-        :sortColumn="sortColumn"
-        :sortOrder="sortOrder"
-        :groups="groups"
-        :view="view"
-        :address="currentDir"
-        @changeSort="changeSort"
-        @openDir="openDir"
-        @select="select"
+      <work-zone
+        :iconSize   = "iconSize"
+        :sortColumn = "sortColumn"
+        :sortOrder  = "sortOrder"
+        :groups     = "groups"
+        :view       = "view"
+        :address    = "currentDir"
+        @changeSort = "changeSort"
+        @openDir    = "openDir"
+        @select     = "ev => previewPath = ev"
       />
       <preview-panel
-        :path="previewPath"
-        :width="rightPanelWidth"
-        @resize="w => rightPanelResize(w)"
+        :path   = "previewPath"
+        :width  = "rightPanelWidth"
+        @resize = "w => rightPanelWidth = w"
       />
     </div>
     <status-bar
-      :items="entries.length" 
-      :dirs="folders" 
-      :files="files" 
-      :view="view"
-      :scale="iconSize"
-      @scaling="ev => scaling(ev)"
-      @changeView="ev => view = ev"
+      :items      = "entries.length" 
+      :dirs       = "folders" 
+      :files      = "files" 
+      :view       = "view"
+      :scale      = "iconSize"
+      @scaling    = "ev => iconSize = ev"
+      @changeView = "ev => view = ev"
     />
   </div>
 </template>
@@ -112,25 +112,16 @@
     },
     
     methods:{
-      scaling(value){
-        this.iconSize = value
-      },
-      select(pathname){
-        this.previewPath = pathname
-      },
-      leftPanelResize(w){
-        this.leftPanelWidth = w
-      },
-      rightPanelResize(w){
-        this.rightPanelWidth = w
-      },
+    
       openDir(dirname){
         this.jump(window.electron.join(this.currentDir, dirname))
       },
+
       changeSort(col,sort){
         this.sortColumn = col
         this.sortOrder  = sort
       },      
+
       sortByProperty(array, property, order){
         return array.sort((a, b) => {
           const valA = a[property]
@@ -151,18 +142,6 @@
         if(this.history.length > this.historyIndex + 1){
           this.history.splice(this.historyIndex + 1)
         }
-      },
-      
-      back(){
-        this.historyIndex--
-      },
-      
-      forward(){
-      	this.historyIndex++
-      },
-      
-      changeHistoryIndex(newIndex){
-        this.historyIndex = newIndex
       },
       
       up(){
