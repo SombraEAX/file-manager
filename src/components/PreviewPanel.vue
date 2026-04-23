@@ -53,10 +53,11 @@
 <script>
   import theme from '../../theme.json'
   import SideBar from './SideBar.vue'
-  import {markdown} from 'markdown'
   import hljs from 'highlight.js'
   import 'highlight.js/styles/default.css';
-
+  import DOMPurify from 'dompurify';
+  import {marked} from 'marked';
+  
   function getFileType(filename) {
     const filenameLower = filename.toLowerCase();
     const dotIndex = filenameLower.lastIndexOf('.');
@@ -170,7 +171,7 @@
           }
           case 'markdown':{
             let source = await window.electron.readFile(path,'utf-8')            
-          	this.text = markdown.toHTML(source)
+          	this.text = DOMPurify.sanitize(marked(source))
           	break
           }
           case 'source':{

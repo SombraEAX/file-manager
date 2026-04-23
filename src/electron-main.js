@@ -22,7 +22,7 @@ function createWindow() {
     protocol: "file:",
     slashes: true
   })
-  let urlAddress = isDev ? 'http://localhost:8080/' : localPath
+  let urlAddress = isDev ? 'http://localhost:8081/' : localPath
   mainWindow.loadURL(urlAddress)
 
   //mainWindow.webContents.openDevTools();
