@@ -20,22 +20,21 @@
       @click="$emit('up')"
       :disabled="address == '/'"
     ></button>
-    <input  
-      class="address" 
-      @keydown.enter="gotopath" 
-      @keydown.esc="blur"
-      @blur="tmp = address"
-      @focus="focus"
-      v-model="tmp"
-      ref="addressInput"
+    <AddressBar
+      :address="address"
+      @jump="gotopath"
     />
   </div>
 </template>
 <script>
   import theme from '../../theme.json'
+  import AddressBar from "./AddressBar.vue"
   
   export default {
     emits: ['back', 'forward', 'up', 'jump', 'changeHistoryIndex'],
+    components:{
+      AddressBar
+    },
     props: {
       address: String,
       history: {
@@ -55,14 +54,9 @@
       focus(){
         this.$refs.addressInput.select()
       },
-      blur(){
-        this.$refs.addressInput.blur()
-      },
-      gotopath(){
-        let pathname = this.tmp
+      gotopath(pathname){
         if(pathname !== '/') pathname = pathname.replace(/\/$/,'')
         this.$emit('jump', pathname)
-        this.blur()
       },
       showHistory(){
         let { ipcRenderer } = window.electron
@@ -90,12 +84,13 @@
 </script>
 <style scoped>
   .top-panel{
-    height:50px;
+    height:40px;
     display:flex;
     flex-direction:row;
+    align-items: flex-end;
   }
   .top-panel>*{
-    margin:auto 2px;
+    margin:0 2px;
     padding:0px;
     box-sizing:border-box;
     height:30px
@@ -131,16 +126,6 @@
   }
   .history{
     background-image:url("../assets/caret-down.png")    
-  }
-  input{
-    border:1px solid v-bind('theme.textBoxesBorderColor');
-    border-radius:0px;
-    margin-right:7px !important;
-    padding-left:5px !important
-  }
-  input:focus {
-    outline: none;
-    border:1px solid v-bind('theme.textBoxesBorderColorActive');    
   }
   button[disabled]{
     filter: grayscale(1)

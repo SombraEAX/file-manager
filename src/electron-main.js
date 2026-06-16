@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, Menu, MenuItem } = require('electron')
+const { app, BrowserWindow, ipcMain, Menu, MenuItem, clipboard, dialog } = require('electron')
 
 const url = require("url")
 const path = require("path")
@@ -71,6 +71,21 @@ ipcMain.on('show-menu', (event, {items,x,y}) => {
 
   menu.popup({x,y})	
 })
+
+ipcMain.on('copy-to-clipboard', (event, text) => {
+  clipboard.writeText(text); 
+});
+
+ipcMain.handle('get-from-clipboard', () => {
+  return clipboard.readText(); 
+});
+
+ipcMain.handle('open-directory-dialog', async () => {
+  const result = await dialog.showOpenDialog(mainWindow, {
+    properties: ['openDirectory']
+  });
+  return result.canceled ? null : result.filePaths[0];
+});
 
 ipcMain.on('show-history-menu', (event, { history, current, x, y }) => {
   let menu = new Menu()

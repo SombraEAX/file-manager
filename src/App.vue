@@ -47,6 +47,9 @@
         @resize = "w => rightPanelWidth = w"
       />
     </div>
+    <transition name="toast-fade">
+      <div class="toast" v-if="toastVisible">{{ toastText }}</div>
+    </transition>
     <status-bar
       :items      = "entries.length" 
       :dirs       = "folders" 
@@ -107,7 +110,10 @@
         sortColumn: 'name',
         sortOrder: 'asc',
         groupBy: null,
-        isDev: ~location.href.indexOf('localhost')
+        isDev: ~location.href.indexOf('localhost'),
+        toastText: '',
+        toastVisible: false,
+        toastTimer: null
       }
     },
     
@@ -138,6 +144,12 @@
       },
 
       jump(pathname){
+        try {
+          if(!window.electron.isDir(pathname)) throw new Error();
+        } catch(e) {
+          this.showToast('Folder not found');
+          return;
+        }
         this.history[++this.historyIndex] = pathname
         if(this.history.length > this.historyIndex + 1){
           this.history.splice(this.historyIndex + 1)
@@ -148,6 +160,15 @@
         this.jump(this.currentDir.replace(/\/[^/]+\/?$/,'') || '/')
       },
 
+      showToast(text){
+        if(this.toastTimer) clearTimeout(this.toastTimer);
+        this.toastText = text;
+        this.toastVisible = true;
+        this.toastTimer = setTimeout(() => {
+          this.toastVisible = false;
+          this.toastTimer = null;
+        }, 2500);
+      },
       getGroup(entry){
         switch(this.groupBy){
           case 'name': return entry.name[Number(entry.name[0] === '.')].toUpperCase()
@@ -207,17 +228,21 @@
     watch:{
       
       async currentDir(){
-        let folders = 0
-        let files   = 0
-        this.entries = await window.electron.readdir(this.currentDir)
+        try {
+          let folders = 0
+          let files   = 0
+          this.entries = await window.electron.readdir(this.currentDir)
           
-        for(let entry of this.entries){
-          if(entry.type === 'directory') folders++
-          if(entry.type === 'file')      files++
+          for(let entry of this.entries){
+            if(entry.type === 'directory') folders++
+            if(entry.type === 'file')      files++
+          }
+          
+          this.folders = folders
+          this.files   = files
+        } catch(e) {
+          this.showToast('Folder not found');
         }
-        
-        this.folders = folders
-        this.files   = files
       } 
     }
   }
@@ -280,5 +305,27 @@
   }
   .scrollbox:hover{
     overflow:auto
+  }
+  .toast{
+    position:fixed;
+    top:55px;
+    left:50%;
+    transform:translateX(-50%);
+    background:#000;
+    color:#fff;
+    padding:5px 16px;
+    border-radius:6px;
+    font-size:13px;
+    font-family:v-bind('theme.font');
+    z-index:9999;
+    white-space:nowrap;
+    pointer-events:none;
+    line-height:1;
+  }
+  .toast-fade-enter-active, .toast-fade-leave-active{
+    transition:opacity 0.5s;
+  }
+  .toast-fade-enter, .toast-fade-leave-to{
+    opacity:0;
   }
 </style>

@@ -1,0 +1,639 @@
+<template>
+  <div class="outer" @click.stop>
+    <div class="inner">
+      <div class="row first" :data-editing="isEditing" :data-search="isExecutingSearch" :data-results="isSearchResults" @click="enableEdit" :class="{ shadow: dropdownScrolled }">
+        <div v-if="isExecutingSearch" class="search-mode-bar">
+          <span class="search-mode-icon"></span>
+          <span class="search-mode-text" v-if="!isSearchResults">Search «{{ searchQuery }}» in {{ selectedLocation }}</span>
+          <span class="search-mode-text" v-if="isSearchResults">Search results for «{{ searchQuery }}»</span>
+          <div v-if="!isSearchResults" class="search-progress"></div>
+        </div>
+        <div v-if="!isEditing && !isExecutingSearch" class="breadcrumbs">
+          <span class="breadcrumb-root" @click.stop="goToRoot">
+            <span class="root-icon"></span>
+          </span>
+          <span
+            v-if="breadcrumbParts.length > 0"
+            class="triangle-wrap"
+            @click.stop="toggleDropdown(-1)"
+          >
+            <span class="triangle" :class="{ open: openDropdownIdx === -1 }"> ▸ </span>
+          </span>
+          <span v-for="(part, index) in breadcrumbParts" :key="index">
+            <span class="breadcrumb" @click.stop="goToSegment(index)">{{ part }}</span>
+            <span
+              v-if="index < breadcrumbParts.length - 1"
+              class="triangle-wrap"
+              @click.stop="toggleDropdown(index)"
+            >
+              <span class="triangle" :class="{ open: openDropdownIdx === index }"> ▸ </span>
+            </span>
+          </span>
+        </div>
+
+        <input
+          v-if="isEditing"
+          class="address"
+          @keydown.enter="gotopath"
+          @keydown.esc="finishEditing"
+          v-model="tmp"
+          ref="addressInput"
+        />
+
+        <button
+          class="button"
+          v-if="isEditing"
+          :disabled="!hasClipboardText"
+          @click.stop="pasteAndGo"
+        >
+          Paste and go
+        </button>
+
+        <button
+          class="button"
+          v-if="isEditing"
+          @click="copyPath"
+        >
+          Copy path
+        </button>      
+
+        <button
+          :data-search="isSearch"
+          class="go"
+          v-if="isEditing"
+          @click.stop="gotopath"
+        >
+        </button>  
+      </div>
+
+      <div class="items-outer editing-dropdown" v-if="isEditing && !isSearch">
+      <div class="items-inner">
+      <div class="items">
+        <div class="row item" v-for="dir in dirItems" @click.stop="dirItemClick(dir)">
+          <div class="icon"></div>
+          <div class="label">{{dir}}</div>
+        </div>
+      </div>
+      </div>
+      </div>
+
+      <div class="items-outer" v-if="isEditing && isSearch" data-search="true">
+      <div class="items-inner">
+      <div class="items">
+        <div class="row form-row">
+          <div class="label">Search in:</div>
+          <div class="field">
+            <drop-down :options="searchOptions" v-model="selectedSearchOption" />
+          </div>
+        </div>
+        <div class="row form-row">
+          <div class="label">Location:</div>
+          <div class="field">
+            <drop-down :options="locationOptions" v-model="selectedLocation" :editable="true"/>
+          </div>
+        </div>
+        <div class="row form-row">
+          <div class="label">Filetypes:</div>
+          <div class="field">
+            <drop-down :options="filetypesOptions" v-model="selectedFiletypes" :multipleSelect="true"/>
+          </div>
+        </div>
+        <div class="row form-row">
+          <div class="checkbox-group" @click.stop="includeHidden = !includeHidden">
+            <span class="checkbox-wrap"><app-checkbox :model-value="includeHidden" /></span>
+            <div class="label">Include hidden files</div>
+          </div>
+          <div class="checkbox-group" @click.stop="includeRegExp = !includeRegExp">
+            <span class="checkbox-wrap"><app-checkbox :model-value="includeRegExp" /></span>
+            <div class="label">RegExp</div>
+          </div>
+        </div>
+      </div>
+      </div>
+      </div>
+
+      <div class="items-outer breadcrumb-dropdown" v-if="!isEditing && openDropdownIdx !== null">
+      <div class="items-inner" @scroll="onDropdownScroll">
+      <div class="items">
+        <div
+          v-for="dir in dropdownItems"
+          class="row item"
+          @click.stop="dropdownNavigate(dir)"
+        >
+          <div class="icon"></div>
+          <div class="label">{{ dir }}</div>
+        </div>
+      </div>
+      </div>
+      </div>
+    </div>
+  </div>
+</template>
+
+<script>
+import theme from '../../theme.json';
+import DropDown from './DropDown.vue';
+import AppCheckbox from './AppCheckbox.vue';
+const { ipcRenderer } = window.electron
+const homedir = `/home/${window.electron.getUserName()}`
+
+export default {
+  components: { DropDown, AppCheckbox },
+  props: {
+    address: String
+  },
+  data() {
+    return {
+      tmp: this.address,
+      focused:false,
+      theme,
+
+      searchOptions: ['Filenames', 'Content', 'Filenames and content'],
+      filetypesOptions: ['Documents', 'Code', 'Images', 'Video', 'Audio'],
+      isEditing: false,
+      openDropdownIdx: null,
+      dropdownItems: [],
+      hasClipboardText: false,
+    selectedSearchOption: 'Filenames',
+    selectedLocation: this.address,
+    browseInProgress: false,
+      selectedFiletypes: [],
+      includeHidden: false,
+      includeRegExp: false,
+      searchQuery: '',
+      isExecutingSearch: false,
+      isSearchResults: false,
+      searchTimer: null,
+      dropdownScrolled: false
+    };
+  },
+  computed: {
+    locationOptions(){
+      return [
+        { label: 'Current directory', value: this.address },
+        { label: 'Root directory', value: '/' },
+        { label: 'Home directory', value: homedir },
+        { label: 'Browse...', value: null }
+      ];
+    },
+    isSearch(){
+      let text = this.tmp.trim()
+      if(!text) return false
+      return text[0] !== '/'
+    },
+    breadcrumbParts() {
+      let breadcrumbs = this.tmp ? this.tmp.split('/').filter(part => part) : []; 
+      breadcrumbs.unshift()
+      return breadcrumbs
+    },
+    dirItems() {
+      try {
+        return window.electron.readdirSync(this.address)
+          .filter(item => window.electron.isDir(window.electron.join(this.address, item)));
+      } catch(e) {
+        return [];
+      }
+    }
+  },
+  methods: {
+    dirItemClick(dir) {
+      this.tmp = window.electron.join(this.address, dir);
+      this.gotopath();
+    },
+    copyPath(){
+      window.electron.ipcRenderer.send('copy-to-clipboard',this.address)
+    },
+    pasteAndGo(){
+      this.tmp = window.electron.clipboard.readText();
+      this.gotopath();
+    },
+    onDropdownScroll(e) {
+      this.dropdownScrolled = e.target.scrollTop > 0;
+    },
+    focus() {
+      this.$refs.addressInput.select();
+    },
+    blur() {
+      this.$refs.addressInput.blur();
+    },
+    enableEdit() {
+      this.dropdownScrolled = false;
+      this.closeDropdown();
+      if(this.searchTimer){
+        clearTimeout(this.searchTimer);
+        this.searchTimer = null;
+      }
+      if(this.isExecutingSearch){
+        this.tmp = this.searchQuery;
+        this.isExecutingSearch = false;
+        this.isSearchResults = false;
+      }
+      this.isEditing = true;
+      this.hasClipboardText = !!(window.electron.clipboard.readText());
+      document.addEventListener('click', this.clickOutsideHandler);
+      this.$nextTick(() => {
+        this.focus(); 
+      });
+    },
+    clickOutsideHandler() {
+      this.finishEditing();
+      this.closeDropdown();
+    },
+    finishEditing() {
+      document.removeEventListener('click', this.clickOutsideHandler);
+      this.tmp = this.address;
+      this.isEditing = false;
+    },
+    goToRoot() {
+      this.closeDropdown();
+      this.tmp = "/";
+      this.$emit("jump", "/");
+    },
+    goToSegment(index) {
+      this.closeDropdown();
+      let newPath = '/' + this.breadcrumbParts.slice(0, index + 1).join('/');
+      this.tmp = newPath;
+      this.$emit("jump", newPath); 
+    },
+    toggleDropdown(idx) {
+      this.dropdownScrolled = false;
+      if (this.openDropdownIdx === idx) {
+        this.closeDropdown();
+        return;
+      }
+      let path = idx === -1 ? '/' : '/' + this.breadcrumbParts.slice(0, idx + 1).join('/');
+      this.openDropdownIdx = idx;
+      this.dropdownItems = window.electron.readdirSync(path)
+        .filter(item => window.electron.isDir(window.electron.join(path, item)));
+      document.addEventListener('click', this.dropdownOutsideHandler);
+    },
+    dropdownOutsideHandler() {
+      this.closeDropdown();
+    },
+    dropdownNavigate(dir) {
+      let path;
+      if (this.openDropdownIdx === -1) {
+        path = '/' + dir;
+      } else {
+        path = '/' + this.breadcrumbParts.slice(0, this.openDropdownIdx + 1).join('/') + '/' + dir;
+      }
+      this.closeDropdown();
+      this.tmp = path;
+      this.$emit("jump", path);
+    },
+    closeDropdown() {
+      document.removeEventListener('click', this.dropdownOutsideHandler);
+      this.openDropdownIdx = null;
+      this.dropdownItems = [];
+      this.dropdownScrolled = false;
+    },
+    gotopath() {
+      if(this.isSearch){
+        this.searchQuery = this.tmp.trim();
+        this.isExecutingSearch = true;
+        this.isSearchResults = false;
+        if(this.searchTimer) clearTimeout(this.searchTimer);
+        this.searchTimer = setTimeout(() => {
+          this.isSearchResults = true;
+          this.searchTimer = null;
+        }, 3000);
+        this.finishEditing();
+        return;
+      }
+      let pathname = this.tmp;
+      if (pathname !== "/") pathname = pathname.replace(/\/$/, ""); 
+      this.$emit("jump", pathname);
+      this.finishEditing(); 
+    }
+  },
+  watch: {
+    address(newAddress) {
+      this.tmp = newAddress;
+    },
+    async selectedLocation(val){
+      if(val !== null || this.browseInProgress) return;
+      this.browseInProgress = true;
+      let dir = await window.electron.ipcRenderer.invoke('open-directory-dialog');
+      if(dir){
+        this.selectedLocation = dir;
+      }else{
+        this.selectedLocation = this.address;
+      }
+      this.browseInProgress = false;
+    }
+  }
+};
+</script>
+
+<style scoped>
+  .outer{
+    flex:1;
+    position:relative;
+    height:30px;
+    margin-right: 7px !important;
+    padding-left: 5px !important;
+  }
+  .inner{
+    font-family:v-bind('theme.font');
+    width:100%;
+    z-index:1000;
+  	position:absolute;
+  	min-height:30px;
+  	display:flex;
+  	flex-direction:column;
+    border: 0px;
+    border-radius: v-bind('theme.addressBar.borderRadius');
+    background: v-bind('theme.addressBar.background');
+    color: v-bind('theme.addressBar.textColor');
+  }
+  .row{
+    height:30px;
+    width:100%
+  }
+  .items{
+    width:100%;
+  	display:flex;
+  	flex-direction:column
+  }
+  .first{
+    cursor:text;
+    box-sizing:border-box;
+    border-radius: v-bind('theme.addressBar.borderRadius');
+  }
+  .first[data-editing="true"]{
+    border: 2px solid v-bind('theme.textBoxesBorderColorActive');	    
+  }
+  .first[data-search="true"]{
+    background:v-bind('theme.searchMode.background');
+    color:v-bind('theme.searchMode.textColor');
+    cursor:text;
+    overflow:hidden;
+    position:relative
+  }
+  .first[data-results="true"]{
+    background:v-bind('theme.addressBar.background');
+    color:v-bind('theme.addressBar.textColor')
+  }
+  .first.shadow{
+    box-shadow: 0 2px 3px rgba(0,0,0,0.15);
+    position:relative;
+    z-index:1;
+    border-radius: v-bind('theme.addressBar.borderRadius') v-bind('theme.addressBar.borderRadius') 0 0
+  }
+  
+  .search-mode-bar{
+    display:flex;
+    align-items:center;
+    width:100%;
+    height:100%;
+    z-index:1;
+    position:relative
+  }
+  .search-mode-icon{
+    width:16px;
+    height:16px;
+    background-image:url("../assets/search.png");
+    background-size:contain;
+    background-repeat:no-repeat;
+    background-position:center;
+    margin:0 5px;
+    flex-shrink:0
+  }
+  .search-mode-text{
+    white-space:nowrap;
+    overflow:hidden;
+    text-overflow:ellipsis;
+    font-size:14px
+  }
+  .search-progress{
+    position:absolute;
+    bottom:0;
+    left:0;
+    right:0;
+    height:3px;
+    background:rgba(0,0,0,0.1);
+    overflow:hidden
+  }
+  .search-progress::after{
+    content:'';
+    position:absolute;
+    top:0;
+    left:-40%;
+    width:40%;
+    height:100%;
+    background:v-bind('theme.searchMode.progressColor');
+    animation:searchProgress 1.5s ease-in-out infinite
+  }
+  @keyframes searchProgress{
+    0%{left:-40%}
+    100%{left:100%}
+  }
+  
+  .breadcrumbs {
+    width:100%;
+    margin:auto;
+    display: flex;
+    flex-wrap: nowrap;
+  }
+  
+  .breadcrumb {
+    font-size: 14px;
+    color: v-bind('theme.addressBar.textColor');
+    padding: 0 5px;
+    cursor: pointer;
+  }
+  
+  .breadcrumb:hover {
+    text-decoration: underline;
+    color: v-bind('theme.linkHover');
+  }
+  
+  .breadcrumb-root {
+    cursor: pointer;
+    padding: 0 5px 0 7px;
+    display: flex;
+    align-items: center;
+  }
+  
+  .breadcrumb-root:hover {
+    filter: hue-rotate(90deg);
+  }
+  
+  .root-icon {
+    width: 16px;
+    height: 16px;
+    background-image: url('../assets/folder.png');
+    background-size: contain;
+    background-repeat: no-repeat;
+    background-position: center;
+  }
+
+  .triangle-wrap{
+    position:relative;
+    display:inline-flex;
+  }
+  .triangle{
+    cursor:pointer;
+    transition: transform 0.2s;
+    display:inline-block;
+  }
+  .triangle.open{
+    transform: rotate(90deg);
+  }
+  
+  .triangle:hover{
+    color: v-bind('theme.linkHover');	
+  }
+
+  input {
+    border:0px;
+    background:transparent;
+    flex:1;
+    outline:none
+  }
+  
+  .button{
+    border:0px;
+    background: v-bind('theme.addressBar.inlineButton.background');
+    border-radius: v-bind('theme.addressBar.inlineButton.borderRadius');
+    color: v-bind('theme.addressBar.inlineButton.textColor');
+    margin:auto;
+    margin-right:5px;
+    height:20px;
+  }
+
+  .button[disabled]{
+    background: v-bind('theme.addressBar.inlineButton.disabled.background');
+    color:      v-bind('theme.addressBar.inlineButton.disabled.textColor');  	
+  }
+  
+  .button:not([disabled]){
+    background: v-bind('theme.addressBar.inlineButton.normal.background');
+    color:      v-bind('theme.addressBar.inlineButton.normal.textColor');
+    cursor:pointer;
+  }
+  
+
+  .button:not([disabled]):hover{
+    background: v-bind('theme.addressBar.inlineButton.hover.background');
+    color:      v-bind('theme.addressBar.inlineButton.hover.textColor');  	
+  }
+  .icon{
+    width:16px;
+    height:16px;
+    background-image:url('../assets/folder.png');
+    background-position:center;
+    background-repeat:no-repeat;
+    background-size:contain;
+    margin:auto 0 auto 7px;
+    flex-shrink:0
+  }  
+  .label{
+    margin:auto 0 auto 5px;
+    width:100%  	
+  }
+  .row{
+    display:flex
+  }
+  .item:last-child{
+    border-bottom-right-radius: v-bind('theme.addressBar.borderRadius');
+    border-bottom-left-radius:  v-bind('theme.addressBar.borderRadius');
+  }
+  .item{
+    cursor:pointer
+  }
+  .item:not(.form-row):hover{
+    background: v-bind('theme.addressBar.activeItem.background');  	
+    color: v-bind('theme.addressBar.activeItem.textColor');  	
+  }
+  .go{
+    margin:auto;
+    width:20px;
+    height:20px;
+    background-image:url("../assets/right-arrow.png");
+    background-position:center;
+    background-repeat:no-repeat;
+    border:0px;
+    background-color:transparent;
+    background-size:16px;
+    margin-right:5px;    
+    cursor:pointer
+  }
+  .go[data-search="true"]{
+    background-image:url("../assets/search.png");  
+  }
+  .go:hover{
+    filter: hue-rotate(90deg);
+  }
+  .form-row{
+    display:flex;
+    flex-direction:row
+  }
+  .form-row .label{
+    margin:auto;
+    margin-left:5px;
+    flex:2
+  }
+  .checkbox-group{
+    display:flex;
+    align-items:center;
+    cursor:pointer;
+    margin-right:16px
+  }
+  .checkbox-group .label{
+    flex:0;
+    white-space:nowrap;
+    margin-left:3px
+  }
+  .form-row .field{
+    margin:auto;
+    margin-right:5px;
+    flex:1;
+    height:20px  	
+  }
+  .checkbox-wrap{
+  	margin:auto;
+  	flex:0;
+  	margin-left:5px;
+  	display:flex;
+  	align-items:center
+  }
+  .items-outer.breadcrumb-dropdown{
+    max-height:250px;
+    height:auto;
+  }
+  .items-outer.breadcrumb-dropdown .items-inner{
+    position:relative;
+    height:auto;
+    max-height:250px;
+    overflow-y:auto;
+  }
+  .items-outer.editing-dropdown{
+    max-height:200px;
+    height:auto;
+  }
+  .items-outer.editing-dropdown .items-inner{
+    position:relative;
+    height:auto;
+    max-height:200px;
+    overflow-y:auto;
+  }
+  .items-outer[data-search="true"]{
+    height:auto;
+  }
+  .items-outer[data-search="true"] .items-inner{
+    position:relative;
+    height:auto;
+    overflow:visible;
+  }
+  .items-outer{
+    width:100%;
+    position:relative
+  }
+  .items-inner{
+  	position:absolute;
+  	width:100%;
+  	height:100%;
+  	overflow-y:auto
+  }
+</style>

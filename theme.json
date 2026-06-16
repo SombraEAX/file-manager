@@ -48,5 +48,48 @@
 			"active":"red",
 			"insert":"red"
 		}
+	},
+	"checkbox":{
+		"background":"#fff",
+		"borderColor":"#888",
+		"checkedBackground":"#0000aa",
+		"checkmarkColor":"#fff"
+	},
+	"dropDown":{
+		"background":"#fff",
+		"textColor":"#000",
+		"borderColor":"grey",
+		"itemHoverBackground":"lightblue",
+		"itemSelectedBackground":"lightblue",
+		"itemSelectedTextColor":"#000"
+	},
+	"searchMode":{
+		"background":"#d4d4d4",
+		"textColor":"#333",
+		"progressColor":"#4caf50"
+	},
+	"addressBar":{
+		"background":"#ccc",
+		"textColor":"#000",
+		"borderRadius":"5px",
+		"activeItem":{
+			"background":"lightblue",
+			"textColor":"#000"													
+		},
+		"inlineButton":{
+			"borderRadius":"3px",
+			"normal":{
+				"background":"#0000aa",
+				"textColor":"#fff"									
+			},
+			"hover":{
+				"background":"#0000ff",
+				"textColor":"#fff"													
+			},
+			"disabled":{
+				"background":"#888",
+				"textColor":"#fff"				
+			}
+		}
 	}
 }

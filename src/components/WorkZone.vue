@@ -1,6 +1,6 @@
 <template>
-  <div class="outer">
-    <div class="inner scrollbox">
+  <div class="outer" :class="{ 'table-mode': view === 'table' }">
+    <div class="inner scrollbox" :class="{ padded: view !== 'table' }">
       <TableHeader
         v-if="view == 'table'"
         :columns="columns"
@@ -139,5 +139,11 @@
     right:0px;
     top:0px;
     bottom:0px;
+  }
+  .outer.table-mode .inner{
+    top:5px;
+  }
+  .inner.padded{
+    padding:10px;
   }
 </style>

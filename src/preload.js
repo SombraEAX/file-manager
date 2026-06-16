@@ -4,6 +4,7 @@ const { join } = require('path')
 const {readdir, lstat, readFile, access, constants} = require('fs/promises')
 const filetypes = Object.entries(require('../filetypes'))
 const path = require('path')
+const { clipboard } = require('electron')
 
 function type(entry){
   switch(true){
@@ -87,12 +88,21 @@ contextBridge.exposeInMainWorld(
 
       return stats
     },
+    clipboard:{
+      writeText(str){
+        clipboard.writeText(str)
+      },
+      readText(){
+        return clipboard.readText()
+      }
+    },
     readdirSync, join,
     ipcRenderer: {
       ...ipcRenderer,
       send: ipcRenderer.send.bind(ipcRenderer),
       on: ipcRenderer.on.bind(ipcRenderer),
       once: ipcRenderer.once.bind(ipcRenderer),
+      invoke: ipcRenderer.invoke.bind(ipcRenderer),
       removeListener: ipcRenderer.removeListener.bind(ipcRenderer)
     },
     readFile,getImageDataUri,
