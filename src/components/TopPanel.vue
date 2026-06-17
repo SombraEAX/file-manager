@@ -26,6 +26,21 @@
       @jump="gotopath"
       @search="e => $emit('search', e)"
     />
+    <button
+      class="icon icon-list"
+      :class="{ active: view === 'list' }"
+      @click="$emit('changeView', 'list')"
+    ></button>
+    <button
+      class="icon icon-icons"
+      :class="{ active: view === 'icons' }"
+      @click="$emit('changeView', 'icons')"
+    ></button>
+    <button
+      class="icon icon-table"
+      :class="{ active: view === 'table' }"
+      @click="$emit('changeView', 'table')"
+    ></button>
   </div>
 </template>
 <script>
@@ -33,7 +48,7 @@
   import AddressBar from "./AddressBar.vue"
   
   export default {
-    emits: ['back', 'forward', 'up', 'jump', 'changeHistoryIndex', 'search'],
+    emits: ['back', 'forward', 'up', 'jump', 'changeHistoryIndex', 'search', 'changeView'],
     components:{
       AddressBar
     },
@@ -44,7 +59,8 @@
         default: () => []
       },
       historyIndex: Number,
-      searchVersion: Number
+      searchVersion: Number,
+      view: String
     },
     data(){
       return {
@@ -96,7 +112,6 @@
     margin:0 2px;
     padding:0px;
     box-sizing:border-box;
-    height:30px
   }
   .address{
     flex:1
@@ -109,6 +124,9 @@
     background-size:50%;
     background-color:transparent;
     border:0px;
+  }
+  button:not(.icon){
+    height:30px;
   }
   button:hover{
     filter: hue-rotate(90deg);
@@ -132,5 +150,32 @@
   }
   button[disabled]{
     filter: grayscale(1)
+  }
+  .top-panel .icon{
+    width:30px;
+    height:30px;
+    background-position:center;
+    background-size:50%;
+    background-repeat:no-repeat;
+    border:0px;
+    outline:0;
+    background-color:transparent;
+    margin:0 2px;
+    box-sizing:content-box;
+  }
+  .top-panel .icon-list{
+    background-image:url("../assets/list.png")
+  }
+  .top-panel .icon-table{
+    background-image:url("../assets/table.png")
+  }
+  .top-panel .icon-icons{
+    background-image:url("../assets/icons.png")
+  }
+  .top-panel .icon.active{
+    filter: hue-rotate(90deg);
+  }
+  .top-panel .icon:not(.active){
+    cursor:pointer;
   }
 </style>

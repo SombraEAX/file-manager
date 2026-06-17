@@ -28,15 +28,20 @@
       @jump               = "jump"
       @changeHistoryIndex = "ev => tabs[activeTabIndex].historyIndex = ev"
       @search             = "onSearchResults"
+      :view               = "view"
+      @changeView         = "ev => view = ev"
     />
     <div class="main">
       <directory-tree
-        class     = "tree" 
-        :dirs     = "dirs" 
-        :selected = "currentDir"
-        :width    = "leftPanelWidth"
-        @resize   = "w => leftPanelWidth = w"
-        @select   = "jump"
+        class       = "tree" 
+        :dirs       = "dirs" 
+        :selected   = "currentDir"
+        :width      = "leftPanelWidth"
+        :items      = "isSearchMode && searchResults ? searchResults.length : entries.length"
+        :files      = "isSearchMode && searchResults ? searchFiles : files"
+        :dirsCount  = "isSearchMode && searchResults ? searchDirs : folders"
+        @resize     = "w => leftPanelWidth = w"
+        @select     = "jump"
       />
       <work-zone
         ref="workzone"
@@ -54,26 +59,19 @@
       <preview-panel
         :path   = "previewPath"
         :width  = "rightPanelWidth"
+        :view   = "view"
+        :scale  = "iconSize"
         @resize = "w => rightPanelWidth = w"
+        @scaling = "ev => iconSize = ev"
       />
     </div>
     <transition name="toast-fade">
       <div class="toast" v-if="toastVisible">{{ toastText }}</div>
     </transition>
-    <status-bar
-      :items      = "isSearchMode && searchResults ? searchResults.length : entries.length" 
-      :dirs       = "isSearchMode && searchResults ? searchDirs : folders" 
-      :files      = "isSearchMode && searchResults ? searchFiles : files" 
-      :view       = "view"
-      :scale      = "iconSize"
-      @scaling    = "ev => iconSize = ev"
-      @changeView = "ev => view = ev"
-    />
   </div>
 </template>
 
 <script>
-  import StatusBar from './components/StatusBar.vue'
   import DirectoryTree from './components/DirectoryTree.vue'
   import theme from '../theme.json'
   import TopPanel from './components/TopPanel.vue'
@@ -95,7 +93,6 @@
     components: {
       MenuBar,
       WorkZone,
-      StatusBar,
       DirectoryTree,
       TopPanel,
       PreviewPanel,

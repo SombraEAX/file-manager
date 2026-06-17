@@ -5,13 +5,20 @@
     minWidth="150"
     position="left"
   >
-    <div class="outer scrollbox">
-      <div class="inner">
-        <directory-list
-          :dirs="dirs" 
-          :selected="selected" 
-          @select="(ev) => $emit('select',ev)"
-        />
+    <div class="tree-wrap">
+      <div class="outer scrollbox">
+        <div class="inner">
+          <directory-list
+            :dirs="dirs" 
+            :selected="selected" 
+            @select="(ev) => $emit('select',ev)"
+          />
+        </div>
+      </div>
+      <div class="counts">
+        <span class="count-icon icon-item"></span> {{ items }}
+        <span class="count-icon icon-file"></span> {{ files }}
+        <span class="count-icon icon-folder"></span> {{ dirsCount }}
       </div>
     </div>
   </side-bar>
@@ -29,7 +36,10 @@
         type: Array,
         default: () => []
       },
-      selected: String	
+      selected: String,
+      items: Number,
+      files: Number,
+      dirsCount: Number
     },
     methods:{
     },
@@ -52,9 +62,46 @@
     box-sizing:border-box;
   }
   .outer{
-    height:100%;
     flex:1;
+    min-height:0;
     display: block;
     position:relative;
-  }  
+  }
+  .tree-wrap{
+    height:100%;
+    display:flex;
+    flex-direction:column;
+  }
+  .counts{
+    padding:4px 10px;
+    font-size:12px;
+    line-height:14px;
+    white-space:nowrap;
+    font-family:sans-serif;
+    background:v-bind('theme.sidebarBg');
+    color:v-bind('theme.textColor');
+    flex-shrink:0;
+    display:flex;
+    align-items:center;
+    gap:4px;
+  }
+
+  .count-icon{
+    display:inline-block;
+    width:14px;
+    height:14px;
+    background-size:contain;
+    background-repeat:no-repeat;
+    background-position:center;
+    margin-left:6px;
+  }
+  .icon-item{
+    background-image:url("../assets/icons.png")
+  }
+  .icon-file{
+    background-image:url("../assets/file.png")
+  }
+  .icon-folder{
+    background-image:url("../assets/folder.png")
+  }
 </style>

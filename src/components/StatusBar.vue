@@ -1,8 +1,8 @@
 <template>
   <div class="status-bar">
-    <div class="text">{{ items }} items</div>
-    <div class="text">{{ files }} files</div>
-    <div class="text">{{ dirs }} folders</div>
+    <div class="text"><span class="icon-item"></span> {{ items }}</div>
+    <div class="text"><span class="icon-file"></span> {{ files }}</div>
+    <div class="text"><span class="icon-folder"></span> {{ dirs }}</div>
     <div class="text" v-if="selected">{{ selected }} items selected {{ prettyBytes(size) }}</div>
     <div style="flex: 1"></div>
     <input
@@ -97,6 +97,39 @@
   }
   .icon-icons{
     background-image:url("../assets/icons.png")
+  }
+  .icon-item{
+    display:inline-block;
+    width:16px;
+    height:16px;
+    background-image:url("../assets/icons.png");
+    background-size:contain;
+    background-repeat:no-repeat;
+    background-position:center;
+    vertical-align:middle;
+    margin-right:3px
+  }
+  .icon-file{
+    display:inline-block;
+    width:16px;
+    height:16px;
+    background-image:url("../assets/file.png");
+    background-size:contain;
+    background-repeat:no-repeat;
+    background-position:center;
+    vertical-align:middle;
+    margin-right:3px
+  }
+  .icon-folder{
+    display:inline-block;
+    width:16px;
+    height:16px;
+    background-image:url("../assets/folder.png");
+    background-size:contain;
+    background-repeat:no-repeat;
+    background-position:center;
+    vertical-align:middle;
+    margin-right:3px
   }
   .icon:not(.active):hover{
     filter: hue-rotate(90deg);    

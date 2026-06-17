@@ -1,11 +1,11 @@
 <template>
-  <side-bar
-    @resize="(ev) => $emit('resize',ev)"
-    :width="width"
-    minWidth="300"
-    position="right"
-  >
-    <div style="height:100%">
+    <side-bar
+      @resize="(ev) => $emit('resize',ev)"
+      :width="width"
+      minWidth="300"
+      position="right"
+    >
+      <div class="preview-wrap">
 
       <!-- image -->
       <div
@@ -46,6 +46,16 @@
       <!-- unknown -->
       <div v-if="!type" class="unknown">
         <div>The preview is unavailable</div>
+      </div>
+      <div class="scale-bar" v-if="view === 'icons'">
+        <input
+          type="range"
+          min="16"
+          max="128"
+          :value="scale"
+          @input="onScale"
+          class="slider"
+        />
       </div>
     </div>
   </side-bar>
@@ -139,10 +149,12 @@
   }
 
   export default {
-    emits: ['resize'],
+    emits: ['resize', 'scaling'],
     props: {
       path: String,
-      width: Number
+      width: Number,
+      view: String,
+      scale: Number
     },
     components: { SideBar },
     data(){			
@@ -151,6 +163,11 @@
         text:null,
         type: null,
         imageStyle: null
+      }
+    },
+    methods:{
+      onScale(ev){
+        this.$emit('scaling', Number(ev.target.value))
       }
     },
     watch:{
@@ -219,9 +236,34 @@
     flex:1;
     display: flex;
   }  
+  .preview-wrap{
+    height:100%;
+    display:flex;
+    flex-direction:column;
+  }
+  .preview-wrap > :not(.scale-bar){
+    flex:1;
+    min-height:0;
+  }
+  .scale-bar{
+    padding:4px 10px;
+    text-align:center;
+    flex-shrink:0;
+    background:v-bind('theme.sidebarBg');
+    min-height:28px;
+    display:flex;
+    align-items:center;
+  }
+  .slider{
+    width:100%;
+    vertical-align:middle;
+    cursor:pointer;
+    accent-color:v-bind('theme.accentColor');
+    outline:0;
+  }
   .unknown{
     height:100%;
-    display:flex    
+    display:flex
   }
   .unknown div{
     font-family:sans-serif;
