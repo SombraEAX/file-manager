@@ -1,32 +1,35 @@
 <template>
   <div class="outer" :class="{ 'table-mode': view === 'table' }">
-    <div class="inner scrollbox" :class="{ padded: view !== 'table' }">
-      <TableHeader
-        v-if="view == 'table'"
-        :columns="columns"
-        :sortColumn="sortColumn"
-        :sortOrder="sortOrder"
-        @changeWidth="changeWidth"
-        @changeSort="changeSort"
-        @moveColumn="moveColumn"
-        @toggleColumnVisible="toggleColumnVisible"
-      />
-      <EntriesGroup
-        v-for="group in groups"
-        :name="group.name"
-      >
-        <DirEntry
-          v-for="entry in group.entries"
-          :columns="visibleColumns"
-          :params="entry"
-          :view="view"
-          :selected="entry.selected"
-          :iconSize="iconSize"
-          @openDir="openDir"
-          @contextMenu="onContextMenu"
-          @click="select(entry)"
+    <div class="scroll-wrap">
+      <div class="inner" :class="{ padded: view !== 'table' }">
+        <TableHeader
+          v-if="view == 'table'"
+          :columns="columns"
+          :sortColumn="sortColumn"
+          :sortOrder="sortOrder"
+          @changeWidth="changeWidth"
+          @changeSort="changeSort"
+          @moveColumn="moveColumn"
+          @toggleColumnVisible="toggleColumnVisible"
         />
-      </EntriesGroup>
+        <EntriesGroup
+          v-for="group in groups"
+          :name="group.name"
+        >
+          <DirEntry
+            v-for="entry in group.entries"
+            :columns="visibleColumns"
+            :params="entry"
+            :view="view"
+            :selected="entry.selected"
+            :iconSize="iconSize"
+            @openDir="openDir"
+            @contextMenu="onContextMenu"
+            @click="select(entry)"
+          />
+        </EntriesGroup>
+      </div>
+      <div class="spacer"></div>
     </div>
   </div>
 </template>
@@ -137,17 +140,50 @@
     width:100%;
     height:100%
   }
-  .inner{
+  .scroll-wrap{
     position:absolute;
     left:0px;
     right:0px;
     top:0px;
     bottom:0px;
+    overflow:hidden;
   }
-  .outer.table-mode .inner{
-    top:5px;
+  .inner{
+    position:absolute;
+    left:0px;
+    top:0px;
+    bottom:0px;
+    right:-12px;
+    overflow-y:scroll;
+    padding-right:12px;
   }
   .inner.padded{
     padding:10px;
+  }
+  .scroll-wrap:not(:hover) .inner.padded{
+    padding-right:12px;
+  }
+  .scroll-wrap:hover .inner{
+    right:0px;
+    padding-right:0px;
+  }
+  .scroll-wrap:hover .inner.padded{
+    right:0px;
+    padding:10px;
+    padding-right:0px;
+  }
+  .spacer{
+    position:absolute;
+    right:0px;
+    top:0px;
+    bottom:0px;
+    width:12px;
+    pointer-events:none;
+  }
+  .scroll-wrap:hover .spacer{
+    display:none;
+  }
+  .outer.table-mode .scroll-wrap{
+    top:5px;
   }
 </style>

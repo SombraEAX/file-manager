@@ -178,7 +178,7 @@
 
       switchTab(index){
         if(index < 0 || index >= this.tabs.length || index === this.activeTabIndex) return;
-        let el = this.$refs.workzone?.$el.querySelector('.scrollbox');
+        let el = this.$refs.workzone?.$el.querySelector('.inner');
         if(el) this.tabs[this.activeTabIndex].scrollTop = el.scrollTop;
         this.activeTabIndex = index;
         this._restoreScrollPending = true;
@@ -282,7 +282,7 @@
       restoreScroll(){
         if(!this._restoreScrollPending) return;
         this._restoreScrollPending = false;
-        let el = this.$refs.workzone?.$el.querySelector('.scrollbox');
+        let el = this.$refs.workzone?.$el.querySelector('.inner');
         let tab = this.tabs[this.activeTabIndex];
         if(el && tab && tab.scrollTop){
           el.scrollTop = tab.scrollTop;
