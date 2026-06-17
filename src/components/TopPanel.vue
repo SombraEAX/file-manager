@@ -22,7 +22,9 @@
     ></button>
     <AddressBar
       :address="address"
+      :search-version="searchVersion"
       @jump="gotopath"
+      @search="e => $emit('search', e)"
     />
   </div>
 </template>
@@ -31,7 +33,7 @@
   import AddressBar from "./AddressBar.vue"
   
   export default {
-    emits: ['back', 'forward', 'up', 'jump', 'changeHistoryIndex'],
+    emits: ['back', 'forward', 'up', 'jump', 'changeHistoryIndex', 'search'],
     components:{
       AddressBar
     },
@@ -41,7 +43,8 @@
         type: Array,
         default: () => []
       },
-      historyIndex: Number
+      historyIndex: Number,
+      searchVersion: Number
     },
     data(){
       return {

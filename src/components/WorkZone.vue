@@ -99,7 +99,7 @@
     },
     methods: {
       select(entry){
-        let pathname = window.electron.join(this.address,entry.name)
+        let pathname = entry.path || window.electron.join(this.address, entry.name)
         this.$emit('select', pathname)
       },
       openDir(dir){

@@ -140,7 +140,8 @@ const homedir = `/home/${window.electron.getUserName()}`
 export default {
   components: { DropDown, AppCheckbox },
   props: {
-    address: String
+    address: String,
+    searchVersion: Number
   },
   data() {
     return {
@@ -155,7 +156,7 @@ export default {
       dropdownItems: [],
       hasClipboardText: false,
     selectedSearchOption: 'Filenames',
-    selectedLocation: this.address,
+    selectedLocation: this.address || homedir,
     browseInProgress: false,
       selectedFiletypes: [],
       includeHidden: false,
@@ -163,8 +164,12 @@ export default {
       searchQuery: '',
       isExecutingSearch: false,
       isSearchResults: false,
+      searchHadResults: false,
       searchTimer: null,
-      dropdownScrolled: false
+      dropdownScrolled: false,
+      wasSearchMode: false,
+      searchId: 0,
+      searchResultsAcc: []
     };
   },
   computed: {
@@ -225,8 +230,12 @@ export default {
       }
       if(this.isExecutingSearch){
         this.tmp = this.searchQuery;
+        this.wasSearchMode = true;
+        this.searchHadResults = this.isSearchResults;
         this.isExecutingSearch = false;
         this.isSearchResults = false;
+      }else{
+        this.wasSearchMode = false;
       }
       this.isEditing = true;
       this.hasClipboardText = !!(window.electron.clipboard.readText());
@@ -235,14 +244,19 @@ export default {
         this.focus(); 
       });
     },
+    finishEditing() {
+      document.removeEventListener('click', this.clickOutsideHandler);
+      if(this.wasSearchMode){
+        this.isExecutingSearch = true;
+        this.isSearchResults = this.searchHadResults;
+      }else{
+        this.tmp = this.address;
+      }
+      this.isEditing = false;
+    },
     clickOutsideHandler() {
       this.finishEditing();
       this.closeDropdown();
-    },
-    finishEditing() {
-      document.removeEventListener('click', this.clickOutsideHandler);
-      this.tmp = this.address;
-      this.isEditing = false;
     },
     goToRoot() {
       this.closeDropdown();
@@ -287,17 +301,50 @@ export default {
       this.dropdownItems = [];
       this.dropdownScrolled = false;
     },
+    onSearchMessage(e){
+      if(e.data.type === '__search_batch' && e.data.id === this.searchId){
+        this.searchResultsAcc = this.searchResultsAcc.concat(e.data.batch);
+        if(e.data.done) this.isSearchResults = true;
+        this.$emit('search', {
+          query: this.searchQuery,
+          results: [...this.searchResultsAcc],
+          searchIn: this.selectedSearchOption,
+          location: this.selectedLocation
+        });
+      }
+    },
+    onSearchEsc(e){
+      if(e.key === 'Escape' && this.isExecutingSearch){
+        if(this.searchId) window.electron.cancelSearch(this.searchId);
+        this.searchId = 0;
+        this.isSearchResults = true;
+        this.$emit('search', { query: this.searchQuery, results: [...this.searchResultsAcc] });
+      }
+    },
+    cancelSearch(){
+      if(this.searchId) window.electron.cancelSearch(this.searchId);
+      this.searchId = 0;
+      this.isExecutingSearch = false;
+      this.isSearchResults = false;
+      this.wasSearchMode = false;
+      this.$emit('search', { query: '', results: null });
+    },
     gotopath() {
       if(this.isSearch){
         this.searchQuery = this.tmp.trim();
         this.isExecutingSearch = true;
         this.isSearchResults = false;
-        if(this.searchTimer) clearTimeout(this.searchTimer);
-        this.searchTimer = setTimeout(() => {
-          this.isSearchResults = true;
-          this.searchTimer = null;
-        }, 3000);
         this.finishEditing();
+        this.searchResultsAcc = [];
+        let ft = this.selectedFiletypes;
+        this.searchId = window.electron.startSearch({
+          query: '' + this.searchQuery,
+          location: '' + this.selectedLocation,
+          searchIn: '' + this.selectedSearchOption,
+          filetypes: ft ? Array.from(ft) : [],
+          includeHidden: !!this.includeHidden,
+          useRegex: !!this.includeRegExp
+        });
         return;
       }
       let pathname = this.tmp;
@@ -306,9 +353,26 @@ export default {
       this.finishEditing(); 
     }
   },
-  watch: {
+    mounted(){
+      window.addEventListener('message', this.onSearchMessage);
+      document.addEventListener('keydown', this.onSearchEsc);
+    },
+    beforeUnmount(){
+      window.removeEventListener('message', this.onSearchMessage);
+      document.removeEventListener('keydown', this.onSearchEsc);
+    },
+    watch: {
     address(newAddress) {
       this.tmp = newAddress;
+      this.selectedLocation = newAddress;
+      if(this.isExecutingSearch){
+        this.cancelSearch();
+      }
+    },
+    searchVersion(){
+      if(this.isExecutingSearch){
+        this.cancelSearch();
+      }
     },
     async selectedLocation(val){
       if(val !== null || this.browseInProgress) return;

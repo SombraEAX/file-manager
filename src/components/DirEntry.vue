@@ -54,7 +54,7 @@
     methods: {
       doubleClick(){
         if(this.params.type === 'directory')
-          this.$emit('openDir',this.params.name)
+          this.$emit('openDir', this.params.path || this.params.name)
       },
       click(){
         if(this.clicked && Date.now() - this.clicked < 500)

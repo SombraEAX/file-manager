@@ -56,6 +56,96 @@ async function getImageDataUri(imagePath) {
   }
 }
 
+async function runSearch(id, params) {
+  const { query, location, searchIn, filetypes, includeHidden, useRegex } = params;
+  const BATCH_SIZE = 50;
+  let buffer = [];
+
+  function flush(done) {
+    if (buffer.length || done) {
+      window.postMessage({ type: '__search_batch', id, batch: buffer, done }, '*');
+      buffer = [];
+    }
+  }
+
+  function matchText(text, q, regex) {
+    if (!text) return false;
+    if (regex) { try { return new RegExp(q, 'i').test(text); } catch(e) { return false; } }
+    return text.toLowerCase().includes(q.toLowerCase());
+  }
+
+  const filetypeCategories = Object.entries(require('../filetypes'));
+
+  function getFiletype(name, isDir) {
+    if (isDir) return 'directory';
+    if (name[0] === '.') return 'Dotfile';
+    const ext = name.split('.').pop().toLowerCase();
+    const found = filetypeCategories.find(([, exts]) => exts.includes(ext));
+    return found ? found[0] : 'Other';
+  }
+
+  const filetypeFilterMap = { 'Documents': 'document', 'Images': 'image', 'Video': 'video', 'Audio': 'audio' };
+
+  async function walk(dir) {
+    if (cancelledSearches.has(id)) return;
+    let entries;
+    try { entries = await readdir(dir); } catch(e) { return; }
+
+    for (const name of entries) {
+      const fullPath = join(dir, name);
+      let stats;
+      try { stats = await lstat(fullPath); } catch(e) { continue; }
+
+      if (!includeHidden && name.startsWith('.')) continue;
+
+      const isDir = stats.isDirectory();
+      const entryFiletype = getFiletype(name, isDir);
+
+      if (filetypes.length > 0) {
+        let match = filetypes.some(ft => {
+          if (ft === 'Code') return !isDir && entryFiletype === 'Other';
+          return filetypeFilterMap[ft] === entryFiletype;
+        });
+        if (!match) continue;
+      }
+
+      let nameMatch = false, contentMatch = false;
+
+      if (searchIn === 'Filenames' || searchIn === 'Filenames and content')
+        nameMatch = matchText(name, query, useRegex);
+
+      if ((searchIn === 'Content' || searchIn === 'Filenames and content') && !isDir) {
+        try { const content = await readFile(fullPath, { encoding: 'utf-8' }); contentMatch = matchText(content, query, useRegex); } catch(e) {}
+      }
+
+      const matched = searchIn === 'Filenames' ? nameMatch
+        : searchIn === 'Content' ? contentMatch
+        : (nameMatch || contentMatch);
+
+      if (matched) {
+        buffer.push({
+          name,
+          path: fullPath,
+          type: isDir ? 'directory' : 'file',
+          filetype: entryFiletype,
+          size: stats.size,
+          modified: new Date(stats.mtimeMs),
+          mtimeMs: stats.mtimeMs,
+          ext: isDir ? '' : name.split('.').pop().toLowerCase()
+        });
+        if (buffer.length >= BATCH_SIZE) flush();
+      }
+
+      if (isDir) await walk(fullPath);
+    }
+  }
+
+  await walk(location);
+  flush(true);
+}
+
+const cancelledSearches = new Set();
+
 contextBridge.exposeInMainWorld(
   'electron',
   {
@@ -97,6 +187,15 @@ contextBridge.exposeInMainWorld(
       }
     },
     readdirSync, join,
+    startSearch(params){
+      const id = Date.now() + '_' + Math.random();
+      cancelledSearches.delete(id);
+      runSearch(id, params);
+      return id;
+    },
+    cancelSearch(id){
+      cancelledSearches.add(id);
+    },
     ipcRenderer: {
       ...ipcRenderer,
       send: ipcRenderer.send.bind(ipcRenderer),

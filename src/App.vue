@@ -15,11 +15,13 @@
       :address            = "currentDir"
       :history            = "history"
       :historyIndex       = "historyIndex"
+      :search-version     = "searchVersion"
       @back               = "ev => historyIndex--"
       @forward            = "ev => historyIndex++"
       @up                 = "up"
       @jump               = "jump"
       @changeHistoryIndex = "ev => historyIndex = ev"
+      @search             = "onSearchResults"
     />
     <div class="main">
       <directory-tree
@@ -51,9 +53,9 @@
       <div class="toast" v-if="toastVisible">{{ toastText }}</div>
     </transition>
     <status-bar
-      :items      = "entries.length" 
-      :dirs       = "folders" 
-      :files      = "files" 
+      :items      = "isSearchMode && searchResults ? searchResults.length : entries.length" 
+      :dirs       = "isSearchMode && searchResults ? searchDirs : folders" 
+      :files      = "isSearchMode && searchResults ? searchFiles : files" 
       :view       = "view"
       :scale      = "iconSize"
       @scaling    = "ev => iconSize = ev"
@@ -113,14 +115,36 @@
         isDev: ~location.href.indexOf('localhost'),
         toastText: '',
         toastVisible: false,
-        toastTimer: null
+        toastTimer: null,
+        searchResults: null,
+        searchQuery: '',
+        isSearchMode: false,
+        searchVersion: 0
       }
     },
     
     methods:{
     
       openDir(dirname){
-        this.jump(window.electron.join(this.currentDir, dirname))
+        if(this.isSearchMode && dirname.startsWith('/')){
+          this.isSearchMode = false;
+          this.searchResults = null;
+          this.jump(dirname);
+        }else{
+          this.jump(window.electron.join(this.currentDir, dirname));
+        }
+      },
+
+      onSearchResults({ query, results }){
+        if(results === null){
+          this.isSearchMode = false;
+          this.searchResults = null;
+          this.searchQuery = '';
+          return;
+        }
+        this.searchQuery = query;
+        this.searchResults = results;
+        this.isSearchMode = true;
       },
 
       changeSort(col,sort){
@@ -150,6 +174,9 @@
           this.showToast('Folder not found');
           return;
         }
+        this.isSearchMode = false;
+        this.searchResults = null;
+        this.searchVersion++;
         this.history[++this.historyIndex] = pathname
         if(this.history.length > this.historyIndex + 1){
           this.history.splice(this.historyIndex + 1)
@@ -157,6 +184,8 @@
       },
       
       up(){
+        this.isSearchMode = false;
+        this.searchResults = null;
         this.jump(this.currentDir.replace(/\/[^/]+\/?$/,'') || '/')
       },
 
@@ -172,7 +201,7 @@
       getGroup(entry){
         switch(this.groupBy){
           case 'name': return entry.name[Number(entry.name[0] === '.')].toUpperCase()
-          case 'modified': return entry.mtime.toISOString().split('T')[0]
+          case 'modified': return new Date(entry.modified).toISOString().split('T')[0]
           case 'size': {
             let {size} = entry
             if(size < 10 * KB)  return '< 10 KB'
@@ -195,6 +224,8 @@
     
     computed:{
       groups(){
+        let source = this.isSearchMode && this.searchResults ? this.searchResults : this.entries;
+
         let groups = []
         let prop = {
           name: 'name',
@@ -203,7 +234,7 @@
           modified: 'mtimeMs'
         }[this.sortColumn]
 
-        for(let entry of this.entries){
+        for(let entry of source){
           let groupName = this.getGroup(entry)
           let group = groups.find(g => g.name === groupName)
           if(!group) groups.push(group = {name:groupName, entries:[]})
@@ -221,6 +252,14 @@
           
       currentDir(){
         return this.history[this.historyIndex]
+      },
+
+      searchFiles(){
+        return this.searchResults ? this.searchResults.filter(e => e.type === 'file').length : 0;
+      },
+
+      searchDirs(){
+        return this.searchResults ? this.searchResults.filter(e => e.type === 'directory').length : 0;
       }
       
     },
@@ -228,6 +267,8 @@
     watch:{
       
       async currentDir(){
+        this.isSearchMode = false;
+        this.searchResults = null;
         try {
           let folders = 0
           let files   = 0
