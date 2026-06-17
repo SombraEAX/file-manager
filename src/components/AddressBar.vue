@@ -439,7 +439,7 @@ export default {
     color:v-bind('theme.addressBar.textColor')
   }
   .first.shadow{
-    box-shadow: 0 2px 3px rgba(0,0,0,0.15);
+    box-shadow: 0 2px 3px v-bind('theme.addressBar.shadowColor');
     position:relative;
     z-index:1;
     border-radius: v-bind('theme.addressBar.borderRadius') v-bind('theme.addressBar.borderRadius') 0 0
@@ -475,7 +475,7 @@ export default {
     left:0;
     right:0;
     height:3px;
-    background:rgba(0,0,0,0.1);
+    background:v-bind('theme.searchMode.progressTrack');
     overflow:hidden
   }
   .search-progress::after{

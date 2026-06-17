@@ -66,12 +66,14 @@
 	"searchMode":{
 		"background":"#d4d4d4",
 		"textColor":"#333",
-		"progressColor":"#4caf50"
+		"progressColor":"#4caf50",
+		"progressTrack":"rgba(0,0,0,0.1)"
 	},
 	"addressBar":{
 		"background":"#ccc",
 		"textColor":"#000",
 		"borderRadius":"5px",
+		"shadowColor":"rgba(0,0,0,0.15)",
 		"activeItem":{
 			"background":"lightblue",
 			"textColor":"#000"													
