@@ -11,16 +11,22 @@
       @changeSortOrder  = "ev => sortOrder = ev"
       @changeGroup      = "ev => groupBy = ev"
     />
+    <tab-bar
+      :tabs        = "tabs"
+      :active-index = "activeTabIndex"
+      @select      = "switchTab"
+      @close       = "closeTab"
+    />
     <top-panel
       :address            = "currentDir"
-      :history            = "history"
-      :historyIndex       = "historyIndex"
+      :history            = "tabs[activeTabIndex]?.history || []"
+      :historyIndex       = "tabs[activeTabIndex]?.historyIndex ?? -1"
       :search-version     = "searchVersion"
-      @back               = "ev => historyIndex--"
-      @forward            = "ev => historyIndex++"
+      @back               = "ev => tabs[activeTabIndex].historyIndex--"
+      @forward            = "ev => tabs[activeTabIndex].historyIndex++"
       @up                 = "up"
       @jump               = "jump"
-      @changeHistoryIndex = "ev => historyIndex = ev"
+      @changeHistoryIndex = "ev => tabs[activeTabIndex].historyIndex = ev"
       @search             = "onSearchResults"
     />
     <div class="main">
@@ -33,6 +39,7 @@
         @select   = "jump"
       />
       <work-zone
+        ref="workzone"
         :iconSize   = "iconSize"
         :sortColumn = "sortColumn"
         :sortOrder  = "sortOrder"
@@ -42,6 +49,7 @@
         @changeSort = "changeSort"
         @openDir    = "openDir"
         @select     = "ev => previewPath = ev"
+        @contextMenu = "onFolderContextMenu"
       />
       <preview-panel
         :path   = "previewPath"
@@ -72,6 +80,7 @@
   import WorkZone from './components/WorkZone.vue'
   import PreviewPanel from './components/PreviewPanel.vue'
   import MenuBar from './components/MenuBar.vue'
+  import TabBar from './components/TabBar.vue'
   import prettyBytes from 'pretty-bytes'
 
   const username = window.electron.getUserName()
@@ -89,7 +98,8 @@
       StatusBar,
       DirectoryTree,
       TopPanel,
-      PreviewPanel
+      PreviewPanel,
+      TabBar
     },
     
     data(){      
@@ -102,8 +112,9 @@
           { name: username, pathname: homedir, caption:username },
           { name: '/', pathname: '/', caption: 'System root' }
         ],
-        history: [],
-        historyIndex: -1,
+        tabs: [],
+        activeTabIndex: -1,
+        tabIdCounter: 0,
         iconSize: 200,
         view: 'table',
         entries: [],
@@ -119,7 +130,8 @@
         searchResults: null,
         searchQuery: '',
         isSearchMode: false,
-        searchVersion: 0
+        searchVersion: 0,
+        _restoreScrollPending: false
       }
     },
     
@@ -167,6 +179,42 @@
         })
       },
 
+      switchTab(index){
+        if(index < 0 || index >= this.tabs.length || index === this.activeTabIndex) return;
+        let el = this.$refs.workzone?.$el.querySelector('.scrollbox');
+        if(el) this.tabs[this.activeTabIndex].scrollTop = el.scrollTop;
+        this.activeTabIndex = index;
+        this._restoreScrollPending = true;
+        this.searchVersion++;
+      },
+
+      closeTab(index){
+        if(this.tabs.length <= 1) return;
+        let wasActive = index === this.activeTabIndex;
+        this.tabs.splice(index, 1);
+        if(index < this.activeTabIndex){
+          this.activeTabIndex--;
+        }else if(index === this.activeTabIndex && this.activeTabIndex >= this.tabs.length){
+          this.activeTabIndex = this.tabs.length - 1;
+        }
+        if(wasActive) this._restoreScrollPending = true;
+        this.searchVersion++;
+      },
+
+      openInNewTab(pathname){
+        if(!pathname.startsWith('/'))
+          pathname = window.electron.join(this.currentDir, pathname);
+        try {
+          if(!window.electron.isDir(pathname)) throw new Error();
+        } catch(e) {
+          this.showToast('Folder not found');
+          return;
+        }
+        this.tabs.push({ id: ++this.tabIdCounter, history: [pathname], historyIndex: 0, scrollTop: 0 });
+        this.activeTabIndex = this.tabs.length - 1;
+        this.searchVersion++;
+      },
+
       jump(pathname){
         try {
           if(!window.electron.isDir(pathname)) throw new Error();
@@ -177,9 +225,10 @@
         this.isSearchMode = false;
         this.searchResults = null;
         this.searchVersion++;
-        this.history[++this.historyIndex] = pathname
-        if(this.history.length > this.historyIndex + 1){
-          this.history.splice(this.historyIndex + 1)
+        let tab = this.tabs[this.activeTabIndex];
+        tab.history[++tab.historyIndex] = pathname
+        if(tab.history.length > tab.historyIndex + 1){
+          tab.history.splice(tab.historyIndex + 1)
         }
       },
       
@@ -187,6 +236,23 @@
         this.isSearchMode = false;
         this.searchResults = null;
         this.jump(this.currentDir.replace(/\/[^/]+\/?$/,'') || '/')
+      },
+
+      onFolderContextMenu({ path, x, y }){
+        window.electron.ipcRenderer.send('show-menu', {
+          items: [
+            { label: 'Open' },
+            { label: 'Open in new tab' }
+          ],
+          x, y
+        });
+        window.electron.ipcRenderer.once('show-menu-reply', (_, index) => {
+          if(index === 0){
+            this.openDir(path);
+          }else if(index === 1){
+            this.openInNewTab(path);
+          }
+        });
       },
 
       showToast(text){
@@ -215,10 +281,21 @@
           case 'type': return entry.filetype
           default: null
         }
+      },
+      restoreScroll(){
+        if(!this._restoreScrollPending) return;
+        this._restoreScrollPending = false;
+        let el = this.$refs.workzone?.$el.querySelector('.scrollbox');
+        let tab = this.tabs[this.activeTabIndex];
+        if(el && tab && tab.scrollTop){
+          el.scrollTop = tab.scrollTop;
+        }
       }
     },
     
     mounted(){
+      this.tabs.push({ id: ++this.tabIdCounter, history: [], historyIndex: -1, scrollTop: 0 });
+      this.activeTabIndex = 0;
       this.jump(homedir)
     },
     
@@ -251,7 +328,8 @@
       },
           
       currentDir(){
-        return this.history[this.historyIndex]
+        let tab = this.tabs[this.activeTabIndex];
+        return tab ? tab.history[tab.historyIndex] : undefined;
       },
 
       searchFiles(){
@@ -281,10 +359,11 @@
           
           this.folders = folders
           this.files   = files
+          this.$nextTick(() => this.restoreScroll());
         } catch(e) {
           this.showToast('Folder not found');
         }
-      } 
+      }
     }
   }
 </script>

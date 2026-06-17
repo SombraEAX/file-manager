@@ -4,6 +4,7 @@
     :data-variant="view" 
     :data-selected="selected" 
     @click="click"
+    @contextmenu.prevent="onContextMenu"
   >
     <div
       class="icon" 
@@ -25,7 +26,7 @@
   import prettyBytes from 'pretty-bytes'
   
   export default {
-    emits: ['openDir'],
+    emits: ['openDir', 'contextMenu'],
     props: {
       view:String,
       columns:{
@@ -55,6 +56,10 @@
       doubleClick(){
         if(this.params.type === 'directory')
           this.$emit('openDir', this.params.path || this.params.name)
+      },
+      onContextMenu(e){
+        if(this.params.type === 'directory')
+          this.$emit('contextMenu', { path: this.params.path || this.params.name, x: e.clientX, y: e.clientY });
       },
       click(){
         if(this.clicked && Date.now() - this.clicked < 500)

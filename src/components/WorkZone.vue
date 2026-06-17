@@ -23,6 +23,7 @@
           :selected="entry.selected"
           :iconSize="iconSize"
           @openDir="openDir"
+          @contextMenu="onContextMenu"
           @click="select(entry)"
         />
       </EntriesGroup>
@@ -37,7 +38,7 @@
  
   
   export default {
-    emits: ['openDir', 'changeSort'],
+    emits: ['openDir', 'changeSort', 'contextMenu', 'select'],
     components:{
       EntriesGroup,
       TableHeader,
@@ -104,6 +105,9 @@
       },
       openDir(dir){
         this.$emit('openDir',dir)
+      },
+      onContextMenu(e){
+        this.$emit('contextMenu', e);
       },
       changeSort(col,sort){
         this.$emit('changeSort',col,sort)

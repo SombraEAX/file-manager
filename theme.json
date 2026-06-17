@@ -93,5 +93,17 @@
 				"textColor":"#fff"				
 			}
 		}
+	},
+	"tabBar":{
+		"borderRadius":"5px",
+		"font":"sans-serif",
+		"height":"30px",
+		"activeBackground":"#ccc",
+		"activeTextColor":"#000",
+		"inactiveBackground":"#fff",
+		"inactiveTextColor":"#000",
+		"inactiveHoverBackground":"#e0e0e0",
+		"dividerColor":"#bbb",
+		"closeHoverColor":"#c00"
 	}
 }
