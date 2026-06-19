@@ -32,6 +32,7 @@
   "_id": "file-manager@0.1.0",
   "readme": "ERROR: No README data found!",
   "dependencies": {
+    "@azurity/pure-nerd-font": "^3.0.5",
     "@vue/cli-plugin-router": "^5.0.9",
     "@vue/cli-plugin-vuex": "^5.0.9",
     "@vue/cli-service": "^5.0.9",

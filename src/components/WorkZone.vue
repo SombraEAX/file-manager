@@ -15,6 +15,8 @@
         <EntriesGroup
           v-for="group in groups"
           :name="group.name"
+          :view="view"
+          :iconSize="iconSize"
         >
           <DirEntry
             v-for="entry in group.entries"
@@ -23,6 +25,7 @@
             :view="view"
             :selected="entry.selected"
             :iconSize="iconSize"
+            :address="address"
             @openDir="openDir"
             @contextMenu="onContextMenu"
             @click="select(entry)"

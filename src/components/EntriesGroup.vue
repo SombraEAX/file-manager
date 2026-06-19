@@ -4,7 +4,7 @@
       <div class="title">{{name}}</div>
       <div class="icon" :data-expand="expand"></div>
     </div>
-    <div v-if="!name || expand">
+    <div v-if="!name || expand" :style="gridStyle">
       <slot></slot>
     </div>
   </div>
@@ -15,12 +15,34 @@
   export default {
     name:'EntriesGroup',
     props: {
-      name:String
+      name:String,
+      view:String,
+      iconSize: Number
     },
     data(){
       return {
         theme,
         expand: true
+      }
+    },
+    computed: {
+      gridStyle() {
+        if (this.view === 'icons') {
+          const minSize = Math.max(this.iconSize || 120, 120)
+          return {
+            display: 'grid',
+            gridTemplateColumns: `repeat(auto-fill, minmax(${minSize}px, 1fr))`,
+            gap: '20px'
+          }
+        }
+        if (this.view === 'list') {
+          return {
+            display: 'grid',
+            gridTemplateColumns: `repeat(auto-fill, minmax(150px, 1fr))`,
+            gap: '5px'
+          }
+        }
+        return null
       }
     },
     methods: {

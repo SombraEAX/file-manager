@@ -68,6 +68,7 @@
     <transition name="toast-fade">
       <div class="toast" v-if="toastVisible">{{ toastText }}</div>
     </transition>
+
   </div>
 </template>
 
@@ -79,6 +80,7 @@
   import PreviewPanel from './components/PreviewPanel.vue'
   import MenuBar from './components/MenuBar.vue'
   import TabBar from './components/TabBar.vue'
+  import EntryIcon from './components/EntryIcon.vue'
   import prettyBytes from 'pretty-bytes'
 
   const username = window.electron.getUserName()
@@ -96,7 +98,8 @@
       DirectoryTree,
       TopPanel,
       PreviewPanel,
-      TabBar
+      TabBar,
+      EntryIcon
     },
     
     data(){      
@@ -112,7 +115,7 @@
         tabs: [],
         activeTabIndex: -1,
         tabIdCounter: 0,
-        iconSize: 200,
+        iconSize: 120,
         view: 'table',
         entries: [],
         files: 0,

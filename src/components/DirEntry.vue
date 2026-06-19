@@ -6,11 +6,7 @@
     @click="click"
     @contextmenu.prevent="onContextMenu"
   >
-    <div
-      class="icon" 
-      :style="{width:actualIconSize, height:actualIconSize, minWidth:actualIconSize}"
-      :data-type="params.type"
-    ></div>
+    <EntryIcon :size="entryIconSize" :is-dir="params.type === 'directory'" :type="entryType" />
     <div class="label"
       v-for="(col,index) in columns" 
       :style="columnStyle(col,index)"
@@ -24,11 +20,31 @@
 <script>
   import theme from '../../theme.json'
   import prettyBytes from 'pretty-bytes'
-  
+  import EntryIcon from './EntryIcon.vue'
+
+  const homedir = `/home/${window.electron.getUserName()}`
+
+  let xdgCache = null
+  function getXdgDirs() {
+    if (xdgCache) return xdgCache
+    xdgCache = {}
+    try {
+      const content = window.electron.readFileSync(window.electron.join(homedir, '.config/user-dirs.dirs'), 'utf8')
+      const map = { XDG_DOWNLOAD_DIR:'downloads', XDG_DOCUMENTS_DIR:'documents', XDG_MUSIC_DIR:'music', XDG_PICTURES_DIR:'pictures', XDG_VIDEOS_DIR:'videos', XDG_DESKTOP_DIR:'desktop', XDG_PUBLICSHARE_DIR:'public' }
+      for (const line of content.split('\n')) {
+        const m = line.match(/^(\w+)="?\$HOME\/(.+?)"?$/)
+        if (m && map[m[1]]) xdgCache[m[2]] = map[m[1]]
+      }
+    } catch(e) {}
+    return xdgCache
+  }
+
   export default {
     emits: ['openDir', 'contextMenu'],
+    components: { EntryIcon },
     props: {
       view:String,
+      address:String,
       columns:{
         type: Array,
         default: () => []
@@ -47,12 +63,32 @@
       }
     },
     computed:{
-      actualIconSize(){
-        if(this.view === 'icons') return this.iconSize + 'px'
-        return '16px'
+      entryIconSize(){
+        return this.view === 'icons' ? this.iconSize : 16
+      },
+      iconSizePx(){
+        return this.entryIconSize + 'px'
+      },
+      entryType(){
+        if (this.params.type === 'directory') return this.folderType(this.params.name)
+        return this.params.ext || ''
       }
     },
     methods: {
+      folderType(name) {
+        if (name.toLowerCase() === 'node_modules') return 'npm'
+        if (this.address !== homedir) return ''
+        const nameMap = {
+          'home': 'home', 'desktop': 'desktop', 'documents': 'documents',
+          'downloads': 'downloads', 'music': 'music', 'pictures': 'pictures',
+          'videos': 'videos', 'trash': 'trash', 'public': 'public',
+          'npm': 'npm',
+        }
+        const type = nameMap[name.toLowerCase()]
+        if (type) return type
+        const xdg = getXdgDirs()
+        return xdg[name] || ''
+      },
       doubleClick(){
         if(this.params.type === 'directory')
           this.$emit('openDir', this.params.path || this.params.name)
@@ -68,7 +104,7 @@
       },
       columnStyle(col,index){
         if(this.view !== 'table') return {width:'auto'}
-        let w = (index ? col.width : col.width - 21) + 'px'
+        let w = (index ? col.width : col.width - 26) + 'px'
         return {width: w, minWidth: w}
       },
       stringify(val,colname){
@@ -98,32 +134,37 @@
   }
   [data-variant="table"]{
     min-width: min-content;
-    color:      v-bind('theme.tableRow.params')
+    color:      v-bind('theme.tableRow.params');
+    padding-left: 10px;
+  }
+  [data-variant="table"] .label[data-colname] ~ .label[data-colname]{
+    padding-left: 10px;
+  }
+  [data-variant="table"] .label[data-colname="name"]{
+    padding-left: 3px;
   }
   [data-colname="name"]{
     color:      v-bind('theme.tableRow.name')
   }
   [data-variant="list"]{
-    max-width:150px;
-    width:150px;
-    display:inline-flex;
-    margin-left:5px
+    display:flex;
+    width:100%
   }
-  [data-variant="table"] .icon{
-    margin-left:5px
+  .main > :first-child{
+    display:inline-flex;
+    align-items:center;
   }
   [data-variant="icons"] .label{
     text-align:center;
     height:50px;
     word-wrap: break-word;
     white-space:wrap;
-    width:     v-bind('actualIconSize');
+    width:     v-bind('iconSizePx');
     min-width:120px;
-    max-width: v-bind('actualIconSize');
+    max-width: v-bind('iconSizePx');
   }
   [data-variant="icons"]{
-    margin:10px;
-    display:inline-flex;
+    display:flex;
     flex-direction:column !important;
     align-items:center
   }

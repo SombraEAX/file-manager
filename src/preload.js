@@ -1,7 +1,7 @@
 const { contextBridge, ipcRenderer } = require('electron')
-const { readdirSync, lstatSync } = require('fs')
+const { readdirSync, readFileSync, lstatSync } = require('fs')
 const { join } = require('path')
-const {readdir, lstat, readFile, access, constants} = require('fs/promises')
+const {readdir, lstat, stat, readFile, access, constants} = require('fs/promises')
 const filetypes = Object.entries(require('../filetypes'))
 const path = require('path')
 const { clipboard } = require('electron')
@@ -163,16 +163,33 @@ contextBridge.exposeInMainWorld(
         stats[i].filetype = typeLabel
         stats[i].modified = new Date(stats[i].mtimeMs)
 
-        if(stats[i].type !== 'file') continue
+        if(stats[i].type !== 'file' && stats[i].type !== 'symlink') continue
+
+        if(stats[i].type === 'symlink'){
+          try {
+            let targetStat = await stat(join(addr, files[i]))
+            if(targetStat.isDirectory()){
+              stats[i].type = 'directory'
+              stats[i].filetype = 'Directory'
+              continue
+            }
+            stats[i].mode = targetStat.mode
+          } catch(e) {}
+        }
 
         if(files[i][0] === '.'){
           stats[i].filetype = 'Dotfile'
+          stats[i].ext = 'dotfile'
         }else if(~files[i].indexOf('.')){
           let ext = stats[i].ext = files[i].split('.').pop().toLowerCase()
           let type = filetypes.find(
             ([type,extensions]) => ~extensions.indexOf(ext)
           )  
           if(type) stats[i].filetype = type[0]     
+        }
+
+        if(!stats[i].ext && (stats[i].mode & 0o111)){
+          stats[i].ext = 'exe'
         }        
       }
 
@@ -186,7 +203,7 @@ contextBridge.exposeInMainWorld(
         return clipboard.readText()
       }
     },
-    readdirSync, join,
+    readdirSync, readFileSync, join,
     startSearch(params){
       const id = Date.now() + '_' + Math.random();
       cancelledSearches.delete(id);

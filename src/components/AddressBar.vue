@@ -10,7 +10,7 @@
         </div>
         <div v-if="!isEditing && !isExecutingSearch" class="breadcrumbs">
           <span class="breadcrumb-root" @click.stop="goToRoot">
-            <span class="root-icon"></span>
+            <EntryIcon :size="16" is-dir :type="currentFolderType" />
           </span>
           <span
             v-if="breadcrumbParts.length > 0"
@@ -70,7 +70,7 @@
       <div class="items-inner">
       <div class="items">
         <div class="row item" v-for="dir in dirItems" @click.stop="dirItemClick(dir)">
-          <div class="icon"></div>
+          <EntryIcon :size="16" is-dir :type="folderType(dir)" />
           <div class="label">{{dir}}</div>
         </div>
       </div>
@@ -120,7 +120,7 @@
           class="row item"
           @click.stop="dropdownNavigate(dir)"
         >
-          <div class="icon"></div>
+          <EntryIcon :size="16" is-dir :type="folderType(dir)" />
           <div class="label">{{ dir }}</div>
         </div>
       </div>
@@ -134,11 +134,27 @@
 import theme from '../../theme.json';
 import DropDown from './DropDown.vue';
 import AppCheckbox from './AppCheckbox.vue';
+import EntryIcon from './EntryIcon.vue';
 const { ipcRenderer } = window.electron
 const homedir = `/home/${window.electron.getUserName()}`
 
+let xdgCache = null
+function getXdgDirs() {
+  if (xdgCache) return xdgCache
+  xdgCache = {}
+  try {
+    const content = window.electron.readFileSync(window.electron.join(homedir, '.config/user-dirs.dirs'), 'utf8')
+    const map = { XDG_DOWNLOAD_DIR:'downloads', XDG_DOCUMENTS_DIR:'documents', XDG_MUSIC_DIR:'music', XDG_PICTURES_DIR:'pictures', XDG_VIDEOS_DIR:'videos', XDG_DESKTOP_DIR:'desktop', XDG_PUBLICSHARE_DIR:'public' }
+    for (const line of content.split('\n')) {
+      const m = line.match(/^(\w+)="?\$HOME\/(.+?)"?$/)
+      if (m && map[m[1]]) xdgCache[m[2]] = map[m[1]]
+    }
+  } catch(e) {}
+  return xdgCache
+}
+
 export default {
-  components: { DropDown, AppCheckbox },
+  components: { DropDown, AppCheckbox, EntryIcon },
   props: {
     address: String,
     searchVersion: Number
@@ -198,9 +214,26 @@ export default {
       } catch(e) {
         return [];
       }
+    },
+    currentFolderType() {
+      if (!this.address || this.address === homedir) return 'home'
+      const name = this.address.split('/').filter(Boolean).pop()
+      return name && this.folderType(name) || ''
     }
   },
   methods: {
+    folderType(name) {
+      const nameMap = {
+        'home': 'home', 'desktop': 'desktop', 'documents': 'documents',
+        'downloads': 'downloads', 'music': 'music', 'pictures': 'pictures',
+        'videos': 'videos', 'trash': 'trash', 'public': 'public',
+        'npm': 'npm', 'node_modules': 'npm',
+      }
+      const type = nameMap[name.toLowerCase()]
+      if (type) return type
+      const xdg = getXdgDirs()
+      return xdg[name] || ''
+    },
     dirItemClick(dir) {
       this.tmp = window.electron.join(this.address, dir);
       this.gotopath();
@@ -520,7 +553,7 @@ export default {
   }
   
   .breadcrumb-root:hover {
-    filter: hue-rotate(90deg);
+    filter: brightness(1.08);
   }
   
   .root-icon {
@@ -593,18 +626,21 @@ export default {
     flex-shrink:0
   }  
   .label{
-    margin:auto 0 auto 5px;
-    width:100%  	
+    margin:auto 0;
+    width:100%
   }
   .row{
-    display:flex
+    display:flex;
+    gap:5px
   }
   .item:last-child{
     border-bottom-right-radius: v-bind('theme.addressBar.borderRadius');
     border-bottom-left-radius:  v-bind('theme.addressBar.borderRadius');
   }
   .item{
-    cursor:pointer
+    cursor:pointer;
+    padding:0 5px 0 7px;
+    box-sizing:border-box
   }
   .item:not(.form-row):hover{
     background: v-bind('theme.addressBar.activeItem.background');  	
