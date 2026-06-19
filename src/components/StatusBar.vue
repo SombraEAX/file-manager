@@ -83,59 +83,52 @@
   .icon{
     width:24px;
     height:24px;
-    background-position:center;
-    background-size:16px;
-    background-repeat:no-repeat;
     border:0px;
     background-color:transparent
   }
-  .icon-list{
-    background-image:url("../assets/list.png")
+  .icon-list::before,
+  .icon-icons::before,
+  .icon-table::before{
+    font-family:PureNerdFont,"Symbols Nerd Font Mono","Noto Sans Nerd Font","Meslo Nerd Font","FiraCode Nerd Font",sans-serif;
+    font-size:16px;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    height:100%;
+    width:100%
   }
-  .icon-table{
-    background-image:url("../assets/table.png")
-  }
-  .icon-icons{
-    background-image:url("../assets/icons.png")
-  }
-  .icon-item{
-    display:inline-block;
-    width:16px;
-    height:16px;
-    background-image:url("../assets/icons.png");
-    background-size:contain;
-    background-repeat:no-repeat;
-    background-position:center;
-    vertical-align:middle;
-    margin-right:3px
-  }
-  .icon-file{
-    display:inline-block;
-    width:16px;
-    height:16px;
-    background-image:url("../assets/file.png");
-    background-size:contain;
-    background-repeat:no-repeat;
-    background-position:center;
-    vertical-align:middle;
-    margin-right:3px
-  }
+  .icon-list::before{ content:"" }
+  .icon-icons::before{ content:"" }
+  .icon-table::before{ content:"󰀻" }
+  .icon-item,
+  .icon-file,
   .icon-folder{
     display:inline-block;
     width:16px;
     height:16px;
-    background-image:url("../assets/folder.png");
-    background-size:contain;
-    background-repeat:no-repeat;
-    background-position:center;
     vertical-align:middle;
     margin-right:3px
   }
+  .icon-item::before,
+  .icon-file::before,
+  .icon-folder::before{
+    font-family:PureNerdFont,"Symbols Nerd Font Mono","Noto Sans Nerd Font","Meslo Nerd Font","FiraCode Nerd Font",sans-serif;
+    font-size:14px;
+    display:flex;
+    align-items:center;
+    justify-content:center
+  }
+  .icon-item::before{ content:"\f009" }
+  .icon-file::before{ content:"\f15b" }
+  .icon-folder::before{ content:"\f07b" }
   .icon:not(.active):hover{
-    filter: hue-rotate(90deg);    
+    color:v-bind('theme.topPanelIconHoverColor')
   }
   .icon.active{
-    filter: hue-rotate(90deg);  	
+    color:v-bind('theme.topPanelIconHoverColor')
+  }
+  .icon{
+    color:v-bind('theme.topPanelIconColor')
   }
   .icon:not(.active){
     cursor:pointer;

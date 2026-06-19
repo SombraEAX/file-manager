@@ -72,12 +72,18 @@
   .icon{
     width:20px;
     height:20px;
-    background-size:100%
+    display:inline-flex;
+    align-items:center;
+    justify-content:center
   }
-  .icon[data-expand="true"]{
-    background-image:url('../assets/close-block.png')
+  .icon::before{
+    font-family:PureNerdFont,"Symbols Nerd Font Mono","Noto Sans Nerd Font","Meslo Nerd Font","FiraCode Nerd Font",sans-serif;
+    font-size:16px
   }
-  .icon[data-expand="false"]{
-    background-image:url('../assets/open-block.png')
+  .icon[data-expand="true"]::before{
+    content:"\f146"
+  }
+  .icon[data-expand="false"]::before{
+    content:"\f0fe"
   }
 </style>

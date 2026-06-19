@@ -94,6 +94,11 @@
 			}
 		}
 	},
+	"sidebarBg": "#e0e0e0",
+	"sidebarTextColor": "#999",
+	"topPanelIconColor": "#3498db",
+	"topPanelIconHoverColor": "#e74c3c",
+	"treeExpandIconColor": "#3498db",
 	"tabBar":{
 		"borderRadius":"5px",
 		"font":"sans-serif",

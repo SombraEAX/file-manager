@@ -107,7 +107,7 @@
     justify-content:center;
     font-size:16px;
     font-family:PureNerdFont,"Symbols Nerd Font Mono","Noto Sans Nerd Font","Meslo Nerd Font","FiraCode Nerd Font",sans-serif;
-    color:#3498db;
+    color:v-bind('theme.treeExpandIconColor');
   }
   .expand-icon.collapsed::before{ content:"\f0fe" }
   .expand-icon.expanded::before{ content:"\f146" }

@@ -489,12 +489,16 @@ export default {
   .search-mode-icon{
     width:16px;
     height:16px;
-    background-image:url("../assets/search.png");
-    background-size:contain;
-    background-repeat:no-repeat;
-    background-position:center;
     margin:0 5px;
-    flex-shrink:0
+    flex-shrink:0;
+    display:inline-flex;
+    align-items:center;
+    justify-content:center
+  }
+  .search-mode-icon::before{
+    font-family:PureNerdFont,"Symbols Nerd Font Mono","Noto Sans Nerd Font","Meslo Nerd Font","FiraCode Nerd Font",sans-serif;
+    content:"\f002";
+    font-size:14px
   }
   .search-mode-text{
     white-space:nowrap;
@@ -559,10 +563,14 @@ export default {
   .root-icon {
     width: 16px;
     height: 16px;
-    background-image: url('../assets/folder.png');
-    background-size: contain;
-    background-repeat: no-repeat;
-    background-position: center;
+    display:inline-flex;
+    align-items:center;
+    justify-content:center
+  }
+  .root-icon::before{
+    font-family:PureNerdFont,"Symbols Nerd Font Mono","Noto Sans Nerd Font","Meslo Nerd Font","FiraCode Nerd Font",sans-serif;
+    content:"\f07b";
+    font-size:14px
   }
 
   .triangle-wrap{
@@ -618,12 +626,16 @@ export default {
   .icon{
     width:16px;
     height:16px;
-    background-image:url('../assets/folder.png');
-    background-position:center;
-    background-repeat:no-repeat;
-    background-size:contain;
     margin:auto 0 auto 7px;
-    flex-shrink:0
+    flex-shrink:0;
+    display:inline-flex;
+    align-items:center;
+    justify-content:center
+  }
+  .icon::before{
+    font-family:PureNerdFont,"Symbols Nerd Font Mono","Noto Sans Nerd Font","Meslo Nerd Font","FiraCode Nerd Font",sans-serif;
+    content:"\f07b";
+    font-size:14px
   }  
   .label{
     margin:auto 0;
@@ -650,17 +662,21 @@ export default {
     margin:auto;
     width:20px;
     height:20px;
-    background-image:url("../assets/right-arrow.png");
-    background-position:center;
-    background-repeat:no-repeat;
     border:0px;
     background-color:transparent;
-    background-size:16px;
     margin-right:5px;    
-    cursor:pointer
+    cursor:pointer;
+    display:inline-flex;
+    align-items:center;
+    justify-content:center
   }
-  .go[data-search="true"]{
-    background-image:url("../assets/search.png");  
+  .go::before{
+    font-family:PureNerdFont,"Symbols Nerd Font Mono","Noto Sans Nerd Font","Meslo Nerd Font","FiraCode Nerd Font",sans-serif;
+    content:"\f054";
+    font-size:16px
+  }
+  .go[data-search="true"]::before{
+    content:"\f002"
   }
   .go:hover{
     filter: hue-rotate(90deg);

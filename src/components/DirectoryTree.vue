@@ -78,8 +78,8 @@
     line-height:14px;
     white-space:nowrap;
     font-family:sans-serif;
-    background:v-bind('theme.sidebarBg');
-    color:v-bind('theme.textColor');
+    background:transparent;
+    color:v-bind('theme.sidebarTextColor');
     flex-shrink:0;
     display:flex;
     align-items:center;
@@ -95,13 +95,34 @@
     background-position:center;
     margin-left:6px;
   }
-  .icon-item{
-    background-image:url("../assets/icons.png")
+  .icon-item::before{
+    font-family:PureNerdFont,"Symbols Nerd Font Mono","Noto Sans Nerd Font","Meslo Nerd Font","FiraCode Nerd Font",sans-serif;
+    content:"\f009";
+    font-size:12px;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    height:100%;
+    width:100%
   }
-  .icon-file{
-    background-image:url("../assets/file.png")
+  .icon-file::before{
+    font-family:PureNerdFont,"Symbols Nerd Font Mono","Noto Sans Nerd Font","Meslo Nerd Font","FiraCode Nerd Font",sans-serif;
+    content:"\f15b";
+    font-size:12px;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    height:100%;
+    width:100%
   }
-  .icon-folder{
-    background-image:url("../assets/folder.png")
+  .icon-folder::before{
+    font-family:PureNerdFont,"Symbols Nerd Font Mono","Noto Sans Nerd Font","Meslo Nerd Font","FiraCode Nerd Font",sans-serif;
+    content:"\f07b";
+    font-size:12px;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    height:100%;
+    width:100%
   }
 </style>

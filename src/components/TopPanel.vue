@@ -119,17 +119,15 @@
   button{
     cursor:pointer;
     width:30px;
-    background-position:center;
-    background-repeat:no-repeat;
-    background-size:50%;
     background-color:transparent;
     border:0px;
+    color:v-bind('theme.topPanelIconColor')
   }
   button:not(.icon){
     height:30px;
   }
   button:hover{
-    filter: hue-rotate(90deg);
+    color:v-bind('theme.topPanelIconHoverColor')
   }
   .history{
     width:16px;
@@ -137,43 +135,41 @@
   }
   .back{
     margin-right:0px;
-    background-image:url("../assets/left-arrow.png")
   }
-  .forward{
-    background-image:url("../assets/right-arrow.png")
+  .back::before,
+  .forward::before,
+  .up::before,
+  .history::before,
+  .top-panel .icon::before{
+    font-family:PureNerdFont,"Symbols Nerd Font Mono","Noto Sans Nerd Font","Meslo Nerd Font","FiraCode Nerd Font",sans-serif;
+    font-size:16px;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    height:100%;
+    width:100%
   }
-  .up{
-    background-image:url("../assets/up-arrow.png")
-  }
-  .history{
-    background-image:url("../assets/caret-down.png")    
-  }
+  .back::before{ content:"\f053" }
+  .forward::before{ content:"\f054" }
+  .up::before{ content:"\f077" }
+  .history::before{ content:"\f0d7" }
   button[disabled]{
     filter: grayscale(1)
   }
   .top-panel .icon{
     width:30px;
     height:30px;
-    background-position:center;
-    background-size:50%;
-    background-repeat:no-repeat;
     border:0px;
     outline:0;
     background-color:transparent;
     margin:0 2px;
     box-sizing:content-box;
   }
-  .top-panel .icon-list{
-    background-image:url("../assets/list.png")
-  }
-  .top-panel .icon-table{
-    background-image:url("../assets/table.png")
-  }
-  .top-panel .icon-icons{
-    background-image:url("../assets/icons.png")
-  }
+  .top-panel .icon-list::before{ content:"" }
+  .top-panel .icon-table::before{ content:"" }
+  .top-panel .icon-icons::before{ content:"󰀻" }
   .top-panel .icon.active{
-    filter: hue-rotate(90deg);
+    color:v-bind('theme.topPanelIconHoverColor')
   }
   .top-panel .icon:not(.active){
     cursor:pointer;

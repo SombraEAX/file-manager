@@ -180,13 +180,6 @@
     padding-top:2px;
     padding-bottom:2px;
   }
-  .icon{
-    background-image:url('../assets/folder.png');
-    background-size:100%;
-  }
-  .icon[data-type="file"]{
-    background-image:url('../assets/file.png');
-  }
   .main:hover{
     background: v-bind('theme.fileIcon.hover.background');
     color:      v-bind('theme.fileIcon.hover.fontColor')
