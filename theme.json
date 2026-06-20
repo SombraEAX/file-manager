@@ -99,6 +99,7 @@
 	"topPanelIconColor": "#3498db",
 	"topPanelIconHoverColor": "#e74c3c",
 	"treeExpandIconColor": "#3498db",
+	"sidebarSectionTitleColor": "#999",
 	"tabBar":{
 		"borderRadius":"5px",
 		"font":"sans-serif",

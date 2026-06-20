@@ -34,7 +34,6 @@
     <div class="main">
       <directory-tree
         class       = "tree" 
-        :dirs       = "dirs" 
         :selected   = "currentDir"
         :width      = "leftPanelWidth"
         :items      = "isSearchMode && searchResults ? searchResults.length : entries.length"
