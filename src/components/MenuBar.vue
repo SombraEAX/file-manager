@@ -18,14 +18,16 @@
       sortColumn: String,
       sortOrder:  String,
       groupBy:    String,
-      isDev:      Boolean
+      isDev:      Boolean,
+      autohideLeftPanel: Boolean
     },
 
     emits: [
       'changeView', 
       'changeSortColumn', 
       'changeSortOrder',
-      'changeGroup'
+      'changeGroup',
+      'toggleAutohideLeftPanel'
     ],
 
     mounted() {
@@ -66,6 +68,10 @@
           }
           case 'no-group': {
             this.$emit('changeGroup', null)          
+            break
+          }
+          case 'autohide-left-panel': {
+            this.$emit('toggleAutohideLeftPanel')
             break
           }
         }
@@ -181,6 +187,13 @@
                     checked: this.groupBy === null
                   }
                 ]                
+              },
+              { type: 'separator' },
+              {
+                label: 'Autohide left panel',
+                id: 'autohide-left-panel',
+                type: 'checkbox',
+                checked: this.autohideLeftPanel
               },
               { role: 'toggleDevTools', visible: this.isDev }              
             ]

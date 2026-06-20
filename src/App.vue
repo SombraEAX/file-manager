@@ -6,10 +6,12 @@
       :sortOrder        = "sortOrder"
       :groupBy          = "groupBy"
       :isDev            = "isDev"
+      :autohideLeftPanel = "autohideLeftPanel"
       @changeView       = "ev => view = ev"
       @changeSortColumn = "ev => sortColumn = ev"
       @changeSortOrder  = "ev => sortOrder = ev"
       @changeGroup      = "ev => groupBy = ev"
+      @toggleAutohideLeftPanel = "autohideLeftPanel = !autohideLeftPanel"
     />
     <tab-bar
       :tabs        = "tabs"
@@ -32,16 +34,27 @@
       @changeView         = "ev => view = ev"
     />
     <div class="main">
-      <directory-tree
-        class       = "tree" 
-        :selected   = "currentDir"
-        :width      = "leftPanelWidth"
-        :items      = "isSearchMode && searchResults ? searchResults.length : entries.length"
-        :files      = "isSearchMode && searchResults ? searchFiles : files"
-        :dirsCount  = "isSearchMode && searchResults ? searchDirs : folders"
-        @resize     = "w => leftPanelWidth = w"
-        @select     = "jump"
-      />
+      <div 
+        class="left-panel-container"
+        :class="{ autohide: autohideLeftPanel, 'panel-visible': leftPanelVisible }"
+      >
+        <div class="left-panel-trigger" v-if="autohideLeftPanel"
+          @mouseenter="showLeftPanel"
+          @mouseleave="scheduleHideLeftPanel"
+        ></div>
+        <directory-tree
+          class       = "tree" 
+          :selected   = "currentDir"
+          :width      = "leftPanelWidth"
+          :items      = "isSearchMode && searchResults ? searchResults.length : entries.length"
+          :files      = "isSearchMode && searchResults ? searchFiles : files"
+          :dirsCount  = "isSearchMode && searchResults ? searchDirs : folders"
+          @resize     = "w => leftPanelWidth = w"
+          @select     = "jump"
+          @mouseenter = "showLeftPanel"
+          @mouseleave = "scheduleHideLeftPanel"
+        />
+      </div>
       <work-zone
         ref="workzone"
         :iconSize   = "iconSize"
@@ -130,7 +143,10 @@
         searchQuery: '',
         isSearchMode: false,
         searchVersion: 0,
-        _restoreScrollPending: false
+        _restoreScrollPending: false,
+        autohideLeftPanel: localStorage.getItem('autohideLeftPanel') === 'true',
+        leftPanelVisible: false,
+        _leftPanelTimer: null
       }
     },
     
@@ -254,6 +270,20 @@
         });
       },
 
+      showLeftPanel(){
+        if(this._leftPanelTimer){
+          clearTimeout(this._leftPanelTimer)
+          this._leftPanelTimer = null
+        }
+        this.leftPanelVisible = true
+      },
+      scheduleHideLeftPanel(){
+        if(this._leftPanelTimer) clearTimeout(this._leftPanelTimer)
+        this._leftPanelTimer = setTimeout(() => {
+          this.leftPanelVisible = false
+        }, 300)
+      },
+
       showToast(text){
         if(this.toastTimer) clearTimeout(this.toastTimer);
         this.toastText = text;
@@ -343,6 +373,11 @@
     
     watch:{
       
+      autohideLeftPanel(val){
+        localStorage.setItem('autohideLeftPanel', val)
+        if(val) this.leftPanelVisible = false
+      },
+
       async currentDir(){
         this.isSearchMode = false;
         this.searchResults = null;
@@ -390,10 +425,51 @@
     display:flex;
     flex:1;
     flex-direction:row;
-    align-items:stretch
+    align-items:stretch;
+    position:relative
   }
   .tree{
     width:200px
+  }
+  .left-panel-container{
+    display:flex;
+    position:relative
+  }
+  .left-panel-container.autohide{
+    position:absolute;
+    left:0;
+    top:0;
+    bottom:0;
+    width:0;
+    overflow:visible;
+    z-index:200
+  }
+  .left-panel-trigger{
+    position:absolute;
+    left:0;
+    top:0;
+    bottom:0;
+    width:6px;
+    z-index:1;
+    cursor:default
+  }
+  .left-panel-container.autohide .tree{
+    position:absolute !important;
+    left:0 !important;
+    top:0 !important;
+    bottom:0 !important;
+    z-index:101 !important;
+    transform:translateX(-100%);
+    transition:transform .15s ease;
+    background:#fff
+  }
+  .left-panel-container.autohide.panel-visible .tree{
+    transform:translateX(0);
+    box-shadow:2px 0 8px rgba(0,0,0,.3)
+  }
+  .left-panel-container.autohide .tree .line{
+    background-color:transparent !important;
+    border-color:transparent !important
   }
   ::-webkit-scrollbar {
     width: 12px; 
