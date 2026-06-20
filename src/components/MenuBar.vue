@@ -1,14 +1,23 @@
 <template>
-  <div></div>
+  <div class="menu-bar" v-if="items.length">
+    <div
+      class="menu-item"
+      v-for="item in items"
+      :key="item.label"
+      @click="openMenu(item, $event)"
+    >
+      {{ item.label }}
+    </div>
+  </div>
 </template>
 <script>
-  // vue wrapper around the standard electron menu bar
+  import theme from '../../theme.json'
 
   let clickHandler
 
   const { ipcRenderer } = window.electron
 
-  ipcRenderer.on('menu-bar-click', (_,id) => clickHandler && clickHandler(id))
+  ipcRenderer.on('show-menu-bar-submenu-reply', (_,id) => clickHandler && clickHandler(id))
 
   export default {
     name: 'MenuBar',
@@ -19,7 +28,8 @@
       sortOrder:  String,
       groupBy:    String,
       isDev:      Boolean,
-      autohideLeftPanel: Boolean
+      autohideLeftPanel: Boolean,
+      autohideTopPanel: Boolean
     },
 
     emits: [
@@ -27,16 +37,28 @@
       'changeSortColumn', 
       'changeSortOrder',
       'changeGroup',
-      'toggleAutohideLeftPanel'
+      'toggleAutohideLeftPanel',
+      'toggleAutohideTopPanel'
     ],
 
+    data(){
+      return { theme }
+    },
+
     mounted() {
-      this.updateMenu(this.items)
       clickHandler = this.itemClick.bind(this)
     },
-  
+   
     methods: {
-      // handler for clicking on a menu item
+      openMenu(menuItem, event){
+        let rect = event.currentTarget.getBoundingClientRect()
+        ipcRenderer.send('show-menu-bar-submenu', {
+          items: menuItem.submenu,
+          x: rect.x,
+          y: rect.y + rect.height
+        })
+      },
+
       itemClick(id){
         switch(id){
           case 'icons':
@@ -74,15 +96,11 @@
             this.$emit('toggleAutohideLeftPanel')
             break
           }
+          case 'autohide-top-panel': {
+            this.$emit('toggleAutohideTopPanel')
+            break
+          }
         }
-      },
-
-      // updates the menu state
-      updateMenu(newValue){
-        ipcRenderer.send(
-          'update-menu-bar',
-          JSON.parse(JSON.stringify(newValue))
-        )
       }
     },
 
@@ -195,21 +213,37 @@
                 type: 'checkbox',
                 checked: this.autohideLeftPanel
               },
+              {
+                label: 'Autohide top panel',
+                id: 'autohide-top-panel',
+                type: 'checkbox',
+                checked: this.autohideTopPanel
+              },
               { role: 'toggleDevTools', visible: this.isDev }              
             ]
           }
         ]
       }
-    },
-
-    watch: {
-      items: {
-        deep:true,
-        handler(newValue){
-          this.updateMenu(newValue)
-        }
-      }
     }
-    
   }
 </script>
+<style scoped>
+  .menu-bar{
+    display:flex;
+    height:22px;
+    background:transparent;
+    flex-shrink:0
+  }
+  .menu-item{
+    padding:2px 10px;
+    font-size:15px;
+    font-family:sans-serif;
+    cursor:default;
+    display:flex;
+    align-items:center;
+    border-radius:3px
+  }
+  .menu-item:hover{
+    background:rgba(0,0,0,0.08)
+  }
+</style>

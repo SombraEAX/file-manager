@@ -33,7 +33,10 @@ function createWindow() {
 
 }
 
-app.on('ready', createWindow)
+app.on('ready', () => {
+  Menu.setApplicationMenu(null)
+  createWindow()
+})
 
 app.on('window-all-closed', function () {
   if (process.platform !== 'darwin') app.quit()
@@ -43,20 +46,25 @@ app.on('activate', function () {
   if (mainWindow === null) createWindow()
 })
 
-function menuProcessing(event,menu){
-  for(let item of menu){
-    if(item.id){
-      item.click = _ => event.reply('menu-bar-click', item.id)
-    }
-    if(item.submenu){
-      menuProcessing(event,item.submenu)
-    }
+ipcMain.on('show-menu-bar-submenu', (event, {items,x,y}) => {
+  function buildMenu(items){
+    let menu = new Menu()
+    items.forEach((item) => {
+      if(item.visible === false) return
+      if(item.submenu){
+        menu.append(new MenuItem({ label: item.label, submenu: buildMenu(item.submenu) }))
+      }else{
+        let opts = { ...item }
+        delete opts.id
+        delete opts.visible
+        opts.click = () => item.id && event.reply('show-menu-bar-submenu-reply', item.id)
+        menu.append(new MenuItem(opts))
+      }
+    })
+    return menu
   }
-}
-
-ipcMain.on('update-menu-bar', (event, template) => {
-  menuProcessing(event,template)
-  mainWindow.setMenu(Menu.buildFromTemplate(template))
+  let menu = buildMenu(items)
+  menu.popup({ x, y })
 })
 
 ipcMain.on('show-menu', (event, {items,x,y}) => {

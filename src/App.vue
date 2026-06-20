@@ -1,39 +1,54 @@
 <template>
   <div class="global-wrapper">
-    <menu-bar
-      :view             = "view"
-      :sortColumn       = "sortColumn"
-      :sortOrder        = "sortOrder"
-      :groupBy          = "groupBy"
-      :isDev            = "isDev"
-      :autohideLeftPanel = "autohideLeftPanel"
-      @changeView       = "ev => view = ev"
-      @changeSortColumn = "ev => sortColumn = ev"
-      @changeSortOrder  = "ev => sortOrder = ev"
-      @changeGroup      = "ev => groupBy = ev"
-      @toggleAutohideLeftPanel = "autohideLeftPanel = !autohideLeftPanel"
-    />
-    <tab-bar
-      :tabs        = "tabs"
-      :active-index = "activeTabIndex"
-      @select      = "switchTab"
-      @close       = "closeTab"
-    />
-    <top-panel
-      :address            = "currentDir"
-      :history            = "tabs[activeTabIndex]?.history || []"
-      :historyIndex       = "tabs[activeTabIndex]?.historyIndex ?? -1"
-      :search-version     = "searchVersion"
-      @back               = "ev => tabs[activeTabIndex].historyIndex--"
-      @forward            = "ev => tabs[activeTabIndex].historyIndex++"
-      @up                 = "up"
-      @jump               = "jump"
-      @changeHistoryIndex = "ev => tabs[activeTabIndex].historyIndex = ev"
-      @search             = "onSearchResults"
-      :view               = "view"
-      @changeView         = "ev => view = ev"
-    />
-    <div class="main">
+    <div 
+      class="top-panel-container"
+      :class="{ autohide: autohideTopPanel, 'panel-visible': topPanelVisible }"
+    >
+      <div class="top-panel-trigger" v-if="autohideTopPanel"
+        @mouseenter="showTopPanel"
+      ></div>
+      <div class="top-panel-inner"
+        @mouseenter="showTopPanel"
+      >
+        <menu-bar
+          :view             = "view"
+          :sortColumn       = "sortColumn"
+          :sortOrder        = "sortOrder"
+          :groupBy          = "groupBy"
+          :isDev            = "isDev"
+          :autohideLeftPanel = "autohideLeftPanel"
+          :autohideTopPanel  = "autohideTopPanel"
+          @changeView       = "ev => view = ev"
+          @changeSortColumn = "ev => sortColumn = ev"
+          @changeSortOrder  = "ev => sortOrder = ev"
+          @changeGroup      = "ev => groupBy = ev"
+          @toggleAutohideLeftPanel = "autohideLeftPanel = !autohideLeftPanel"
+          @toggleAutohideTopPanel  = "autohideTopPanel = !autohideTopPanel"
+        />
+        <tab-bar
+          :tabs        = "tabs"
+          :active-index = "activeTabIndex"
+          @select      = "switchTab"
+          @close       = "closeTab"
+        />
+        <top-panel
+          ref="topPanel"
+          :address            = "currentDir"
+          :history            = "tabs[activeTabIndex]?.history || []"
+          :historyIndex       = "tabs[activeTabIndex]?.historyIndex ?? -1"
+          :search-version     = "searchVersion"
+          @back               = "ev => tabs[activeTabIndex].historyIndex--"
+          @forward            = "ev => tabs[activeTabIndex].historyIndex++"
+          @up                 = "up"
+          @jump               = "jump"
+          @changeHistoryIndex = "ev => tabs[activeTabIndex].historyIndex = ev"
+          @search             = "onSearchResults"
+          :view               = "view"
+          @changeView         = "ev => view = ev"
+        />
+      </div>
+    </div>
+    <div class="main" @mouseenter="scheduleHideTopPanel">
       <div 
         class="left-panel-container"
         :class="{ autohide: autohideLeftPanel, 'panel-visible': leftPanelVisible }"
@@ -146,7 +161,10 @@
         _restoreScrollPending: false,
         autohideLeftPanel: localStorage.getItem('autohideLeftPanel') === 'true',
         leftPanelVisible: false,
-        _leftPanelTimer: null
+        _leftPanelTimer: null,
+        autohideTopPanel: localStorage.getItem('autohideTopPanel') === 'true',
+        topPanelVisible: false,
+        _topPanelTimer: null
       }
     },
     
@@ -283,6 +301,20 @@
           this.leftPanelVisible = false
         }, 300)
       },
+      showTopPanel(){
+        if(this._topPanelTimer){
+          clearTimeout(this._topPanelTimer)
+          this._topPanelTimer = null
+        }
+        this.topPanelVisible = true
+      },
+      scheduleHideTopPanel(){
+        if(this._topPanelTimer) clearTimeout(this._topPanelTimer)
+        this._topPanelTimer = setTimeout(() => {
+          this.topPanelVisible = false
+          if(this.$refs.topPanel) this.$refs.topPanel.closeDropdowns()
+        }, 300)
+      },
 
       showToast(text){
         if(this.toastTimer) clearTimeout(this.toastTimer);
@@ -377,6 +409,10 @@
         localStorage.setItem('autohideLeftPanel', val)
         if(val) this.leftPanelVisible = false
       },
+      autohideTopPanel(val){
+        localStorage.setItem('autohideTopPanel', val)
+        if(val) this.topPanelVisible = false
+      },
 
       async currentDir(){
         this.isSearchMode = false;
@@ -418,7 +454,8 @@
     height:100%;
     max-height:100%;
     display:flex;
-    flex-direction:column
+    flex-direction:column;
+    position:relative
   }
 
   .main{
@@ -430,6 +467,38 @@
   }
   .tree{
     width:200px
+  }
+  .top-panel-container{
+    flex-shrink:0
+  }
+  .top-panel-container.autohide{
+    height:0;
+    overflow:visible;
+    position:relative;
+    z-index:350
+  }
+  .top-panel-trigger{
+    position:absolute;
+    top:0;
+    left:0;
+    right:0;
+    height:4px;
+    cursor:default
+  }
+  .top-panel-container.autohide .top-panel-inner{
+    position:absolute;
+    top:0;
+    left:0;
+    right:0;
+    z-index:1;
+    background:#fff;
+    transform:translateY(-100%);
+    transition:transform .15s ease;
+    padding-bottom:6px
+  }
+  .top-panel-container.autohide.panel-visible .top-panel-inner{
+    transform:translateY(0);
+    box-shadow:0 2px 8px rgba(0,0,0,.3)
   }
   .left-panel-container{
     display:flex;

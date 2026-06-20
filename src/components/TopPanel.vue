@@ -21,6 +21,7 @@
       :disabled="address == '/'"
     ></button>
     <AddressBar
+      ref="addressBar"
       :address="address"
       :search-version="searchVersion"
       @jump="gotopath"
@@ -92,6 +93,13 @@
           'show-history-menu-reply',
           (_, index) => this.$emit('changeHistoryIndex', index)
         )
+      },
+      closeDropdowns(){
+        let ab = this.$refs.addressBar
+        if(ab){
+          ab.closeDropdown()
+          ab.finishEditing()
+        }
       }
     },
     watch: {
