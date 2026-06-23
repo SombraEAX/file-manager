@@ -1,10 +1,10 @@
 <template>
   <div class="entries-group">
-    <div class="titlebar" @click="expand=!expand" v-if="name">
+    <div class="titlebar" @click="$emit('toggle')" v-if="name">
       <div class="title">{{name}}</div>
-      <div class="icon" :data-expand="expand"></div>
+      <div class="icon" :data-expand="!collapsed"></div>
     </div>
-    <div v-if="!name || expand" :style="gridStyle">
+    <div v-if="!name || !collapsed" :style="gridStyle">
       <slot></slot>
     </div>
   </div>
@@ -17,12 +17,13 @@
     props: {
       name:String,
       view:String,
-      iconSize: Number
+      iconSize: Number,
+      collapsed: Boolean
     },
+    emits: ['toggle'],
     data(){
       return {
-        theme,
-        expand: true
+        theme
       }
     },
     computed: {

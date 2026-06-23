@@ -2,7 +2,7 @@
   <side-bar
     @resize="(ev) => $emit('resize',ev)"
     :width="width"
-    minWidth="150"
+    :minWidth="150"
     position="left"
   >
     <div class="tree-wrap">
