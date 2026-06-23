@@ -29,7 +29,8 @@
       groupBy:    String,
       isDev:      Boolean,
       autohideLeftPanel: Boolean,
-      autohideTopPanel: Boolean
+      autohideTopPanel: Boolean,
+      showHidden: Boolean
     },
 
     emits: [
@@ -38,7 +39,8 @@
       'changeSortOrder',
       'changeGroup',
       'toggleAutohideLeftPanel',
-      'toggleAutohideTopPanel'
+      'toggleAutohideTopPanel',
+      'toggleShowHidden'
     ],
 
     data(){
@@ -98,6 +100,10 @@
           }
           case 'autohide-top-panel': {
             this.$emit('toggleAutohideTopPanel')
+            break
+          }
+          case 'show-hidden': {
+            this.$emit('toggleShowHidden')
             break
           }
         }
@@ -205,6 +211,13 @@
                     checked: this.groupBy === null
                   }
                 ]                
+              },
+              { type: 'separator' },
+              {
+                label: 'Show hidden files',
+                id: 'show-hidden',
+                type: 'checkbox',
+                checked: this.showHidden
               },
               { type: 'separator' },
               {

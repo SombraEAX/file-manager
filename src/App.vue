@@ -18,12 +18,14 @@
           :isDev            = "isDev"
           :autohideLeftPanel = "autohideLeftPanel"
           :autohideTopPanel  = "autohideTopPanel"
+          :showHidden        = "showHidden"
           @changeView       = "ev => view = ev"
           @changeSortColumn = "ev => sortColumn = ev"
           @changeSortOrder  = "ev => sortOrder = ev"
           @changeGroup      = "ev => groupBy = ev"
           @toggleAutohideLeftPanel = "autohideLeftPanel = !autohideLeftPanel"
           @toggleAutohideTopPanel  = "autohideTopPanel = !autohideTopPanel"
+          @toggleShowHidden = "showHidden = !showHidden"
         />
         <tab-bar
           :tabs        = "tabs"
@@ -168,7 +170,8 @@
         autohideTopPanel: localStorage.getItem('autohideTopPanel') === 'true',
         topPanelVisible: false,
         _topPanelTimer: null,
-        rightPanelVisible: localStorage.getItem('rightPanelVisible') !== 'false'
+        rightPanelVisible: localStorage.getItem('rightPanelVisible') !== 'false',
+        showHidden: localStorage.getItem('showHidden') === 'true'
       }
     },
     
@@ -420,6 +423,20 @@
       rightPanelVisible(val){
         localStorage.setItem('rightPanelVisible', val)
       },
+      showHidden(val){
+        localStorage.setItem('showHidden', val)
+        if(this._allEntries){
+          let folders = 0, files = 0
+          let filtered = val ? this._allEntries : this._allEntries.filter(e => e.name[0] !== '.')
+          for(let entry of filtered){
+            if(entry.type === 'directory') folders++
+            if(entry.type === 'file')      files++
+          }
+          this.entries = filtered
+          this.folders = folders
+          this.files   = files
+        }
+      },
 
       async currentDir(){
         this.isSearchMode = false;
@@ -427,12 +444,15 @@
         try {
           let folders = 0
           let files   = 0
-          this.entries = await window.electron.readdir(this.currentDir)
+          this._allEntries = await window.electron.readdir(this.currentDir)
+          let filtered = this.showHidden ? this._allEntries : this._allEntries.filter(e => e.name[0] !== '.')
           
-          for(let entry of this.entries){
+          for(let entry of filtered){
             if(entry.type === 'directory') folders++
             if(entry.type === 'file')      files++
           }
+
+          this.entries = filtered
           
           this.folders = folders
           this.files   = files
