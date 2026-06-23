@@ -45,6 +45,8 @@
           @search             = "onSearchResults"
           :view               = "view"
           @changeView         = "ev => view = ev"
+          @togglePreviewPanel = "rightPanelVisible = !rightPanelVisible"
+          :previewPanelVisible="rightPanelVisible"
         />
       </div>
     </div>
@@ -84,6 +86,7 @@
         @contextMenu = "onFolderContextMenu"
       />
       <preview-panel
+        v-show="rightPanelVisible"
         :path   = "previewPath"
         :width  = "rightPanelWidth"
         :view   = "view"
@@ -164,7 +167,8 @@
         _leftPanelTimer: null,
         autohideTopPanel: localStorage.getItem('autohideTopPanel') === 'true',
         topPanelVisible: false,
-        _topPanelTimer: null
+        _topPanelTimer: null,
+        rightPanelVisible: localStorage.getItem('rightPanelVisible') !== 'false'
       }
     },
     
@@ -412,6 +416,9 @@
       autohideTopPanel(val){
         localStorage.setItem('autohideTopPanel', val)
         if(val) this.topPanelVisible = false
+      },
+      rightPanelVisible(val){
+        localStorage.setItem('rightPanelVisible', val)
       },
 
       async currentDir(){

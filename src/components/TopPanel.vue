@@ -42,6 +42,11 @@
       :class="{ active: view === 'table' }"
       @click="$emit('changeView', 'table')"
     ></button>
+    <button
+      class="icon icon-panel"
+      :class="{ active: previewPanelVisible }"
+      @click="$emit('togglePreviewPanel')"
+    ></button>
   </div>
 </template>
 <script>
@@ -49,7 +54,7 @@
   import AddressBar from "./AddressBar.vue"
   
   export default {
-    emits: ['back', 'forward', 'up', 'jump', 'changeHistoryIndex', 'search', 'changeView'],
+    emits: ['back', 'forward', 'up', 'jump', 'changeHistoryIndex', 'search', 'changeView', 'togglePreviewPanel'],
     components:{
       AddressBar
     },
@@ -61,7 +66,8 @@
       },
       historyIndex: Number,
       searchVersion: Number,
-      view: String
+      view: String,
+      previewPanelVisible: Boolean
     },
     data(){
       return {
@@ -176,6 +182,7 @@
   .top-panel .icon-list::before{ content:"" }
   .top-panel .icon-table::before{ content:"" }
   .top-panel .icon-icons::before{ content:"󰀻" }
+  .top-panel .icon-panel::before{ content:"\ebf4" }
   .top-panel .icon.active{
     color:v-bind('theme.topPanelIconHoverColor')
   }
