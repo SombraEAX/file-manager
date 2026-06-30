@@ -13,8 +13,8 @@
 			"fontColor":"#fff"
 		},
 		"selected":{
-			"background":"blue",
-			"fontColor":"#fff"			
+			"background":"#b0d4f1",
+			"fontColor":"#000"			
 		}	
 	},
 	"tableRow":{

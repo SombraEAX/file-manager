@@ -1,7 +1,7 @@
 <template>
   <div class="outer" :class="{ 'table-mode': view === 'table' }">
-    <div class="scroll-wrap">
-      <div class="inner" :class="{ padded: view !== 'table' }" ref="inner" @scroll="onScroll">
+    <div class="scroll-wrap" ref="scrollWrap">
+      <div class="inner" :class="{ padded: view !== 'table' }" ref="inner" @scroll="onScroll" @mousedown.self="onMouseDown" @click.self="deselectAll">
         <TableHeader
           v-if="view == 'table'"
           :columns="columns"
@@ -12,7 +12,7 @@
           @moveColumn="moveColumn"
           @toggleColumnVisible="toggleColumnVisible"
         />
-        <div class="virtual-body" :style="{ height: totalHeight + 'px' }">
+        <div class="virtual-body" :style="{ height: totalHeight + 'px' }" @mousedown="onMouseDown" @click.self="deselectAll">
           <div
             v-for="item in visibleItems"
             :key="item.key"
@@ -22,7 +22,7 @@
             <div
               v-if="item.type === 'header'"
               class="group-header"
-              @click="toggleGroup(item.group.name)"
+              @click.stop="toggleGroup(item.group.name)"
             >
               <div class="group-header-icon" :data-expand="!isGroupCollapsed(item.group.name)"></div>
               <div class="group-header-title">{{ item.group.name }}</div>
@@ -37,7 +37,7 @@
                 :address="address"
                 @openDir="openDir"
                 @contextMenu="onContextMenu"
-                @click="select(item.entry)"
+                @click="select(item.entry, $event)"
               />
             </template>
             <div v-else class="grid-row" :style="gridRowStyle">
@@ -55,13 +55,14 @@
                   :address="address"
                   @openDir="openDir"
                   @contextMenu="onContextMenu"
-                  @click="select(entry)"
+                  @click="select(entry, $event)"
                 />
               </div>
             </div>
           </div>
         </div>
       </div>
+      <div class="rubber-band" v-if="rubberBand" :style="rubberBandStyle"></div>
       <div class="spacer"></div>
     </div>
   </div>
@@ -75,13 +76,14 @@
   const HEADER_H = 30
   const BUFFER = 200
   const LIST_ITEM_W = 155
-  const LIST_ROW_H = 36
-  const LIST_GAP = 5
+  const LIST_ROW_H = 22
+  const LIST_GAP = 2
   const ICONS_GAP = 20
+  const ICONS_ROW_GAP = 4
   const ICONS_LABEL_H = 50
 
   export default {
-    emits: ['openDir', 'changeSort', 'contextMenu', 'select'],
+    emits: ['openDir', 'changeSort', 'contextMenu', 'select', 'selectRange'],
     components:{
       TableHeader,
       DirEntry
@@ -135,7 +137,16 @@
         scrollTop: 0,
         viewportHeight: 600,
         collapsedGroups: {},
-        containerWidth: 300
+        containerWidth: 300,
+        dragSelecting: false,
+        _justDragged: false,
+        _dragStartClientX: 0,
+        _dragStartClientY: 0,
+        _scrollTopAtStart: 0,
+        _lastClientX: 0,
+        _lastClientY: 0,
+        _autoScrollDir: 0,
+        rubberBand: null
       }
     },
     computed:{
@@ -153,15 +164,18 @@
           if (group.name && this.collapsedGroups[group.name]) continue
           if (this.view === 'table') {
             for (const entry of group.entries) {
-              items.push({ type: 'entry', entry, group, height: TABLE_ROW_H, key: 't-' + group.name + '-' + (entry.path || entry.name) })
+              const p = entry.path || window.electron.join(this.address, entry.name)
+              items.push({ type: 'entry', entry, group, height: TABLE_ROW_H, key: 't-' + group.name + '-' + (entry.path || entry.name), path: p })
             }
           } else {
-            const rowH = this.view === 'list' ? LIST_ROW_H : (Math.max(this.iconSize || 120, 120) + ICONS_LABEL_H + ICONS_GAP)
+            const rowH = this.view === 'list' ? LIST_ROW_H : (Math.max(this.iconSize || 120, 40) + ICONS_LABEL_H + 21)
             for (let i = 0; i < group.entries.length; i += cols) {
               const chunk = group.entries.slice(i, i + cols)
+              const paths = chunk.map(e => e.path || window.electron.join(this.address, e.name))
               items.push({
                 type: 'row',
                 entries: chunk,
+                paths,
                 group,
                 height: rowH,
                 key: 'r-' + group.name + '-' + i
@@ -191,7 +205,7 @@
       },
       itemsPerRow(){
         if (this.view === 'icons') {
-          const w = Math.max(this.iconSize || 120, 120) + ICONS_GAP
+          const w = Math.max(this.iconSize || 120, 120) + ICONS_GAP + 20
           return Math.max(1, Math.floor(this.containerWidth / w))
         }
         if (this.view === 'list') {
@@ -211,15 +225,47 @@
         return {
           display: 'flex',
           flexWrap: 'wrap',
-          gap: LIST_GAP + 'px'
+          columnGap: LIST_GAP + 'px',
+          rowGap: '0px',
+          padding: '0 8px'
         }
       },
       entryWrapStyle(){
         if (this.view === 'icons') {
-          const w = Math.max(this.iconSize || 120, 120)
+          const w = Math.max(this.iconSize || 120, 120) + 20
           return { width: w + 'px', flexShrink: 0 }
         }
         return { width: '150px', flexShrink: 0 }
+      },
+      entryRects(){
+        const rects = []
+        for (const item of this.flatItems) {
+          if (item.type === 'header') continue
+          if (this.view === 'table') {
+            rects.push({ path: item.path, y: item.offset, height: item.height, x: 0, width: this.containerWidth })
+          } else if (item.type === 'row') {
+            const entryW = this.view === 'icons' ? Math.max(this.iconSize || 120, 120) + 20 : 150
+            const gap = this.view === 'icons' ? ICONS_GAP : LIST_GAP
+            for (let i = 0; i < item.entries.length; i++) {
+              rects.push({ path: item.paths[i], y: item.offset, height: item.height, x: i * (entryW + gap), width: entryW })
+            }
+          }
+        }
+        return rects
+      },
+      rubberBandStyle(){
+        if (!this.rubberBand) return { display: 'none' }
+        return {
+          position: 'absolute',
+          left: this.rubberBand.vx + 'px',
+          top: this.rubberBand.vy + 'px',
+          width: this.rubberBand.vw + 'px',
+          height: this.rubberBand.vh + 'px',
+            background: 'rgba(66, 133, 244, 0.2)',
+          border: '1px solid rgba(66, 133, 244, 0.5)',
+          pointerEvents: 'none',
+          zIndex: 100
+        }
       }
     },
     methods: {
@@ -238,9 +284,88 @@
         }
         return lo
       },
-      select(entry){
+      onMouseDown(event){
+        if (event.button !== 0) return
+        if (event.target.closest('[data-variant]')) return
+        this._justDragged = false
+        this._dragStartClientX = event.clientX
+        this._dragStartClientY = event.clientY
+        this._scrollTopAtStart = this.scrollTop
+        this.dragSelecting = true
+        this.rubberBand = null
+        this.$emit('select', null)
+        document.addEventListener('mousemove', this.onDragMove)
+        document.addEventListener('mouseup', this.onDragEnd)
+      },
+      onDragMove(event){
+        if (!this.dragSelecting) return
+        this._lastClientX = event.clientX
+        this._lastClientY = event.clientY
+        this._autoScroll()
+        this._updateDragSelection()
+      },
+      _autoScroll(){
+        const wrapRect = this.$refs.scrollWrap.getBoundingClientRect()
+        const MARGIN = 50
+        let dir = 0
+        let dist = 0
+        if (this._lastClientY < wrapRect.top) {
+          dir = -1
+          dist = wrapRect.top - this._lastClientY + MARGIN
+        } else if (this._lastClientY > wrapRect.bottom) {
+          dir = 1
+          dist = this._lastClientY - wrapRect.bottom + MARGIN
+        } else if (this._lastClientY - wrapRect.top < MARGIN) {
+          dir = -1
+          dist = MARGIN - (this._lastClientY - wrapRect.top)
+        } else if (wrapRect.bottom - this._lastClientY < MARGIN) {
+          dir = 1
+          dist = MARGIN - (wrapRect.bottom - this._lastClientY)
+        }
+        this._autoScrollDir = dir
+        if (!dir) return
+        const speed = Math.min(40, Math.max(5, dist / 3))
+        const inner = this.$refs.inner
+        inner.scrollTop += dir * speed
+        this.scrollTop = inner.scrollTop
+      },
+      _updateDragSelection(){
+        const wrapRect = this.$refs.scrollWrap.getBoundingClientRect()
+        const vx = Math.min(this._dragStartClientX, this._lastClientX) - wrapRect.left
+        const vy = Math.min(this._dragStartClientY, this._lastClientY) - wrapRect.top
+        const vw = Math.abs(this._lastClientX - this._dragStartClientX)
+        const vh = Math.abs(this._lastClientY - this._dragStartClientY)
+        this.rubberBand = { vx, vy, vw, vh }
+
+        const inner = this.$refs.inner
+        const iRect = inner.getBoundingClientRect()
+        const x1 = Math.min(this._dragStartClientX, this._lastClientX) - iRect.left
+        const x2 = Math.max(this._dragStartClientX, this._lastClientX) - iRect.left
+        const startDocY = this._dragStartClientY - iRect.top + this._scrollTopAtStart
+        const curDocY = this._lastClientY - iRect.top + this.scrollTop
+        const y1 = Math.min(startDocY, curDocY)
+        const y2 = Math.max(startDocY, curDocY)
+
+        const paths = this.entryRects
+          .filter(r => r.x < x2 && r.x + r.width > x1 && r.y < y2 && r.y + r.height > y1)
+          .map(r => r.path)
+        this.$emit('selectRange', paths)
+      },
+      onDragEnd(){
+        this.dragSelecting = false
+        this._justDragged = true
+        this.rubberBand = null
+        this._autoScrollDir = 0
+        document.removeEventListener('mousemove', this.onDragMove)
+        document.removeEventListener('mouseup', this.onDragEnd)
+      },
+      select(entry, event){
         let pathname = entry.path || window.electron.join(this.address, entry.name)
-        this.$emit('select', pathname)
+        this.$emit('select', { path: pathname, ctrl: event.ctrlKey || event.metaKey, shift: event.shiftKey })
+      },
+      deselectAll(){
+        if (this._justDragged) return
+        this.$emit('select', null)
       },
       openDir(dir){
         this.$emit('openDir',dir)
@@ -333,6 +458,9 @@
     left:0;
     right:0;
     will-change:transform;
+  }
+  .outer.table-mode .virtual-row{
+    padding-left:8px;
   }
   .group-header{
     display:flex;

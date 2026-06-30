@@ -50,34 +50,57 @@ ipcMain.on('show-menu-bar-submenu', (event, {items,x,y}) => {
   function buildMenu(items){
     let menu = new Menu()
     items.forEach((item) => {
-      if(item.visible === false) return
+      if(item.visible == false) return
       if(item.submenu){
         menu.append(new MenuItem({ label: item.label, submenu: buildMenu(item.submenu) }))
       }else{
-        let opts = { ...item }
-        delete opts.id
-        delete opts.visible
-        opts.click = () => item.id && event.reply('show-menu-bar-submenu-reply', item.id)
-        menu.append(new MenuItem(opts))
+        let opts = {}
+        if(item.role){
+          opts.role = item.role
+        }else{
+          opts.type = item.type || 'normal'
+          opts.label = item.label
+          if(item.checked !== undefined) opts.checked = item.checked
+        }
+        if(item.id) opts.click = () => event.reply('show-menu-bar-submenu-reply', item.id)
+        let menuItem
+        try{
+	        menuItem = new MenuItem(opts)
+	    }catch(e){
+	    	console.log('create menu item error:',e)
+	    	throw e
+	    }
+	    try{
+	        menu.append(menuItem)
+	    }catch(e){
+	    	console.log('menu item append error:',e)
+	    	throw e
+	    }
       }
     })
     return menu
   }
   let menu = buildMenu(items)
-  menu.popup({ x, y })
+  menu.popup({ window: mainWindow, x:Math.floor(x), y:Math.floor(y) })
 })
 
 ipcMain.on('show-menu', (event, {items,x,y}) => {
   let menu = new Menu()
 
-  items.forEach((item, index) =>
-    menu.append(new MenuItem({
-      ...item,
-      click: _ => event.reply('show-menu-reply', index)
-    }))
-  )
+  items.forEach((item, index) => {
+    let opts = {}
+    if(item.role){
+      opts.role = item.role
+    }else{
+      opts.type = item.type || 'normal'
+      opts.label = item.label
+      if(item.checked !== undefined) opts.checked = item.checked
+    }
+    opts.click = () => event.reply('show-menu-reply', index)
+    menu.append(new MenuItem(opts))
+  })
 
-  menu.popup({x,y})	
+  menu.popup({ window: mainWindow, x, y })	
 })
 
 ipcMain.on('copy-to-clipboard', (event, text) => {
@@ -107,5 +130,5 @@ ipcMain.on('show-history-menu', (event, { history, current, x, y }) => {
     }))
   )
 
-  menu.popup({x,y})
+  menu.popup({ window: mainWindow, x, y })
 })

@@ -26,6 +26,8 @@
           @toggleAutohideLeftPanel = "autohideLeftPanel = !autohideLeftPanel"
           @toggleAutohideTopPanel  = "autohideTopPanel = !autohideTopPanel"
           @toggleShowHidden = "showHidden = !showHidden"
+          @selectAll       = "selectAllEntries"
+          @invertSelection = "invertSelection"
         />
         <tab-bar
           :tabs        = "tabs"
@@ -84,7 +86,8 @@
         :address    = "currentDir"
         @changeSort = "changeSort"
         @openDir    = "openDir"
-        @select     = "ev => previewPath = ev"
+        @select     = "selectEntry"
+        @selectRange = "selectRange"
         @contextMenu = "onFolderContextMenu"
       />
       <preview-panel
@@ -155,7 +158,7 @@
         sortColumn: 'name',
         sortOrder: 'asc',
         groupBy: null,
-        isDev: ~location.href.indexOf('localhost'),
+        isDev: location.href.includes('localhost'),
         toastText: '',
         toastVisible: false,
         toastTimer: null,
@@ -171,7 +174,9 @@
         topPanelVisible: false,
         _topPanelTimer: null,
         rightPanelVisible: localStorage.getItem('rightPanelVisible') !== 'false',
-        showHidden: localStorage.getItem('showHidden') === 'true'
+        showHidden: localStorage.getItem('showHidden') === 'true',
+        selectedMap: {},
+        lastClickedPath: null
       }
     },
     
@@ -323,6 +328,74 @@
         }, 300)
       },
 
+      selectEntry(ev){
+        if (!ev) { this.clearSelection(); return }
+        let { path, ctrl, shift } = ev
+        this.previewPath = path
+        if (ctrl) {
+          if (this.selectedMap[path]) {
+            let next = { ...this.selectedMap }; delete next[path]; this.selectedMap = next
+          } else {
+            this.selectedMap = { ...this.selectedMap, [path]: true }
+          }
+        } else if (shift && this.lastClickedPath) {
+          let allPaths = []
+          for (let group of this.groups) {
+            for (let entry of group.entries) {
+              allPaths.push(entry.path || window.electron.join(this.currentDir, entry.name))
+            }
+          }
+          let lastIdx = allPaths.indexOf(this.lastClickedPath)
+          let currIdx = allPaths.indexOf(path)
+          if (~lastIdx && ~currIdx) {
+            let [start, end] = lastIdx < currIdx ? [lastIdx, currIdx] : [currIdx, lastIdx]
+            let next = {}
+            for (let i = start; i <= end; i++) next[allPaths[i]] = true
+            this.selectedMap = next
+          } else {
+            this.selectedMap = { [path]: true }
+          }
+        } else {
+          this.selectedMap = { [path]: true }
+        }
+        this.lastClickedPath = path
+      },
+      selectRange(paths){
+        const next = {}
+        for (const p of paths) next[p] = true
+        this.selectedMap = next
+        this.lastClickedPath = paths.length ? paths[paths.length - 1] : null
+        this.previewPath = paths.length ? paths[paths.length - 1] : null
+      },
+      clearSelection(){
+        this.previewPath = null
+        this.selectedMap = {}
+        this.lastClickedPath = null
+      },
+      selectAllEntries(){
+        let source = this.isSearchMode && this.searchResults ? this.searchResults : this.entries
+        let next = {}
+        for(let entry of source){
+          let path = entry.path || window.electron.join(this.currentDir, entry.name)
+          next[path] = true
+        }
+        this.selectedMap = next
+        let paths = Object.keys(next)
+        this.previewPath = paths.length ? paths[paths.length - 1] : null
+        this.lastClickedPath = paths.length ? paths[paths.length - 1] : null
+      },
+      invertSelection(){
+        let source = this.isSearchMode && this.searchResults ? this.searchResults : this.entries
+        let next = {}
+        for(let entry of source){
+          let path = entry.path || window.electron.join(this.currentDir, entry.name)
+          if(!this.selectedMap[path]) next[path] = true
+        }
+        this.selectedMap = next
+        let paths = Object.keys(next)
+        this.previewPath = paths.length ? paths[paths.length - 1] : null
+        this.lastClickedPath = paths.length ? paths[paths.length - 1] : null
+      },
       showToast(text){
         if(this.toastTimer) clearTimeout(this.toastTimer);
         this.toastText = text;
@@ -383,6 +456,8 @@
           let groupName = this.getGroup(entry)
           let group = groups.find(g => g.name === groupName)
           if(!group) groups.push(group = {name:groupName, entries:[]})
+          let path = entry.path || window.electron.join(this.currentDir, entry.name)
+          entry.selected = !!this.selectedMap[path]
           group.entries.push(entry)
         }
         

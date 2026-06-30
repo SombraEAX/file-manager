@@ -40,7 +40,9 @@
       'changeGroup',
       'toggleAutohideLeftPanel',
       'toggleAutohideTopPanel',
-      'toggleShowHidden'
+      'toggleShowHidden',
+      'selectAll',
+      'invertSelection'
     ],
 
     data(){
@@ -106,6 +108,14 @@
             this.$emit('toggleShowHidden')
             break
           }
+          case 'select-all': {
+            this.$emit('selectAll')
+            break
+          }
+          case 'invert-selection': {
+            this.$emit('invertSelection')
+            break
+          }
         }
       }
     },
@@ -113,6 +123,19 @@
     computed: {
       items(){
         return [
+          {
+            label: 'Edit',
+            submenu: [
+              {
+                label: 'Select All',
+                id: 'select-all'
+              },
+              {
+                label: 'Invert Selection',
+                id: 'invert-selection'
+              }
+            ]
+          },
           {
             label: 'View',
             submenu:[

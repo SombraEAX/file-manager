@@ -50,7 +50,7 @@
       <div class="scale-bar" v-if="view === 'icons'">
         <input
           type="range"
-          min="16"
+          min="40"
           max="128"
           :value="scale"
           @input="onScale"
@@ -172,6 +172,7 @@
     },
     watch:{
       async path(path){
+        if(!path){ this.text = null; this.type = null; this.imageStyle = null; return }
         let {type,language} = getFileType(path)
 
         switch(this.type = type){

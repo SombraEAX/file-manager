@@ -3,7 +3,7 @@
     class="main"
     :data-variant="view" 
     :data-selected="selected" 
-    @click="click"
+    @click="onClick"
     @contextmenu.prevent="onContextMenu"
   >
     <EntryIcon :size="entryIconSize" :is-dir="params.type === 'directory'" :type="entryType" />
@@ -40,7 +40,7 @@
   }
 
   export default {
-    emits: ['openDir', 'contextMenu'],
+    emits: ['openDir', 'contextMenu', 'click'],
     components: { EntryIcon },
     props: {
       view:String,
@@ -64,7 +64,7 @@
     },
     computed:{
       entryIconSize(){
-        return this.view === 'icons' ? this.iconSize : 16
+        return this.view === 'icons' ? Math.max(this.iconSize, 40) : 16
       },
       iconSizePx(){
         return this.entryIconSize + 'px'
@@ -97,10 +97,11 @@
         if(this.params.type === 'directory')
           this.$emit('contextMenu', { path: this.params.path || this.params.name, x: e.clientX, y: e.clientY });
       },
-      click(){
+      onClick($event){
         if(this.clicked && Date.now() - this.clicked < 500)
           this.doubleClick()
         this.clicked = Date.now()
+        this.$emit('click', $event)
       },
       columnStyle(col,index){
         if(this.view !== 'table') return {width:'auto'}
@@ -127,15 +128,17 @@
     min-width:120px;
     background: v-bind('theme.background');
     color:      v-bind('theme.fontColor');
+    box-sizing:border-box;
   }
   [data-selected="true"]{
     background: v-bind('theme.fileIcon.selected.background');
-    color:      v-bind('theme.fileIcon.selected.fontColor')
+    color:      v-bind('theme.fileIcon.selected.fontColor');
+    border-radius:3px;
   }
   [data-variant="table"]{
     min-width: min-content;
     color:      v-bind('theme.tableRow.params');
-    padding-left: 10px;
+    padding-left:2px;
   }
   [data-variant="table"] .label[data-colname] ~ .label[data-colname]{
     padding-left: 10px;
@@ -148,7 +151,8 @@
   }
   [data-variant="list"]{
     display:flex;
-    width:100%
+    width:100%;
+    padding-left:2px;
   }
   .main > :first-child{
     display:inline-flex;
@@ -166,7 +170,17 @@
   [data-variant="icons"]{
     display:flex;
     flex-direction:column !important;
-    align-items:center
+    align-items:center;
+    padding:10px 10px 6px;
+  }
+  [data-variant="icons"][data-selected="true"]{
+    border-radius:6px;
+  }
+  [data-variant="icons"].main:hover{
+    border-radius:6px;
+  }
+  [data-variant="icons"][data-selected="true"]:hover{
+    border-radius:6px;
   }
   .label{
     box-sizing:border-box;   
@@ -182,6 +196,12 @@
   }
   .main:hover{
     background: v-bind('theme.fileIcon.hover.background');
-    color:      v-bind('theme.fileIcon.hover.fontColor')
+    color:      v-bind('theme.fileIcon.hover.fontColor');
+    border-radius:3px;
+  }
+  [data-selected="true"]:hover{
+    background: v-bind('theme.fileIcon.selected.background');
+    color:      v-bind('theme.fileIcon.selected.fontColor');
+    border-radius:3px;
   }
 </style>
