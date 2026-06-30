@@ -69,18 +69,21 @@
         const xdg = getXdgDirs()
         return xdg[dir.name] || ''
       },
-      iconClick(dir){
+      async iconClick(dir){
         dir.open = !dir.open
 
         if(dir.open){
-          dir.dirs = 
-            window.electron
-            .readdirSync(dir.pathname)
-            .map(subdir => ({
-              name: subdir,
-              pathname: window.electron.join(dir.pathname, subdir) 	
-            }))
-            .filter(subdir => window.electron.isDir(subdir.pathname))		
+          try {
+            let items = await window.electron.readdir(dir.pathname)
+            dir.dirs = items
+              .filter(item => item.type === 'directory')
+              .map(item => ({
+                name: item.name,
+                pathname: window.electron.join(dir.pathname, item.name)
+              }))
+          } catch(e) {
+            dir.dirs = []
+          }
         }else{
           delete dir.dirs
         }

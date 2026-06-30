@@ -182,13 +182,13 @@
     
     methods:{
     
-      openDir(dirname){
+      async openDir(dirname){
         if(this.isSearchMode && dirname.startsWith('/')){
           this.isSearchMode = false;
           this.searchResults = null;
-          this.jump(dirname);
+          await this.jump(dirname);
         }else{
-          this.jump(window.electron.join(this.currentDir, dirname));
+          await this.jump(window.electron.join(this.currentDir, dirname));
         }
       },
 
@@ -246,11 +246,11 @@
         this.searchVersion++;
       },
 
-      openInNewTab(pathname){
+      async openInNewTab(pathname){
         if(!pathname.startsWith('/'))
           pathname = window.electron.join(this.currentDir, pathname);
         try {
-          if(!window.electron.isDir(pathname)) throw new Error();
+          if(!(await window.electron.isDir(pathname))) throw new Error();
         } catch(e) {
           this.showToast('Folder not found');
           return;
@@ -260,9 +260,9 @@
         this.searchVersion++;
       },
 
-      jump(pathname){
+      async jump(pathname){
         try {
-          if(!window.electron.isDir(pathname)) throw new Error();
+          if(!(await window.electron.isDir(pathname))) throw new Error();
         } catch(e) {
           this.showToast('Folder not found');
           return;
@@ -277,10 +277,10 @@
         }
       },
       
-      up(){
+      async up(){
         this.isSearchMode = false;
         this.searchResults = null;
-        this.jump(this.currentDir.replace(/\/[^/]+\/?$/,'') || '/')
+        await this.jump(this.currentDir.replace(/\/[^/]+\/?$/,'') || '/')
       },
 
       onFolderContextMenu({ path, x, y }){
@@ -434,10 +434,10 @@
       }
     },
     
-    mounted(){
+    async mounted(){
       this.tabs.push({ id: ++this.tabIdCounter, history: [], historyIndex: -1, scrollTop: 0 });
       this.activeTabIndex = 0;
-      this.jump(homedir)
+      await this.jump(homedir)
     },
     
     computed:{

@@ -185,7 +185,8 @@ export default {
       dropdownScrolled: false,
       wasSearchMode: false,
       searchId: 0,
-      searchResultsAcc: []
+      searchResultsAcc: [],
+      _dirItems: []
     };
   },
   computed: {
@@ -208,12 +209,7 @@ export default {
       return breadcrumbs
     },
     dirItems() {
-      try {
-        return window.electron.readdirSync(this.address)
-          .filter(item => window.electron.isDir(window.electron.join(this.address, item)));
-      } catch(e) {
-        return [];
-      }
+      return this._dirItems
     },
     currentFolderType() {
       if (!this.address || this.address === homedir) return 'home'
@@ -302,7 +298,7 @@ export default {
       this.tmp = newPath;
       this.$emit("jump", newPath); 
     },
-    toggleDropdown(idx) {
+    async toggleDropdown(idx) {
       this.dropdownScrolled = false;
       if (this.openDropdownIdx === idx) {
         this.closeDropdown();
@@ -310,8 +306,12 @@ export default {
       }
       let path = idx === -1 ? '/' : '/' + this.breadcrumbParts.slice(0, idx + 1).join('/');
       this.openDropdownIdx = idx;
-      this.dropdownItems = window.electron.readdirSync(path)
-        .filter(item => window.electron.isDir(window.electron.join(path, item)));
+      try {
+        let items = await window.electron.readdir(path)
+        this.dropdownItems = items.filter(item => item.type === 'directory').map(item => item.name)
+      } catch(e) {
+        this.dropdownItems = []
+      }
       document.addEventListener('click', this.dropdownOutsideHandler);
     },
     dropdownOutsideHandler() {
@@ -395,11 +395,17 @@ export default {
       document.removeEventListener('keydown', this.onSearchEsc);
     },
     watch: {
-    address(newAddress) {
+    async address(newAddress) {
       this.tmp = newAddress;
       this.selectedLocation = newAddress;
       if(this.isExecutingSearch){
         this.cancelSearch();
+      }
+      try {
+        let items = await window.electron.readdir(newAddress)
+        this._dirItems = items.filter(item => item.type === 'directory').map(item => item.name)
+      } catch(e) {
+        this._dirItems = []
       }
     },
     searchVersion(){
