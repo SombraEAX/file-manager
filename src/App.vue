@@ -37,6 +37,7 @@
         />
         <top-panel
           ref="topPanel"
+          :autohideTopPanel   = "autohideTopPanel"
           :address            = "currentDir"
           :history            = "tabs[activeTabIndex]?.history || []"
           :historyIndex       = "tabs[activeTabIndex]?.historyIndex ?? -1"

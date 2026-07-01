@@ -47,16 +47,19 @@
       :class="{ active: previewPanelVisible }"
       @click="$emit('togglePreviewPanel')"
     ></button>
+    <TasksWidget ref="tasksWidget" />
   </div>
 </template>
 <script>
   import theme from '../../theme.json'
   import AddressBar from "./AddressBar.vue"
+  import TasksWidget from "./TasksWidget.vue"
   
   export default {
     emits: ['back', 'forward', 'up', 'jump', 'changeHistoryIndex', 'search', 'changeView', 'togglePreviewPanel'],
     components:{
-      AddressBar
+      AddressBar,
+      TasksWidget
     },
     props: {
       address: String,
@@ -106,6 +109,7 @@
           ab.closeDropdown()
           ab.finishEditing()
         }
+        if(this.$attrs.autohideTopPanel && this.$refs.tasksWidget) this.$refs.tasksWidget.closePopup()
       }
     },
     watch: {
