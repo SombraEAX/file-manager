@@ -638,7 +638,13 @@
       this.tabs.push({ id: ++this.tabIdCounter, history: [], historyIndex: -1, scrollTop: 0 });
       this.activeTabIndex = 0;
       await this.jump(homedir)
-      this._onKeydown = (e) => { if(e.key === 'Escape' && this.trashPopupVisible) this.cancelMoveToTrash() }
+      this._onKeydown = (e) => {
+        if(e.key === 'Escape' && this.trashPopupVisible) this.cancelMoveToTrash()
+        if(e.key === 'Delete' && !this.renamingPath && !this.trashPopupVisible && document.activeElement?.tagName !== 'INPUT'){
+          let paths = Object.keys(this.selectedMap)
+          if(paths.length) this.confirmMoveToTrash(paths)
+        }
+      }
       document.addEventListener('keydown', this._onKeydown)
     },
     beforeUnmount(){
