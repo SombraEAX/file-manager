@@ -225,7 +225,26 @@ contextBridge.exposeInMainWorld(
     readFile,getImageDataUri,
     getUserName: _ => require("os").userInfo().username,
     isDir: async pathname => (await lstat(pathname)).isDirectory(),
-    rename: async (oldPath, newPath) => { await fsRename(oldPath, newPath) }
+    rename: async (oldPath, newPath) => { await fsRename(oldPath, newPath) },
+    readTrashInfo: async (infoDir) => {
+      const fsp = require("fs/promises")
+      const path = require("path")
+      const entries = await fsp.readdir(infoDir).catch(() => [])
+      const map = {}
+      for (const name of entries) {
+        if (!name.endsWith('.trashinfo')) continue
+        try {
+          const content = await fsp.readFile(path.join(infoDir, name), 'utf-8')
+          const match = content.match(/Path=(.+)/)
+          if (match) {
+            const originalName = path.basename(match[1])
+            const trashName = name.replace(/\.trashinfo$/, '')
+            map[originalName] = trashName
+          }
+        } catch (e) {}
+      }
+      return map
+    }
   }
 )
 

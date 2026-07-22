@@ -136,7 +136,35 @@ ipcMain.on('show-history-menu', (event, { history, current, x, y }) => {
   menu.popup({ window: mainWindow, x, y })
 })
 
-async function moveToTrash(filePath) {
+function copyWithProgress(src, dest, onBytesCopied) {
+  return new Promise((resolve, reject) => {
+    const rs = fs.createReadStream(src)
+    const ws = fs.createWriteStream(dest)
+    rs.on('data', (chunk) => {
+      onBytesCopied(chunk.length)
+    })
+    rs.on('error', reject)
+    ws.on('error', reject)
+    ws.on('finish', resolve)
+    rs.pipe(ws)
+  })
+}
+
+async function copyDirWithProgress(src, dest, onBytesCopied) {
+  await fsp.mkdir(dest, { recursive: true })
+  const entries = await fsp.readdir(src, { withFileTypes: true })
+  for (const entry of entries) {
+    const srcPath = path.join(src, entry.name)
+    const destPath = path.join(dest, entry.name)
+    if (entry.isDirectory()) {
+      await copyDirWithProgress(srcPath, destPath, onBytesCopied)
+    } else {
+      await copyWithProgress(srcPath, destPath, onBytesCopied)
+    }
+  }
+}
+
+async function moveToTrash(filePath, onBytesCopied) {
   const trashDir = path.join(os.homedir(), '.local', 'share', 'Trash')
   const trashFiles = path.join(trashDir, 'files')
   const trashInfo = path.join(trashDir, 'info')
@@ -168,9 +196,9 @@ async function moveToTrash(filePath) {
   } catch (e) {
     if (e.code === 'EXDEV') {
       if (stat.isDirectory()) {
-        await fsp.cp(filePath, destPath, { recursive: true })
+        await copyDirWithProgress(filePath, destPath, onBytesCopied || (() => {}))
       } else {
-        await fsp.copyFile(filePath, destPath)
+        await copyWithProgress(filePath, destPath, onBytesCopied || (() => {}))
       }
       await fsp.rm(filePath, { recursive: true })
     } else {
@@ -190,22 +218,118 @@ async function moveToTrash(filePath) {
   await fsp.writeFile(path.join(trashInfo, destName + '.trashinfo'), infoContent, 'utf-8')
 }
 
+async function getDirSize(dirPath) {
+  let size = 0
+  const entries = await fsp.readdir(dirPath, { withFileTypes: true })
+  for (const entry of entries) {
+    const fullPath = path.join(dirPath, entry.name)
+    if (entry.isDirectory()) {
+      size += await getDirSize(fullPath)
+    } else {
+      const stat = await fsp.stat(fullPath)
+      size += stat.size
+    }
+  }
+  return size
+}
+
 ipcMain.handle('trash-items', async (event, paths) => {
   const webContents = event.sender
   const total = paths.length
   let done = 0
   let errors = 0
   let lastError = ''
+
+  let totalBytes = 0
+  const fileSizes = []
   for (const p of paths) {
     try {
-      await moveToTrash(p)
+      const stat = await fsp.stat(p)
+      let size
+      if (stat.isDirectory()) {
+        size = await getDirSize(p)
+      } else {
+        size = stat.size
+      }
+      fileSizes.push(size)
+      totalBytes += size
+    } catch (e) {
+      fileSizes.push(0)
+    }
+  }
+
+  let copiedBytes = 0
+
+  for (let i = 0; i < paths.length; i++) {
+    const p = paths[i]
+    try {
+      await moveToTrash(p, (bytes) => {
+        webContents.send('trash-progress', {
+          done, total, errors,
+          copiedBytes: copiedBytes + bytes,
+          totalBytes
+        })
+      })
     } catch (e) {
       errors++
       lastError = e.message || String(e)
       console.error('trash-item failed:', p, e)
     }
+    copiedBytes += fileSizes[i]
     done++
-    webContents.send('trash-progress', { done, total, errors })
+    webContents.send('trash-progress', { done, total, errors, copiedBytes, totalBytes })
+  }
+  return { done, total, errors, lastError }
+})
+
+async function restoreFromTrash(trashName, originalPath) {
+  const trashDir = path.join(os.homedir(), '.local', 'share', 'Trash')
+  const trashFiles = path.join(trashDir, 'files')
+  const trashInfo = path.join(trashDir, 'info')
+
+  const srcPath = path.join(trashFiles, trashName)
+  const infoPath = path.join(trashInfo, trashName + '.trashinfo')
+
+  const destDir = path.dirname(originalPath)
+  await fsp.mkdir(destDir, { recursive: true })
+
+  const baseName = path.basename(originalPath)
+  let destName = baseName
+  let counter = 1
+  while (true) {
+    try {
+      await fsp.access(path.join(destDir, destName))
+      const ext = path.extname(baseName)
+      const stem = path.basename(baseName, ext)
+      destName = `${stem} (${counter})${ext}`
+      counter++
+    } catch (e) {
+      break
+    }
+  }
+
+  const destPath = path.join(destDir, destName)
+  await fsp.rename(srcPath, destPath)
+
+  try { await fsp.unlink(infoPath) } catch (e) {}
+}
+
+ipcMain.handle('trash-restore-items', async (event, items) => {
+  const webContents = event.sender
+  const total = items.length
+  let done = 0
+  let errors = 0
+  let lastError = ''
+  for (const item of items) {
+    try {
+      await restoreFromTrash(item.trashName, item.originalPath)
+    } catch (e) {
+      errors++
+      lastError = e.message || String(e)
+      console.error('trash-restore failed:', item, e)
+    }
+    done++
+    webContents.send('trash-restore-progress', { done, total, errors })
   }
   return { done, total, errors, lastError }
 })

@@ -154,7 +154,8 @@
   import TabBar from './components/TabBar.vue'
   import EntryIcon from './components/EntryIcon.vue'
   import prettyBytes from 'pretty-bytes'
-  import { createTask, updateTask, removeTask } from './stores/tasks'
+  import { createTask, updateTask, cancelTask, removeTask } from './stores/tasks'
+  import { on, off } from './stores/events'
 
   const username = window.electron.getUserName()
   const homedir  = `/home/${username}`
@@ -543,11 +544,20 @@
         this.trashPopupPaths = []
         if(!paths.length) return
 
-        const task = createTask('Moving to trash…')
+        const parentDir = paths[0].replace(/\/[^/]+\/?$/, '') || '/'
+        const task = createTask('Moving to trash…', {
+          originalPaths: [...paths],
+          parentDir,
+          operation: 'trash'
+        })
 
-        window.electron.ipcRenderer.on('trash-progress', (_, { done, total, errors }) => {
+        window.electron.ipcRenderer.on('trash-progress', (_, { done, total, errors, copiedBytes, totalBytes }) => {
+          if(task.status === 'cancelled') return
+          const progress = totalBytes > 0 && copiedBytes != null
+            ? Math.round((copiedBytes / totalBytes) * 100)
+            : Math.round((done / total) * 100)
           updateTask(task.id, {
-            progress: Math.round((done / total) * 100),
+            progress,
             timeRemaining: null,
             status: done >= total ? (errors ? 'error' : 'done') : 'active',
             name: errors ? `Moving to trash (${errors} errors)` : 'Moving to trash…'
@@ -557,6 +567,10 @@
         try {
           let result = await window.electron.ipcRenderer.invoke('trash-items', JSON.parse(JSON.stringify(paths)))
           window.electron.ipcRenderer.removeAllListeners('trash-progress')
+          if(task.status === 'cancelled'){
+            removeTask(task.id)
+            return
+          }
           updateTask(task.id, {
             progress: 100,
             status: result.errors ? 'error' : 'done',
@@ -571,6 +585,10 @@
           }
         } catch(e) {
           window.electron.ipcRenderer.removeAllListeners('trash-progress')
+          if(task.status === 'cancelled'){
+            removeTask(task.id)
+            return
+          }
           updateTask(task.id, { status: 'error', name: 'Moving to trash failed', progress: 100 })
           this.showToast('Failed to move to trash')
         }
@@ -578,6 +596,116 @@
       trashDelete(){
       },
       trashRestore(){
+      },
+      onTaskCancel(taskId){
+        cancelTask(taskId)
+        setTimeout(() => removeTask(taskId), 2000)
+      },
+      onTaskRetry(task){
+        const oldId = task.id
+        const op = task.data && task.data.operation
+        if(op === 'trash' && task.data.originalPaths){
+          const paths = task.data.originalPaths
+          removeTask(oldId)
+          const parentDir = paths[0].replace(/\/[^/]+\/?$/, '') || '/'
+          const newTask = createTask('Moving to trash…', {
+            originalPaths: [...paths],
+            parentDir,
+            operation: 'trash'
+          })
+          window.electron.ipcRenderer.on('trash-progress', (_, { done, total, errors, copiedBytes, totalBytes }) => {
+            const progress = totalBytes > 0 && copiedBytes != null
+              ? Math.round((copiedBytes / totalBytes) * 100)
+              : Math.round((done / total) * 100)
+            updateTask(newTask.id, {
+              progress,
+              timeRemaining: null,
+              status: done >= total ? (errors ? 'error' : 'done') : 'active',
+              name: errors ? `Moving to trash (${errors} errors)` : 'Moving to trash…'
+            })
+          })
+          window.electron.ipcRenderer.invoke('trash-items', JSON.parse(JSON.stringify(paths))).then(result => {
+            window.electron.ipcRenderer.removeAllListeners('trash-progress')
+            updateTask(newTask.id, {
+              progress: 100,
+              status: result.errors ? 'error' : 'done',
+              name: result.errors ? `Moving to trash (${result.errors} failed)` : 'Moving to trash',
+              timeRemaining: 0
+            })
+            if(result.errors){
+              this.showToast('Failed to move to trash: ' + result.lastError)
+            }else{
+              this.clearSelection()
+              this.refreshDir()
+            }
+          }).catch(() => {
+            window.electron.ipcRenderer.removeAllListeners('trash-progress')
+            updateTask(newTask.id, { status: 'error', name: 'Moving to trash failed', progress: 100 })
+            this.showToast('Failed to move to trash')
+          })
+        }
+      },
+      async onTaskUndo(task){
+        if(!task.data || !task.data.originalPaths) return
+        const items = task.data.originalPaths.map(p => ({
+          trashName: p.split('/').pop(),
+          originalPath: p
+        }))
+        updateTask(task.id, { status: 'active', name: 'Restoring from trash…', progress: 0 })
+        try {
+          let result = await window.electron.ipcRenderer.invoke('trash-restore-items', items)
+          if(task.status === 'cancelled') return
+          if(result.errors){
+            updateTask(task.id, { status: 'error', name: `Restore failed (${result.errors})`, progress: 100 })
+            this.showToast('Failed to restore from trash: ' + result.lastError)
+          }else{
+            removeTask(task.id)
+            const parentDir = task.data.parentDir
+            const names = task.data.originalPaths.map(p => p.split('/').pop())
+            if(this.currentDir === parentDir){
+              await this.refreshDir()
+            }else{
+              await this.jump(parentDir)
+              await this.refreshDir()
+            }
+            const next = {}
+            for(let entry of this.entries){
+              const entryPath = entry.path || window.electron.join(this.currentDir, entry.name)
+              if(names.includes(entry.name)) next[entryPath] = true
+            }
+            this.selectedMap = next
+            this.previewPath = Object.keys(next).pop() || null
+            this.lastClickedPath = this.previewPath
+          }
+        } catch(e) {
+          updateTask(task.id, { status: 'error', name: 'Restore failed', progress: 100 })
+          this.showToast('Failed to restore from trash')
+        }
+      },
+      async onTaskOpenFolder(task){
+        if(!task.data || !task.data.originalPaths) return
+        const trashDir = window.electron.join(homedir, '.local', 'share', 'Trash', 'files')
+        const infoDir = window.electron.join(homedir, '.local', 'share', 'Trash', 'info')
+        const trashNameMap = await window.electron.readTrashInfo(infoDir)
+        const trashNames = task.data.originalPaths
+          .map(p => trashNameMap[p.split('/').pop()])
+          .filter(Boolean)
+        if(this.currentDir === trashDir){
+          await this.refreshDir()
+        }else{
+          await this.jump(trashDir)
+          await this.refreshDir()
+        }
+        if(trashNames.length){
+          const next = {}
+          for(let entry of this.entries){
+            const entryPath = entry.path || window.electron.join(this.currentDir, entry.name)
+            if(trashNames.includes(entry.name)) next[entryPath] = true
+          }
+          this.selectedMap = next
+          this.previewPath = Object.keys(next).pop() || null
+          this.lastClickedPath = this.previewPath
+        }
       },
       showToast(text){
         if(this.toastTimer) clearTimeout(this.toastTimer);
@@ -646,9 +774,17 @@
         }
       }
       document.addEventListener('keydown', this._onKeydown)
+      on('task-cancel', this.onTaskCancel)
+      on('task-retry', this.onTaskRetry)
+      on('task-undo', this.onTaskUndo)
+      on('task-open-folder', this.onTaskOpenFolder)
     },
     beforeUnmount(){
       document.removeEventListener('keydown', this._onKeydown)
+      off('task-cancel', this.onTaskCancel)
+      off('task-retry', this.onTaskRetry)
+      off('task-undo', this.onTaskUndo)
+      off('task-open-folder', this.onTaskOpenFolder)
     },
     
     computed:{

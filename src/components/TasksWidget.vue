@@ -19,16 +19,55 @@
         <div class="arrow"></div>
         <div class="popup-inner">
           <div class="task" v-for="task in tasks" :key="task.id">
-            <div class="task-header">
-              <span class="task-name">{{ task.name }}</span>
-              <span class="task-pct">{{ Math.round(task.progress) }}%</span>
-            </div>
-            <div class="progress-track">
-              <div class="progress-fill" :style="{ width: task.progress + '%' }"></div>
-            </div>
-            <div class="task-footer">
-              <span class="task-status" :data-status="task.status">{{ statusLabel(task) }}</span>
-              <span class="task-eta">{{ formatTime(task.timeRemaining) }}</span>
+            <div class="task-content">
+              <div class="task-info">
+                <div class="task-header">
+                  <span class="task-name">{{ task.name }}</span>
+                  <span class="task-pct" v-if="!isFinished(task)">{{ Math.round(task.progress) }}%</span>
+                </div>
+                <template v-if="!isFinished(task)">
+                  <div class="progress-track">
+                    <div class="progress-fill" :style="{ width: task.progress + '%' }"></div>
+                  </div>
+                  <div class="task-footer">
+                    <span class="task-status" :data-status="task.status">{{ statusLabel(task) }}</span>
+                    <span class="task-eta">{{ formatTime(task.timeRemaining) }}</span>
+                  </div>
+                </template>
+                <template v-else>
+                  <div class="progress-track"></div>
+                  <div class="task-footer">
+                    <span class="task-status" :data-status="task.status">{{ statusLabel(task) }}</span>
+                    <span class="task-eta"></span>
+                  </div>
+                </template>
+              </div>
+              <div class="task-actions" v-if="task.status !== 'cancelled'">
+                <button
+                  v-if="task.status === 'done' && task.data && task.data.operation === 'trash'"
+                  class="action-btn action-folder"
+                  title="Open folder"
+                  @click="emit('task-open-folder', task)"
+                >&#xf07b;</button>
+                <button
+                  v-if="task.status === 'active'"
+                  class="action-btn action-cancel"
+                  title="Cancel"
+                  @click="emit('task-cancel', task.id)"
+                >&#xf01d;</button>
+                <button
+                  v-if="task.status === 'error'"
+                  class="action-btn action-retry"
+                  title="Retry"
+                  @click="emit('task-retry', task)"
+                >&#xf021;</button>
+                <button
+                  v-if="task.status === 'done' && task.data && task.data.operation === 'trash'"
+                  class="action-btn action-undo"
+                  title="Undo"
+                  @click="emit('task-undo', task)"
+                >&#xf0e2;</button>
+              </div>
             </div>
           </div>
         </div>
@@ -39,7 +78,8 @@
 
 <script>
 import theme from '../../theme.json'
-import { tasks, formatTime } from '../stores/tasks'
+import { tasks, removeTask, formatTime } from '../stores/tasks'
+import { emit } from '../stores/events'
 
 export default {
   data() {
@@ -51,7 +91,7 @@ export default {
   computed: {
     tasks() { return tasks },
     allFinished() {
-      return this.tasks.length > 0 && this.tasks.every(t => t.status === 'done' || t.status === 'error')
+      return this.tasks.length > 0 && this.tasks.every(t => t.status === 'done' || t.status === 'error' || t.status === 'cancelled')
     },
     hasErrors() {
       return this.tasks.some(t => t.status === 'error')
@@ -77,12 +117,17 @@ export default {
   },
   methods: {
     formatTime,
+    emit,
+    isFinished(task) {
+      return task.status === 'done' || task.status === 'error'
+    },
     statusLabel(task) {
       switch(task.status) {
         case 'active': return 'In progress'
         case 'paused': return 'Paused'
         case 'done': return 'Completed'
         case 'error': return 'Error'
+        case 'cancelled': return 'Cancelled'
         default: return task.status
       }
     },
@@ -210,6 +255,8 @@ export default {
 .task {
   padding: 8px 12px;
   border-bottom: 1px solid rgba(0,0,0,0.06);
+  height: 56px;
+  box-sizing: border-box;
 }
 .task:last-child {
   border-bottom: none;
@@ -266,5 +313,61 @@ export default {
 .task-eta {
   font-size: 11px;
   color: v-bind('theme.tableRow.params');
+}
+.task-content {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: 100%;
+}
+.task-info {
+  flex: 1;
+  min-width: 0;
+}
+.task-actions {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 2px;
+  flex-shrink: 0;
+}
+.action-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: none;
+  border-radius: 3px;
+  background: transparent;
+  cursor: pointer;
+  font-family: PureNerdFont, "Symbols Nerd Font Mono", "Noto Sans Nerd Font", "Meslo Nerd Font", "FiraCode Nerd Font", sans-serif;
+  font-size: 13px;
+  line-height: 1;
+}
+.action-cancel {
+  color: #e74c3c;
+}
+.action-cancel:hover {
+  background: rgba(231, 76, 60, 0.15);
+}
+.action-retry {
+  color: #e67e22;
+}
+.action-retry:hover {
+  background: rgba(230, 126, 34, 0.15);
+}
+.action-undo {
+  color: #3498db;
+}
+.action-undo:hover {
+  background: rgba(52, 152, 219, 0.15);
+}
+.action-folder {
+  color: #27ae60;
+}
+.action-folder:hover {
+  background: rgba(39, 174, 96, 0.15);
 }
 </style>
