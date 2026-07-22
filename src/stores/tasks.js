@@ -36,17 +36,4 @@ export function useTasks() {
   return tasks
 }
 
-export function addTestTasks() {
-  createTask('Copying files…')
-  updateTask(1, { progress: 75, timeRemaining: 12, status: 'active' })
-
-  createTask('Download archive')
-  updateTask(2, { progress: 100, timeRemaining: 0, status: 'done' })
-
-  createTask('Export data')
-  updateTask(3, { progress: 100, timeRemaining: 0, status: 'error' })
-}
-
-addTestTasks()
-
 export default { tasks, createTask, updateTask, removeTask, formatTime }

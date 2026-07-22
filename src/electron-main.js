@@ -2,6 +2,9 @@ const { app, BrowserWindow, ipcMain, Menu, MenuItem, clipboard, dialog } = requi
 
 const url = require("url")
 const path = require("path")
+const os = require("os")
+const fs = require("fs")
+const fsp = require("fs/promises")
 
 const isDev = process.env.NODE_ENV === 'development'
 
@@ -131,4 +134,78 @@ ipcMain.on('show-history-menu', (event, { history, current, x, y }) => {
   )
 
   menu.popup({ window: mainWindow, x, y })
+})
+
+async function moveToTrash(filePath) {
+  const trashDir = path.join(os.homedir(), '.local', 'share', 'Trash')
+  const trashFiles = path.join(trashDir, 'files')
+  const trashInfo = path.join(trashDir, 'info')
+
+  await fsp.mkdir(trashFiles, { recursive: true })
+  await fsp.mkdir(trashInfo, { recursive: true })
+
+  const stat = await fsp.stat(filePath)
+
+  const baseName = path.basename(filePath)
+  let destName = baseName
+  let counter = 1
+  while (true) {
+    try {
+      await fsp.access(path.join(trashFiles, destName))
+      const ext = path.extname(baseName)
+      const stem = path.basename(baseName, ext)
+      destName = `${stem} (${counter})${ext}`
+      counter++
+    } catch (e) {
+      break
+    }
+  }
+
+  const destPath = path.join(trashFiles, destName)
+
+  try {
+    await fsp.rename(filePath, destPath)
+  } catch (e) {
+    if (e.code === 'EXDEV') {
+      if (stat.isDirectory()) {
+        await fsp.cp(filePath, destPath, { recursive: true })
+      } else {
+        await fsp.copyFile(filePath, destPath)
+      }
+      await fsp.rm(filePath, { recursive: true })
+    } else {
+      throw e
+    }
+  }
+
+  const now = new Date()
+  const dateStr = now.getFullYear() + '-' +
+    String(now.getMonth() + 1).padStart(2, '0') + '-' +
+    String(now.getDate()).padStart(2, '0') + 'T' +
+    String(now.getHours()).padStart(2, '0') + ':' +
+    String(now.getMinutes()).padStart(2, '0') + ':' +
+    String(now.getSeconds()).padStart(2, '0')
+
+  const infoContent = `[Trash Info]\nPath=${filePath}\nDeletionDate=${dateStr}\n`
+  await fsp.writeFile(path.join(trashInfo, destName + '.trashinfo'), infoContent, 'utf-8')
+}
+
+ipcMain.handle('trash-items', async (event, paths) => {
+  const webContents = event.sender
+  const total = paths.length
+  let done = 0
+  let errors = 0
+  let lastError = ''
+  for (const p of paths) {
+    try {
+      await moveToTrash(p)
+    } catch (e) {
+      errors++
+      lastError = e.message || String(e)
+      console.error('trash-item failed:', p, e)
+    }
+    done++
+    webContents.send('trash-progress', { done, total, errors })
+  }
+  return { done, total, errors, lastError }
 })

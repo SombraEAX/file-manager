@@ -111,5 +111,17 @@
 		"inactiveHoverBackground":"#e0e0e0",
 		"dividerColor":"#bbb",
 		"closeHoverColor":"#c00"
+	},
+	"trashPanel":{
+		"background":"#ccc",
+		"borderRadius":"5px",
+		"shadowColor":"rgba(0,0,0,0.15)",
+		"textColor":"#000",
+		"linkColor":"#0000aa",
+		"linkHoverColor":"#0000ff",
+		"deleteColor":"#cc0000",
+		"deleteHoverColor":"#990000",
+		"restoreColor":"#228822",
+		"restoreHoverColor":"#116611"
 	}
 }

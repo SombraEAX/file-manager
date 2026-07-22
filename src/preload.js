@@ -219,7 +219,8 @@ contextBridge.exposeInMainWorld(
       on: ipcRenderer.on.bind(ipcRenderer),
       once: ipcRenderer.once.bind(ipcRenderer),
       invoke: ipcRenderer.invoke.bind(ipcRenderer),
-      removeListener: ipcRenderer.removeListener.bind(ipcRenderer)
+      removeListener: ipcRenderer.removeListener.bind(ipcRenderer),
+      removeAllListeners: ipcRenderer.removeAllListeners.bind(ipcRenderer)
     },
     readFile,getImageDataUri,
     getUserName: _ => require("os").userInfo().username,

@@ -71,6 +71,7 @@
             </div>
           </div>
         </div>
+        <div v-if="isTrash" class="trash-bottom-spacer" @mousedown="onMouseDown" @click.self="deselectAll"></div>
       </div>
       <div class="rubber-band" v-if="rubberBand" :style="rubberBandStyle"></div>
       <div class="spacer"></div>
@@ -107,6 +108,7 @@
         type: Array,
         default: () => []
       },
+      isTrash: Boolean,
       iconSize: Number,
       renamingPath: String,
       renamingValue: String
@@ -527,5 +529,8 @@
   }
   .outer.table-mode .scroll-wrap{
     top:5px;
+  }
+  .trash-bottom-spacer{
+    height:55px;
   }
 </style>

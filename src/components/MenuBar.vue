@@ -43,7 +43,8 @@
       'toggleShowHidden',
       'selectAll',
       'invertSelection',
-      'rename'
+      'rename',
+      'moveToTrash'
     ],
 
     data(){
@@ -121,6 +122,10 @@
             this.$emit('rename')
             break
           }
+          case 'move-to-trash': {
+            this.$emit('moveToTrash')
+            break
+          }
         }
       }
     },
@@ -143,6 +148,10 @@
               {
                 label: 'Rename',
                 id: 'rename'
+              },
+              {
+                label: 'Move to Trash',
+                id: 'move-to-trash'
               }
             ]
           },
