@@ -42,7 +42,8 @@
       'toggleAutohideTopPanel',
       'toggleShowHidden',
       'selectAll',
-      'invertSelection'
+      'invertSelection',
+      'rename'
     ],
 
     data(){
@@ -116,6 +117,10 @@
             this.$emit('invertSelection')
             break
           }
+          case 'rename': {
+            this.$emit('rename')
+            break
+          }
         }
       }
     },
@@ -133,6 +138,11 @@
               {
                 label: 'Invert Selection',
                 id: 'invert-selection'
+              },
+              { type: 'separator' },
+              {
+                label: 'Rename',
+                id: 'rename'
               }
             ]
           },

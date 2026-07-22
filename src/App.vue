@@ -28,6 +28,7 @@
           @toggleShowHidden = "showHidden = !showHidden"
           @selectAll       = "selectAllEntries"
           @invertSelection = "invertSelection"
+          @rename          = "renameSelected"
         />
         <tab-bar
           :tabs        = "tabs"
@@ -85,11 +86,16 @@
         :groups     = "groups"
         :view       = "view"
         :address    = "currentDir"
+        :renamingPath = "renamingPath"
+        :renamingValue = "renamingValue"
         @changeSort = "changeSort"
         @openDir    = "openDir"
         @select     = "selectEntry"
         @selectRange = "selectRange"
-        @contextMenu = "onFolderContextMenu"
+        @contextMenu = "onContextMenu"
+        @confirmRename = "confirmRename"
+        @cancelRename = "cancelRename"
+        @update:renamingValue = "renamingValue = $event"
       />
       <preview-panel
         v-show="rightPanelVisible"
@@ -177,7 +183,9 @@
         rightPanelVisible: localStorage.getItem('rightPanelVisible') !== 'false',
         showHidden: localStorage.getItem('showHidden') === 'true',
         selectedMap: {},
-        lastClickedPath: null
+        lastClickedPath: null,
+        renamingPath: null,
+        renamingValue: ''
       }
     },
     
@@ -284,21 +292,29 @@
         await this.jump(this.currentDir.replace(/\/[^/]+\/?$/,'') || '/')
       },
 
-      onFolderContextMenu({ path, x, y }){
-        window.electron.ipcRenderer.send('show-menu', {
-          items: [
-            { label: 'Open' },
-            { label: 'Open in new tab' }
-          ],
-          x, y
-        });
-        window.electron.ipcRenderer.once('show-menu-reply', (_, index) => {
-          if(index === 0){
-            this.openDir(path);
-          }else if(index === 1){
-            this.openInNewTab(path);
+      onContextMenu({ path, x, y }){
+        let isDir = false
+        let source = this.isSearchMode && this.searchResults ? this.searchResults : this.entries
+        for(let entry of source){
+          let entryPath = entry.path || window.electron.join(this.currentDir, entry.name)
+          if(entryPath === path){
+            isDir = entry.type === 'directory'
+            break
           }
-        });
+        }
+        let items = isDir
+          ? [{ label: 'Open' }, { label: 'Open in new tab' }, { type: 'separator' }, { label: 'Rename' }]
+          : [{ label: 'Rename' }]
+        window.electron.ipcRenderer.send('show-menu', { items, x, y })
+        window.electron.ipcRenderer.once('show-menu-reply', (_, index) => {
+          if(isDir){
+            if(index === 0) this.openDir(path)
+            else if(index === 1) this.openInNewTab(path)
+            else if(index === 3) this.startRename(path)
+          }else{
+            if(index === 0) this.startRename(path)
+          }
+        })
       },
 
       showLeftPanel(){
@@ -397,6 +413,61 @@
         this.previewPath = paths.length ? paths[paths.length - 1] : null
         this.lastClickedPath = paths.length ? paths[paths.length - 1] : null
       },
+      startRename(path){
+        this.renamingPath = path
+        let name = path.split('/').pop()
+        this.renamingValue = name
+      },
+      async confirmRename(newName){
+        if(!this.renamingPath) return
+        let oldPath = this.renamingPath
+        this.renamingPath = null
+        newName = (newName || '').trim()
+        if(!newName){
+          this.showToast('Name cannot be empty')
+          return
+        }
+        if(/[\/\0]/.test(newName)){
+          this.showToast('Invalid characters in name')
+          return
+        }
+        let dir = oldPath.replace(/\/[^/]+\/?$/, '') || '/'
+        let newPath = window.electron.join(dir, newName)
+        if(oldPath === newPath) return
+        try{
+          let entries = await window.electron.readdir(dir)
+          if(entries.some(e => e.name === newName)){
+            this.showToast('A file or folder with that name already exists')
+            return
+          }
+        }catch(e){
+          console.error('readdir check failed:', e)
+        }
+        try{
+          await window.electron.rename(oldPath, newPath)
+          if(this.selectedMap[oldPath]){
+            let next = { ...this.selectedMap }
+            delete next[oldPath]
+            next[newPath] = true
+            this.selectedMap = next
+          }
+          if(this.previewPath === oldPath) this.previewPath = newPath
+          if(this.lastClickedPath === oldPath) this.lastClickedPath = newPath
+          await this.refreshDir()
+        }catch(e){
+          console.error('rename failed:', e)
+          this.showToast('Failed to rename')
+        }
+      },
+      cancelRename(){
+        this.renamingPath = null
+      },
+      renameSelected(){
+        let paths = Object.keys(this.selectedMap)
+        if(paths.length === 1){
+          this.startRename(paths[0])
+        }
+      },
       showToast(text){
         if(this.toastTimer) clearTimeout(this.toastTimer);
         this.toastText = text;
@@ -432,6 +503,23 @@
         if(el && tab && tab.scrollTop){
           el.scrollTop = tab.scrollTop;
         }
+      },
+      async refreshDir(){
+        if(!this.currentDir) return
+        try {
+          let folders = 0
+          let files   = 0
+          this._allEntries = await window.electron.readdir(this.currentDir)
+          let filtered = this.showHidden ? this._allEntries : this._allEntries.filter(e => e.name[0] !== '.')
+          for(let entry of filtered){
+            if(entry.type === 'directory') folders++
+            if(entry.type === 'file')      files++
+          }
+          this.entries = filtered
+          this.folders = folders
+          this.files   = files
+          this.searchVersion++
+        } catch(e) {}
       }
     },
     

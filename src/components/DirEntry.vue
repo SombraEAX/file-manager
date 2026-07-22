@@ -12,7 +12,18 @@
       :style="columnStyle(col,index)"
       :data-colname="col.colname"
     >
-      {{stringify(params[col.field],col.colname)}}
+      <input
+        v-if="renaming && col.colname === 'name'"
+        class="rename-input"
+        ref="renameInput"
+        :value="renamingValue"
+        @input="$emit('update:renamingValue', $event.target.value)"
+        @keydown.enter="$emit('confirmRename', $event.target.value)"
+        @keydown.esc="$emit('cancelRename')"
+        @blur="$emit('confirmRename', $event.target.value)"
+        @click.stop
+      />
+      <template v-else>{{stringify(params[col.field],col.colname)}}</template>
     </div>
     <div v-if="view==='table'" class="label" style="width:5px"></div>
   </div>
@@ -40,7 +51,7 @@
   }
 
   export default {
-    emits: ['openDir', 'contextMenu', 'click'],
+    emits: ['openDir', 'contextMenu', 'click', 'confirmRename', 'cancelRename', 'update:renamingValue'],
     components: { EntryIcon },
     props: {
       view:String,
@@ -54,12 +65,28 @@
         default: () => []
       },
       selected:Boolean,
-      iconSize:Number
+      iconSize:Number,
+      renaming:Boolean,
+      renamingValue:String
     },
     data(){
       return {
         clicked:null,
         theme
+      }
+    },
+    watch:{
+      renaming(val){
+        if(val){
+          this.$nextTick(()=>{
+            let input = this.$refs.renameInput
+            if(input){
+              input = Array.isArray(input) ? input[0] : input
+              input.focus()
+              input.select()
+            }
+          })
+        }
       }
     },
     computed:{
@@ -94,8 +121,7 @@
           this.$emit('openDir', this.params.path || this.params.name)
       },
       onContextMenu(e){
-        if(this.params.type === 'directory')
-          this.$emit('contextMenu', { path: this.params.path || this.params.name, x: e.clientX, y: e.clientY });
+        this.$emit('contextMenu', { path: this.params.path || window.electron.join(this.address, this.params.name), x: e.clientX, y: e.clientY });
       },
       onClick($event){
         if(this.clicked && Date.now() - this.clicked < 500)
@@ -193,6 +219,19 @@
     padding-left:2px;
     padding-top:2px;
     padding-bottom:2px;
+  }
+  .rename-input{
+    font-family: v-bind('theme.font');
+    font-size:16px;
+    line-height:16px;
+    padding:0 2px;
+    border:1px solid #4a90d9;
+    border-radius:2px;
+    outline:none;
+    background:#fff;
+    color:#000;
+    width:100%;
+    box-sizing:border-box;
   }
   .main:hover{
     background: v-bind('theme.fileIcon.hover.background');

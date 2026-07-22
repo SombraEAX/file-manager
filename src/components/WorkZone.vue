@@ -35,9 +35,14 @@
                 :selected="item.entry.selected"
                 :iconSize="iconSize"
                 :address="address"
+                :renaming="renamingPath === item.path"
+                :renamingValue="renamingPath === item.path ? renamingValue : ''"
                 @openDir="openDir"
                 @contextMenu="onContextMenu"
                 @click="select(item.entry, $event)"
+                @confirmRename="$emit('confirmRename', $event)"
+                @cancelRename="$emit('cancelRename')"
+                @update:renamingValue="$emit('update:renamingValue', $event)"
               />
             </template>
             <div v-else class="grid-row" :style="gridRowStyle">
@@ -53,9 +58,14 @@
                   :selected="entry.selected"
                   :iconSize="iconSize"
                   :address="address"
+                  :renaming="renamingPath === (entry.path || address + '/' + entry.name)"
+                  :renamingValue="renamingPath === (entry.path || address + '/' + entry.name) ? renamingValue : ''"
                   @openDir="openDir"
                   @contextMenu="onContextMenu"
                   @click="select(entry, $event)"
+                  @confirmRename="$emit('confirmRename', $event)"
+                  @cancelRename="$emit('cancelRename')"
+                  @update:renamingValue="$emit('update:renamingValue', $event)"
                 />
               </div>
             </div>
@@ -83,7 +93,7 @@
   const ICONS_LABEL_H = 50
 
   export default {
-    emits: ['openDir', 'changeSort', 'contextMenu', 'select', 'selectRange'],
+    emits: ['openDir', 'changeSort', 'contextMenu', 'select', 'selectRange', 'confirmRename', 'cancelRename', 'update:renamingValue'],
     components:{
       TableHeader,
       DirEntry
@@ -97,7 +107,9 @@
         type: Array,
         default: () => []
       },
-      iconSize: Number
+      iconSize: Number,
+      renamingPath: String,
+      renamingValue: String
     },
     data(){
       return {

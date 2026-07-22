@@ -1,7 +1,7 @@
 const { contextBridge, ipcRenderer } = require('electron')
 const { readdirSync, readFileSync } = require('fs')
 const { join } = require('path')
-const {readdir, lstat, stat, readFile, access, constants} = require('fs/promises')
+const {readdir, lstat, stat, readFile, access, constants, rename: fsRename} = require('fs/promises')
 const filetypes = Object.entries(require('../filetypes'))
 const path = require('path')
 const { clipboard } = require('electron')
@@ -223,7 +223,8 @@ contextBridge.exposeInMainWorld(
     },
     readFile,getImageDataUri,
     getUserName: _ => require("os").userInfo().username,
-    isDir: async pathname => (await lstat(pathname)).isDirectory()
+    isDir: async pathname => (await lstat(pathname)).isDirectory(),
+    rename: async (oldPath, newPath) => { await fsRename(oldPath, newPath) }
   }
 )
 
