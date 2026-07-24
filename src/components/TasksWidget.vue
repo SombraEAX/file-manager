@@ -44,10 +44,10 @@
               </div>
               <div class="task-actions" v-if="task.status !== 'cancelled'">
                 <button
-                  v-if="task.status === 'done' && task.data && task.data.operation === 'trash'"
+                  v-if="task.status === 'done' && task.data && (task.data.operation === 'trash' || task.data.operation === 'trash-delete' || task.data.operation === 'trash-restore')"
                   class="action-btn action-folder"
                   title="Open folder"
-                  @click="emit('task-open-folder', task)"
+                  @click="open = false; emit('task-open-folder', task)"
                 >&#xf07b;</button>
                 <button
                   v-if="task.status === 'active'"

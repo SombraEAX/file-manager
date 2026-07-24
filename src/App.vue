@@ -140,6 +140,36 @@
         </div>
       </div>
     </transition>
+    <transition name="trash-popup-fade">
+      <div class="trash-confirm-overlay" v-if="trashActionVisible" @click.self="cancelTrashAction">
+        <div class="trash-confirm-popup">
+          <div class="trash-confirm-text">
+            <template v-if="trashActionMode === 'delete'">
+              <template v-if="trashActionPaths.length === 1">
+                Permanently delete "{{ trashActionPaths[0].split('/').pop() }}"?
+              </template>
+              <template v-else>
+                Permanently delete {{ trashActionPaths.length }} files?
+              </template>
+            </template>
+            <template v-if="trashActionMode === 'restore'">
+              <template v-if="trashActionPaths.length === 1">
+                Restore "{{ trashActionPaths[0].split('/').pop() }}"?
+              </template>
+              <template v-else>
+                Restore {{ trashActionPaths.length }} files?
+              </template>
+            </template>
+          </div>
+          <div class="trash-confirm-actions">
+            <button class="trash-confirm-btn cancel" @click="cancelTrashAction">Cancel</button>
+            <button class="trash-confirm-btn confirm" @click="executeTrashAction">
+              {{ trashActionMode === 'delete' ? 'Delete' : 'Restore' }}
+            </button>
+          </div>
+        </div>
+      </div>
+    </transition>
 
   </div>
 </template>
@@ -219,7 +249,10 @@
         renamingPath: null,
         renamingValue: '',
         trashPopupVisible: false,
-        trashPopupPaths: []
+        trashPopupPaths: [],
+        trashActionVisible: false,
+        trashActionMode: '',
+        trashActionPaths: []
       }
     },
     
@@ -594,14 +627,159 @@
         }
       },
       trashDelete(){
+        let paths = Object.keys(this.selectedMap)
+        if(!paths.length){
+          paths = this.entries.map(e => e.path || window.electron.join(this.currentDir, e.name))
+        }
+        if(!paths.length) return
+        this.trashActionMode = 'delete'
+        this.trashActionPaths = paths
+        this.trashActionVisible = true
       },
       trashRestore(){
+        let paths = Object.keys(this.selectedMap)
+        if(!paths.length){
+          paths = this.entries.map(e => e.path || window.electron.join(this.currentDir, e.name))
+        }
+        if(!paths.length) return
+        this.trashActionMode = 'restore'
+        this.trashActionPaths = paths
+        this.trashActionVisible = true
+      },
+      cancelTrashAction(){
+        this.trashActionVisible = false
+        this.trashActionMode = ''
+        this.trashActionPaths = []
+      },
+      async _runTrashDelete(paths, parentDir){
+        const task = createTask('Deleting from trash…', {
+          originalPaths: [...paths],
+          parentDir,
+          operation: 'trash-delete'
+        })
+        window.electron.ipcRenderer.on('trash-permanent-delete-progress', (_, { done, total, errors }) => {
+          if(task.status === 'cancelled') return
+          updateTask(task.id, {
+            progress: Math.round((done / total) * 100),
+            timeRemaining: null,
+            status: done >= total ? (errors ? 'error' : 'done') : 'active',
+            name: errors ? `Deleting from trash (${errors} errors)` : 'Deleting from trash…'
+          })
+        })
+        try {
+          let result = await window.electron.ipcRenderer.invoke('trash-permanent-delete', JSON.parse(JSON.stringify(paths)))
+          window.electron.ipcRenderer.removeAllListeners('trash-permanent-delete-progress')
+          if(task.status === 'cancelled'){
+            removeTask(task.id)
+            return { cancelled: true }
+          }
+          updateTask(task.id, {
+            progress: 100,
+            status: result.errors ? 'error' : 'done',
+            name: result.errors ? `Deleting from trash (${result.errors} failed)` : 'Deleted from trash',
+            timeRemaining: 0
+          })
+          return { task, result }
+        } catch(e) {
+          window.electron.ipcRenderer.removeAllListeners('trash-permanent-delete-progress')
+          if(task.status === 'cancelled'){
+            removeTask(task.id)
+            return { cancelled: true }
+          }
+          updateTask(task.id, { status: 'error', name: 'Delete failed', progress: 100 })
+          return { task, result: { errors: 1 } }
+        }
+      },
+      async _runTrashRestore(restoreItems, parentDir, originalPaths){
+        const task = createTask('Restoring from trash…', {
+          originalPaths: [...originalPaths],
+          trashNames: restoreItems.map(i => i.trashName),
+          parentDir,
+          operation: 'trash-restore'
+        })
+        window.electron.ipcRenderer.on('trash-restore-progress', (_, { done, total, errors, copiedBytes, totalBytes }) => {
+          if(task.status === 'cancelled') return
+          const progress = totalBytes > 0 && copiedBytes != null
+            ? Math.round((copiedBytes / totalBytes) * 100)
+            : Math.round((done / total) * 100)
+          updateTask(task.id, {
+            progress,
+            timeRemaining: null,
+            status: done >= total ? (errors ? 'error' : 'done') : 'active',
+            name: errors ? `Restoring from trash (${errors} errors)` : 'Restoring from trash…'
+          })
+        })
+        try {
+          let result = await window.electron.ipcRenderer.invoke('trash-restore-items', JSON.parse(JSON.stringify(restoreItems)))
+          window.electron.ipcRenderer.removeAllListeners('trash-restore-progress')
+          if(task.status === 'cancelled'){
+            removeTask(task.id)
+            return { cancelled: true }
+          }
+          updateTask(task.id, {
+            progress: 100,
+            status: result.errors ? 'error' : 'done',
+            name: result.errors ? `Restore failed (${result.errors})` : 'Restored from trash',
+            timeRemaining: 0
+          })
+          return { task, result }
+        } catch(e) {
+          window.electron.ipcRenderer.removeAllListeners('trash-restore-progress')
+          if(task.status === 'cancelled'){
+            removeTask(task.id)
+            return { cancelled: true }
+          }
+          updateTask(task.id, { status: 'error', name: 'Restore failed', progress: 100 })
+          return { task, result: { errors: 1 } }
+        }
+      },
+      async executeTrashAction(){
+        const mode = this.trashActionMode
+        const paths = this.trashActionPaths
+        this.trashActionVisible = false
+        this.trashActionMode = ''
+        this.trashActionPaths = []
+        if(!paths.length) return
+
+        if(mode === 'delete'){
+          const { cancelled, result } = await this._runTrashDelete(paths, this.currentDir)
+          if(cancelled) return
+          if(result.errors){
+            this.showToast('Failed to delete: ' + result.lastError)
+          }else{
+            this.clearSelection()
+            await this.refreshDir()
+          }
+        }
+
+        if(mode === 'restore'){
+          const trashInfoDir = window.electron.join(this.currentDir, '..', 'info')
+          const allTrashInfo = await window.electron.readAllTrashInfo(trashInfoDir)
+          const restoreItems = paths.map(p => {
+            const name = p.split('/').pop()
+            const found = allTrashInfo.find(i => i.trashName === name)
+            return { trashName: name, originalPath: found ? found.originalPath : p }
+          })
+
+          const parentDir = restoreItems.length && restoreItems[0].originalPath
+            ? restoreItems[0].originalPath.replace(/\/[^/]+\/?$/, '') || '/'
+            : '/'
+
+          const { cancelled, result } = await this._runTrashRestore(restoreItems, parentDir, paths)
+          if(cancelled) return
+          if(result.errors){
+            this.showToast('Failed to restore: ' + result.lastError)
+          }else{
+            this.clearSelection()
+            await this.refreshDir()
+          }
+        }
       },
       onTaskCancel(taskId){
         cancelTask(taskId)
         setTimeout(() => removeTask(taskId), 2000)
       },
-      onTaskRetry(task){
+      async onTaskRetry(task){
         const oldId = task.id
         const op = task.data && task.data.operation
         if(op === 'trash' && task.data.originalPaths){
@@ -644,6 +822,33 @@
             this.showToast('Failed to move to trash')
           })
         }
+        if(op === 'trash-delete' && task.data.originalPaths){
+          removeTask(oldId)
+          const { cancelled, result } = await this._runTrashDelete(task.data.originalPaths, task.data.parentDir)
+          if(cancelled) return
+          if(result.errors){
+            this.showToast('Failed to delete: ' + result.lastError)
+          }else{
+            this.clearSelection()
+            await this.refreshDir()
+          }
+        }
+        if(op === 'trash-restore' && task.data.trashNames){
+          const items = task.data.trashNames.map((name, i) => ({
+            trashName: name,
+            originalPath: task.data.originalPaths[i]
+          }))
+          const parentDir = task.data.parentDir
+          removeTask(oldId)
+          const { cancelled, result } = await this._runTrashRestore(items, parentDir, task.data.originalPaths)
+          if(cancelled) return
+          if(result.errors){
+            this.showToast('Failed to restore: ' + result.lastError)
+          }else{
+            this.clearSelection()
+            await this.refreshDir()
+          }
+        }
       },
       async onTaskUndo(task){
         if(!task.data || !task.data.originalPaths) return
@@ -684,6 +889,30 @@
       },
       async onTaskOpenFolder(task){
         if(!task.data || !task.data.originalPaths) return
+        const op = task.data.operation
+
+        if(op === 'trash-restore'){
+          const parentDir = task.data.parentDir
+          if(this.currentDir === parentDir){
+            await this.refreshDir()
+          }else{
+            await this.jump(parentDir)
+            await this.refreshDir()
+          }
+          const names = task.data.originalPaths.map(p => p.split('/').pop())
+          if(names.length){
+            const next = {}
+            for(let entry of this.entries){
+              const entryPath = entry.path || window.electron.join(this.currentDir, entry.name)
+              if(names.includes(entry.name)) next[entryPath] = true
+            }
+            this.selectedMap = next
+            this.previewPath = Object.keys(next).pop() || null
+            this.lastClickedPath = this.previewPath
+          }
+          return
+        }
+
         const trashDir = window.electron.join(homedir, '.local', 'share', 'Trash', 'files')
         const infoDir = window.electron.join(homedir, '.local', 'share', 'Trash', 'info')
         const trashNameMap = await window.electron.readTrashInfo(infoDir)
@@ -768,7 +997,8 @@
       await this.jump(homedir)
       this._onKeydown = (e) => {
         if(e.key === 'Escape' && this.trashPopupVisible) this.cancelMoveToTrash()
-        if(e.key === 'Delete' && !this.renamingPath && !this.trashPopupVisible && document.activeElement?.tagName !== 'INPUT'){
+        if(e.key === 'Escape' && this.trashActionVisible) this.cancelTrashAction()
+        if(e.key === 'Delete' && !this.renamingPath && !this.trashPopupVisible && !this.trashActionVisible && document.activeElement?.tagName !== 'INPUT'){
           let paths = Object.keys(this.selectedMap)
           if(paths.length) this.confirmMoveToTrash(paths)
         }

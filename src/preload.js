@@ -244,6 +244,26 @@ contextBridge.exposeInMainWorld(
         } catch (e) {}
       }
       return map
+    },
+    readAllTrashInfo: async (infoDir) => {
+      const fsp = require("fs/promises")
+      const path = require("path")
+      const entries = await fsp.readdir(infoDir).catch(() => [])
+      const result = []
+      for (const name of entries) {
+        if (!name.endsWith('.trashinfo')) continue
+        try {
+          const content = await fsp.readFile(path.join(infoDir, name), 'utf-8')
+          const match = content.match(/Path=(.+)/)
+          if (match) {
+            result.push({
+              trashName: name.replace(/\.trashinfo$/, ''),
+              originalPath: match[1]
+            })
+          }
+        } catch (e) {}
+      }
+      return result
     }
   }
 )
