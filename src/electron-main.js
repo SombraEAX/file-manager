@@ -7,6 +7,7 @@ const fs = require("fs")
 const fsp = require("fs/promises")
 
 const isDev = process.env.NODE_ENV === 'development'
+const SLOW_FS = true
 
 let mainWindow
 
@@ -136,12 +137,18 @@ ipcMain.on('show-history-menu', (event, { history, current, x, y }) => {
   menu.popup({ window: mainWindow, x, y })
 })
 
-function copyWithProgress(src, dest, onBytesCopied) {
+async function copyWithProgress(src, dest, onBytesCopied) {
   return new Promise((resolve, reject) => {
     const rs = fs.createReadStream(src)
     const ws = fs.createWriteStream(dest)
+    let totalCopied = 0
     rs.on('data', (chunk) => {
-      onBytesCopied(chunk.length)
+      totalCopied += chunk.length
+      onBytesCopied(totalCopied)
+      if (SLOW_FS) {
+        rs.pause()
+        setTimeout(() => rs.resume(), 1000)
+      }
     })
     rs.on('error', reject)
     ws.on('error', reject)
@@ -191,18 +198,27 @@ async function moveToTrash(filePath, onBytesCopied) {
 
   const destPath = path.join(trashFiles, destName)
 
-  try {
-    await fsp.rename(filePath, destPath)
-  } catch (e) {
-    if (e.code === 'EXDEV') {
-      if (stat.isDirectory()) {
-        await copyDirWithProgress(filePath, destPath, onBytesCopied || (() => {}))
-      } else {
-        await copyWithProgress(filePath, destPath, onBytesCopied || (() => {}))
-      }
-      await fsp.rm(filePath, { recursive: true })
+  if (SLOW_FS) {
+    if (stat.isDirectory()) {
+      await copyDirWithProgress(filePath, destPath, onBytesCopied || (() => {}))
     } else {
-      throw e
+      await copyWithProgress(filePath, destPath, onBytesCopied || (() => {}))
+    }
+    await fsp.rm(filePath, { recursive: true })
+  } else {
+    try {
+      await fsp.rename(filePath, destPath)
+    } catch (e) {
+      if (e.code === 'EXDEV') {
+        if (stat.isDirectory()) {
+          await copyDirWithProgress(filePath, destPath, onBytesCopied || (() => {}))
+        } else {
+          await copyWithProgress(filePath, destPath, onBytesCopied || (() => {}))
+        }
+        await fsp.rm(filePath, { recursive: true })
+      } else {
+        throw e
+      }
     }
   }
 
@@ -216,6 +232,7 @@ async function moveToTrash(filePath, onBytesCopied) {
 
   const infoContent = `[Trash Info]\nPath=${filePath}\nDeletionDate=${dateStr}\n`
   await fsp.writeFile(path.join(trashInfo, destName + '.trashinfo'), infoContent, 'utf-8')
+  return { trashName: destName }
 }
 
 async function getDirSize(dirPath) {
@@ -233,7 +250,13 @@ async function getDirSize(dirPath) {
   return size
 }
 
-ipcMain.handle('trash-items', async (event, paths) => {
+const cancelledTasks = new Set()
+ipcMain.on('trash-cancel', (event, taskId) => { cancelledTasks.add(taskId) })
+ipcMain.on('trash-restore-cancel', (event, taskId) => { cancelledTasks.add(taskId) })
+ipcMain.on('trash-delete-cancel', (event, taskId) => { cancelledTasks.add(taskId) })
+
+ipcMain.handle('trash-items', async (event, paths, taskId) => {
+  cancelledTasks.delete(taskId)
   const webContents = event.sender
   const total = paths.length
   let done = 0
@@ -259,17 +282,22 @@ ipcMain.handle('trash-items', async (event, paths) => {
   }
 
   let copiedBytes = 0
+  const trashed = []
 
   for (let i = 0; i < paths.length; i++) {
+    if (cancelledTasks.has(taskId)) break
     const p = paths[i]
+    const currentFile = path.basename(p)
     try {
-      await moveToTrash(p, (bytes) => {
+      const result = await moveToTrash(p, (bytes) => {
         webContents.send('trash-progress', {
           done, total, errors,
           copiedBytes: copiedBytes + bytes,
-          totalBytes
+          totalBytes,
+          currentFile
         })
       })
+      trashed.push({ trashName: result.trashName, originalPath: p })
     } catch (e) {
       errors++
       lastError = e.message || String(e)
@@ -277,8 +305,20 @@ ipcMain.handle('trash-items', async (event, paths) => {
     }
     copiedBytes += fileSizes[i]
     done++
-    webContents.send('trash-progress', { done, total, errors, copiedBytes, totalBytes })
+    webContents.send('trash-progress', { done, total, errors, copiedBytes, totalBytes, currentFile })
   }
+
+  const cancelled = cancelledTasks.has(taskId)
+  cancelledTasks.delete(taskId)
+
+  if (cancelled && trashed.length) {
+    webContents.send('trash-progress', { done, total, errors: 0, copiedBytes: totalBytes, totalBytes, currentFile: 'Cancelling…', cancelled: true })
+    for (const item of trashed) {
+      try { await restoreFromTrash(item.trashName, item.originalPath) } catch (e) { console.error('trash rollback failed:', e) }
+    }
+    return { done: 0, total, errors: 0, lastError: '', cancelled: true }
+  }
+
   return { done, total, errors, lastError }
 })
 
@@ -311,25 +351,36 @@ async function restoreFromTrash(trashName, originalPath, onBytesCopied) {
   const destPath = path.join(destDir, destName)
   const stat = await fsp.stat(srcPath)
 
-  try {
-    await fsp.rename(srcPath, destPath)
-  } catch (e) {
-    if (e.code === 'EXDEV') {
-      if (stat.isDirectory()) {
-        await copyDirWithProgress(srcPath, destPath, onBytesCopied || (() => {}))
-      } else {
-        await copyWithProgress(srcPath, destPath, onBytesCopied || (() => {}))
-      }
-      await fsp.rm(srcPath, { recursive: true })
+  if (SLOW_FS) {
+    if (stat.isDirectory()) {
+      await copyDirWithProgress(srcPath, destPath, onBytesCopied || (() => {}))
     } else {
-      throw e
+      await copyWithProgress(srcPath, destPath, onBytesCopied || (() => {}))
+    }
+    await fsp.rm(srcPath, { recursive: true })
+  } else {
+    try {
+      await fsp.rename(srcPath, destPath)
+    } catch (e) {
+      if (e.code === 'EXDEV') {
+        if (stat.isDirectory()) {
+          await copyDirWithProgress(srcPath, destPath, onBytesCopied || (() => {}))
+        } else {
+          await copyWithProgress(srcPath, destPath, onBytesCopied || (() => {}))
+        }
+        await fsp.rm(srcPath, { recursive: true })
+      } else {
+        throw e
+      }
     }
   }
 
   try { await fsp.unlink(infoPath) } catch (e) {}
+  return { restoredPath: destPath }
 }
 
-ipcMain.handle('trash-restore-items', async (event, items) => {
+ipcMain.handle('trash-restore-items', async (event, items, taskId) => {
+  cancelledTasks.delete(taskId)
   const webContents = event.sender
   const total = items.length
   let done = 0
@@ -358,17 +409,22 @@ ipcMain.handle('trash-restore-items', async (event, items) => {
   }
 
   let copiedBytes = 0
+  const restored = []
 
   for (let i = 0; i < items.length; i++) {
+    if (cancelledTasks.has(taskId)) break
     const item = items[i]
+    const currentFile = path.basename(item.originalPath)
     try {
-      await restoreFromTrash(item.trashName, item.originalPath, (bytes) => {
+      const result = await restoreFromTrash(item.trashName, item.originalPath, (bytes) => {
         webContents.send('trash-restore-progress', {
           done, total, errors,
           copiedBytes: copiedBytes + bytes,
-          totalBytes
+          totalBytes,
+          currentFile
         })
       })
+      restored.push({ restoredPath: result.restoredPath })
     } catch (e) {
       errors++
       lastError = e.message || String(e)
@@ -376,12 +432,25 @@ ipcMain.handle('trash-restore-items', async (event, items) => {
     }
     copiedBytes += fileSizes[i]
     done++
-    webContents.send('trash-restore-progress', { done, total, errors, copiedBytes, totalBytes })
+    webContents.send('trash-restore-progress', { done, total, errors, copiedBytes, totalBytes, currentFile })
   }
+
+  const cancelled = cancelledTasks.has(taskId)
+  cancelledTasks.delete(taskId)
+
+  if (cancelled && restored.length) {
+    webContents.send('trash-restore-progress', { done, total, errors: 0, copiedBytes: totalBytes, totalBytes, currentFile: 'Cancelling…', cancelled: true })
+    for (const item of restored) {
+      try { await moveToTrash(item.restoredPath) } catch (e) { console.error('restore rollback failed:', e) }
+    }
+    return { done: 0, total, errors: 0, lastError: '', cancelled: true }
+  }
+
   return { done, total, errors, lastError }
 })
 
-ipcMain.handle('trash-permanent-delete', async (event, paths) => {
+ipcMain.handle('trash-permanent-delete', async (event, paths, taskId) => {
+  cancelledTasks.delete(taskId)
   const webContents = event.sender
   const trashDir = path.join(os.homedir(), '.local', 'share', 'Trash')
   const trashInfo = path.join(trashDir, 'info')
@@ -390,6 +459,8 @@ ipcMain.handle('trash-permanent-delete', async (event, paths) => {
   let errors = 0
   let lastError = ''
   for (const p of paths) {
+    if (cancelledTasks.has(taskId)) break
+    const currentFile = path.basename(p)
     try {
       await fsp.rm(p, { recursive: true })
       const baseName = path.basename(p)
@@ -400,7 +471,10 @@ ipcMain.handle('trash-permanent-delete', async (event, paths) => {
       console.error('trash-permanent-delete failed:', p, e)
     }
     done++
-    webContents.send('trash-permanent-delete-progress', { done, total, errors })
+    webContents.send('trash-permanent-delete-progress', { done, total, errors, currentFile })
   }
-  return { done, total, errors, lastError }
+
+  const cancelled = cancelledTasks.has(taskId)
+  cancelledTasks.delete(taskId)
+  return { done, total, errors, lastError, cancelled }
 })

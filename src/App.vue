@@ -184,7 +184,7 @@
   import TabBar from './components/TabBar.vue'
   import EntryIcon from './components/EntryIcon.vue'
   import prettyBytes from 'pretty-bytes'
-  import { createTask, updateTask, cancelTask, removeTask } from './stores/tasks'
+  import { tasks, createTask, updateTask, cancelTask, removeTask } from './stores/tasks'
   import { on, off } from './stores/events'
 
   const username = window.electron.getUserName()
@@ -581,33 +581,38 @@
         const task = createTask('Moving to trash…', {
           originalPaths: [...paths],
           parentDir,
-          operation: 'trash'
+          operation: 'trash',
+          from: paths.length === 1 ? paths[0] : paths[0] + ' (+' + (paths.length - 1) + ')',
+          to: '~/.local/share/Trash/files'
         })
 
-        window.electron.ipcRenderer.on('trash-progress', (_, { done, total, errors, copiedBytes, totalBytes }) => {
+        window.electron.ipcRenderer.on('trash-progress', (_, { done, total, errors, copiedBytes, totalBytes, currentFile }) => {
           if(task.status === 'cancelled') return
           const progress = totalBytes > 0 && copiedBytes != null
             ? Math.round((copiedBytes / totalBytes) * 100)
             : Math.round((done / total) * 100)
+          const fileLabel = currentFile || paths[0].split('/').pop()
           updateTask(task.id, {
             progress,
+            totalSize: totalBytes || task.totalSize,
             timeRemaining: null,
             status: done >= total ? (errors ? 'error' : 'done') : 'active',
-            name: errors ? `Moving to trash (${errors} errors)` : 'Moving to trash…'
+            name: errors ? `Moving to trash (${errors} errors)` : `Moving ${fileLabel} to trash`
           })
         })
 
         try {
-          let result = await window.electron.ipcRenderer.invoke('trash-items', JSON.parse(JSON.stringify(paths)))
+          let result = await window.electron.ipcRenderer.invoke('trash-items', JSON.parse(JSON.stringify(paths)), task.id)
           window.electron.ipcRenderer.removeAllListeners('trash-progress')
           if(task.status === 'cancelled'){
             removeTask(task.id)
+            await this.refreshDir()
             return
           }
           updateTask(task.id, {
             progress: 100,
             status: result.errors ? 'error' : 'done',
-            name: result.errors ? `Moving to trash (${result.errors} failed)` : 'Moving to trash',
+            name: result.errors ? `Moving to trash (${result.errors} failed)` : paths.length === 1 ? `Moved ${paths[0].split('/').pop()} to trash` : `Moved ${paths.length} files to trash`,
             timeRemaining: 0
           })
           if(result.errors){
@@ -655,19 +660,22 @@
         const task = createTask('Deleting from trash…', {
           originalPaths: [...paths],
           parentDir,
-          operation: 'trash-delete'
+          operation: 'trash-delete',
+          from: '~/.local/share/Trash/files',
+          to: ''
         })
-        window.electron.ipcRenderer.on('trash-permanent-delete-progress', (_, { done, total, errors }) => {
+        window.electron.ipcRenderer.on('trash-permanent-delete-progress', (_, { done, total, errors, currentFile }) => {
           if(task.status === 'cancelled') return
+          const fileLabel = currentFile || ''
           updateTask(task.id, {
             progress: Math.round((done / total) * 100),
             timeRemaining: null,
             status: done >= total ? (errors ? 'error' : 'done') : 'active',
-            name: errors ? `Deleting from trash (${errors} errors)` : 'Deleting from trash…'
+            name: errors ? `Deleting from trash (${errors} errors)` : `Deleting ${fileLabel} from trash`
           })
         })
         try {
-          let result = await window.electron.ipcRenderer.invoke('trash-permanent-delete', JSON.parse(JSON.stringify(paths)))
+          let result = await window.electron.ipcRenderer.invoke('trash-permanent-delete', JSON.parse(JSON.stringify(paths)), task.id)
           window.electron.ipcRenderer.removeAllListeners('trash-permanent-delete-progress')
           if(task.status === 'cancelled'){
             removeTask(task.id)
@@ -676,7 +684,7 @@
           updateTask(task.id, {
             progress: 100,
             status: result.errors ? 'error' : 'done',
-            name: result.errors ? `Deleting from trash (${result.errors} failed)` : 'Deleted from trash',
+            name: result.errors ? `Deleting from trash (${result.errors} failed)` : paths.length === 1 ? `Deleted ${paths[0].split('/').pop()} from trash` : `Deleted ${paths.length} files from trash`,
             timeRemaining: 0
           })
           return { task, result }
@@ -695,31 +703,36 @@
           originalPaths: [...originalPaths],
           trashNames: restoreItems.map(i => i.trashName),
           parentDir,
-          operation: 'trash-restore'
+          operation: 'trash-restore',
+          from: '~/.local/share/Trash/files',
+          to: parentDir
         })
-        window.electron.ipcRenderer.on('trash-restore-progress', (_, { done, total, errors, copiedBytes, totalBytes }) => {
+        window.electron.ipcRenderer.on('trash-restore-progress', (_, { done, total, errors, copiedBytes, totalBytes, currentFile }) => {
           if(task.status === 'cancelled') return
           const progress = totalBytes > 0 && copiedBytes != null
             ? Math.round((copiedBytes / totalBytes) * 100)
             : Math.round((done / total) * 100)
+          const fileLabel = currentFile || ''
           updateTask(task.id, {
             progress,
+            totalSize: totalBytes || task.totalSize,
             timeRemaining: null,
             status: done >= total ? (errors ? 'error' : 'done') : 'active',
-            name: errors ? `Restoring from trash (${errors} errors)` : 'Restoring from trash…'
+            name: errors ? `Restoring from trash (${errors} errors)` : `Restoring ${fileLabel} from trash`
           })
         })
         try {
-          let result = await window.electron.ipcRenderer.invoke('trash-restore-items', JSON.parse(JSON.stringify(restoreItems)))
+          let result = await window.electron.ipcRenderer.invoke('trash-restore-items', JSON.parse(JSON.stringify(restoreItems)), task.id)
           window.electron.ipcRenderer.removeAllListeners('trash-restore-progress')
           if(task.status === 'cancelled'){
             removeTask(task.id)
+            await this.refreshDir()
             return { cancelled: true }
           }
           updateTask(task.id, {
             progress: 100,
             status: result.errors ? 'error' : 'done',
-            name: result.errors ? `Restore failed (${result.errors})` : 'Restored from trash',
+            name: result.errors ? `Restore failed (${result.errors})` : originalPaths.length === 1 ? `Restored ${originalPaths[0].split('/').pop()} from trash` : `Restored ${originalPaths.length} files from trash`,
             timeRemaining: 0
           })
           return { task, result }
@@ -776,8 +789,14 @@
         }
       },
       onTaskCancel(taskId){
+        const task = tasks.find(t => t.id === taskId)
+        if(task){
+          const op = task.data && task.data.operation
+          if(op === 'trash') window.electron.ipcRenderer.send('trash-cancel', taskId)
+          else if(op === 'trash-restore') window.electron.ipcRenderer.send('trash-restore-cancel', taskId)
+          else if(op === 'trash-delete') window.electron.ipcRenderer.send('trash-delete-cancel', taskId)
+        }
         cancelTask(taskId)
-        setTimeout(() => removeTask(taskId), 2000)
       },
       async onTaskRetry(task){
         const oldId = task.id
@@ -789,25 +808,34 @@
           const newTask = createTask('Moving to trash…', {
             originalPaths: [...paths],
             parentDir,
-            operation: 'trash'
+            operation: 'trash',
+            from: paths.length === 1 ? paths[0] : paths[0] + ' (+' + (paths.length - 1) + ')',
+            to: '~/.local/share/Trash/files'
           })
-          window.electron.ipcRenderer.on('trash-progress', (_, { done, total, errors, copiedBytes, totalBytes }) => {
+          window.electron.ipcRenderer.on('trash-progress', (_, { done, total, errors, copiedBytes, totalBytes, currentFile }) => {
             const progress = totalBytes > 0 && copiedBytes != null
               ? Math.round((copiedBytes / totalBytes) * 100)
               : Math.round((done / total) * 100)
+            const fileLabel = currentFile || paths[0].split('/').pop()
             updateTask(newTask.id, {
               progress,
+              totalSize: totalBytes || newTask.totalSize,
               timeRemaining: null,
               status: done >= total ? (errors ? 'error' : 'done') : 'active',
-              name: errors ? `Moving to trash (${errors} errors)` : 'Moving to trash…'
+              name: errors ? `Moving to trash (${errors} errors)` : `Moving ${fileLabel} to trash`
             })
           })
-          window.electron.ipcRenderer.invoke('trash-items', JSON.parse(JSON.stringify(paths))).then(result => {
+          window.electron.ipcRenderer.invoke('trash-items', JSON.parse(JSON.stringify(paths)), newTask.id).then(result => {
             window.electron.ipcRenderer.removeAllListeners('trash-progress')
+            if(newTask.status === 'cancelled'){
+              removeTask(newTask.id)
+              this.refreshDir()
+              return
+            }
             updateTask(newTask.id, {
               progress: 100,
               status: result.errors ? 'error' : 'done',
-              name: result.errors ? `Moving to trash (${result.errors} failed)` : 'Moving to trash',
+              name: result.errors ? `Moving to trash (${result.errors} failed)` : paths.length === 1 ? `Moved ${paths[0].split('/').pop()} to trash` : `Moved ${paths.length} files to trash`,
               timeRemaining: 0
             })
             if(result.errors){
@@ -856,10 +884,29 @@
           trashName: p.split('/').pop(),
           originalPath: p
         }))
-        updateTask(task.id, { status: 'active', name: 'Restoring from trash…', progress: 0 })
-        try {
-          let result = await window.electron.ipcRenderer.invoke('trash-restore-items', items)
+        updateTask(task.id, { status: 'active', name: 'Restoring from trash…', progress: 0, from: '~/.local/share/Trash/files', to: task.data.parentDir || '' })
+        window.electron.ipcRenderer.on('trash-restore-progress', (_, { done, total, errors, copiedBytes, totalBytes, currentFile }) => {
           if(task.status === 'cancelled') return
+          const progress = totalBytes > 0 && copiedBytes != null
+            ? Math.round((copiedBytes / totalBytes) * 100)
+            : Math.round((done / total) * 100)
+          const fileLabel = currentFile || ''
+          updateTask(task.id, {
+            progress,
+            totalSize: totalBytes || task.totalSize,
+            timeRemaining: null,
+            status: done >= total ? (errors ? 'error' : 'done') : 'active',
+            name: errors ? `Restoring from trash (${errors} errors)` : `Restoring ${fileLabel} from trash`
+          })
+        })
+        try {
+          let result = await window.electron.ipcRenderer.invoke('trash-restore-items', items, task.id)
+          window.electron.ipcRenderer.removeAllListeners('trash-restore-progress')
+          if(task.status === 'cancelled'){
+            removeTask(task.id)
+            await this.refreshDir()
+            return
+          }
           if(result.errors){
             updateTask(task.id, { status: 'error', name: `Restore failed (${result.errors})`, progress: 100 })
             this.showToast('Failed to restore from trash: ' + result.lastError)
@@ -883,6 +930,7 @@
             this.lastClickedPath = this.previewPath
           }
         } catch(e) {
+          window.electron.ipcRenderer.removeAllListeners('trash-restore-progress')
           updateTask(task.id, { status: 'error', name: 'Restore failed', progress: 100 })
           this.showToast('Failed to restore from trash')
         }
