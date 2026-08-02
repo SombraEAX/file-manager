@@ -3,6 +3,7 @@
     class="main"
     :data-variant="view" 
     :data-selected="selected" 
+    :data-cut="isCut"
     @click="onClick"
     @contextmenu.prevent="onContextMenu"
   >
@@ -67,7 +68,12 @@
       selected:Boolean,
       iconSize:Number,
       renaming:Boolean,
-      renamingValue:String
+      renamingValue:String,
+      clipboardMode:String,
+      clipboardPaths:{
+        type: Array,
+        default: () => []
+      }
     },
     data(){
       return {
@@ -99,6 +105,11 @@
       entryType(){
         if (this.params.type === 'directory') return this.folderType(this.params.name)
         return this.params.ext || ''
+      },
+      isCut(){
+        if (this.clipboardMode !== 'cut' || !this.clipboardPaths.length) return false
+        const entryPath = this.params.path || window.electron.join(this.address, this.params.name)
+        return this.clipboardPaths.includes(entryPath)
       }
     },
     methods: {
@@ -242,5 +253,8 @@
     background: v-bind('theme.fileIcon.selected.background');
     color:      v-bind('theme.fileIcon.selected.fontColor');
     border-radius:3px;
+  }
+  [data-cut="true"]{
+    opacity: 0.45;
   }
 </style>

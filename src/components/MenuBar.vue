@@ -44,7 +44,10 @@
       'selectAll',
       'invertSelection',
       'rename',
-      'moveToTrash'
+      'moveToTrash',
+      'copy',
+      'cut',
+      'paste'
     ],
 
     data(){
@@ -126,6 +129,18 @@
             this.$emit('moveToTrash')
             break
           }
+          case 'copy': {
+            this.$emit('copy')
+            break
+          }
+          case 'cut': {
+            this.$emit('cut')
+            break
+          }
+          case 'paste': {
+            this.$emit('paste')
+            break
+          }
         }
       }
     },
@@ -149,6 +164,20 @@
                 label: 'Rename',
                 id: 'rename'
               },
+              { type: 'separator' },
+              {
+                label: 'Copy',
+                id: 'copy'
+              },
+              {
+                label: 'Cut',
+                id: 'cut'
+              },
+              {
+                label: 'Paste',
+                id: 'paste'
+              },
+              { type: 'separator' },
               {
                 label: 'Move to Trash',
                 id: 'move-to-trash'

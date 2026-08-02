@@ -37,6 +37,8 @@
                 :address="address"
                 :renaming="renamingPath === item.path"
                 :renamingValue="renamingPath === item.path ? renamingValue : ''"
+                :clipboardMode="clipboardMode"
+                :clipboardPaths="clipboardPaths"
                 @openDir="openDir"
                 @contextMenu="onContextMenu"
                 @click="select(item.entry, $event)"
@@ -60,6 +62,8 @@
                   :address="address"
                   :renaming="renamingPath === (entry.path || address + '/' + entry.name)"
                   :renamingValue="renamingPath === (entry.path || address + '/' + entry.name) ? renamingValue : ''"
+                  :clipboardMode="clipboardMode"
+                  :clipboardPaths="clipboardPaths"
                   @openDir="openDir"
                   @contextMenu="onContextMenu"
                   @click="select(entry, $event)"
@@ -111,7 +115,12 @@
       isTrash: Boolean,
       iconSize: Number,
       renamingPath: String,
-      renamingValue: String
+      renamingValue: String,
+      clipboardMode: String,
+      clipboardPaths: {
+        type: Array,
+        default: () => []
+      }
     },
     data(){
       return {
@@ -414,6 +423,36 @@
         if (!el) return
         this.viewportHeight = el.clientHeight
         this.containerWidth = el.clientWidth
+      },
+      scrollToPath(path){
+        if (!path) return
+        for (const group of this.groups) {
+          for (const entry of group.entries) {
+            const p = entry.path || window.electron.join(this.address, entry.name)
+            if (p !== path) continue
+            if (this.collapsedGroups[group.name]) {
+              this.collapsedGroups = { ...this.collapsedGroups, [group.name]: false }
+            }
+            break
+          }
+        }
+        const items = this.flatItems
+        let item = null
+        for (const it of items) {
+          if (it.type === 'entry' && it.path === path) { item = it; break }
+          if (it.type === 'row' && it.paths && it.paths.includes(path)) { item = it; break }
+        }
+        if (!item) return
+        const el = this.$refs.inner
+        const viewport = this.viewportHeight || (el ? el.clientHeight : 600)
+        const itemTop = item.offset
+        const itemBottom = item.offset + item.height
+        const curTop = el ? el.scrollTop : this.scrollTop
+        if (itemTop >= curTop && itemBottom <= curTop + viewport) return
+        let target = itemTop - (viewport - item.height) / 2
+        target = Math.max(0, target)
+        if (el) el.scrollTop = target
+        this.scrollTop = target
       }
     },
     mounted(){

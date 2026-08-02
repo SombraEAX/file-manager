@@ -30,6 +30,9 @@
           @invertSelection = "invertSelection"
           @rename          = "renameSelected"
           @moveToTrash     = "moveToTrashFromMenu"
+          @copy            = "onCopy"
+          @cut             = "onCut"
+          @paste           = "onPaste"
         />
         <tab-bar
           :tabs        = "tabs"
@@ -90,6 +93,8 @@
         :isTrash    = "isTrash"
         :renamingPath = "renamingPath"
         :renamingValue = "renamingValue"
+        :clipboardMode = "clipboardMode"
+        :clipboardPaths = "clipboardPaths"
         @changeSort = "changeSort"
         @openDir    = "openDir"
         @select     = "selectEntry"
@@ -184,7 +189,7 @@
   import TabBar from './components/TabBar.vue'
   import EntryIcon from './components/EntryIcon.vue'
   import prettyBytes from 'pretty-bytes'
-  import { tasks, createTask, updateTask, cancelTask, removeTask } from './stores/tasks'
+  import { tasks, createTask, updateTask, cancelTask, removeTask, pauseTask, resumeTask, createThrottledRunner } from './stores/tasks'
   import { on, off } from './stores/events'
 
   const username = window.electron.getUserName()
@@ -252,20 +257,36 @@
         trashPopupPaths: [],
         trashActionVisible: false,
         trashActionMode: '',
-        trashActionPaths: []
+        trashActionPaths: [],
+        clipboardPaths: [],
+        clipboardMode: '',
       }
+    },
+
+    created(){
+      this._undoThrottle = createThrottledRunner()
     },
     
     methods:{
     
       async openDir(dirname){
-        if(this.isSearchMode && dirname.startsWith('/')){
+        const absolute = dirname.startsWith('/')
+        const target = absolute
+          ? dirname
+          : window.electron.join(this.currentDir, dirname)
+        if(!target || target === this.currentDir) return
+        if(!absolute){
+          try {
+            if(!(await window.electron.isDir(target))) return
+          } catch(e) {
+            return
+          }
+        }
+        if(this.isSearchMode){
           this.isSearchMode = false;
           this.searchResults = null;
-          await this.jump(dirname);
-        }else{
-          await this.jump(window.electron.join(this.currentDir, dirname));
         }
+        await this.jump(target);
       },
 
       onSearchResults({ query, results }){
@@ -337,6 +358,7 @@
       },
 
       async jump(pathname){
+        if(!pathname || pathname === this.currentDir) return
         try {
           if(!(await window.electron.isDir(pathname))) throw new Error();
         } catch(e) {
@@ -370,8 +392,11 @@
           }
         }
         let items = isDir
-          ? [{ label: 'Open' }, { label: 'Open in new tab' }, { type: 'separator' }, { label: 'Rename' }, { label: 'Move to Trash' }]
-          : [{ label: 'Rename' }, { label: 'Move to Trash' }]
+          ? [{ label: 'Open' }, { label: 'Open in new tab' }, { type: 'separator' }, { label: 'Rename' }, { label: 'Copy' }, { label: 'Cut' }, { type: 'separator' }, { label: 'Move to Trash' }]
+          : [{ label: 'Rename' }, { label: 'Copy' }, { label: 'Cut' }, { type: 'separator' }, { label: 'Move to Trash' }]
+        if(this.clipboardPaths.length){
+          items.push({ label: 'Paste' })
+        }
         window.electron.ipcRenderer.send('show-menu', { items, x, y })
         window.electron.ipcRenderer.once('show-menu-reply', (_, index) => {
           if(isDir){
@@ -381,11 +406,37 @@
             else if(index === 4){
               let paths = Object.keys(this.selectedMap)
               if(!paths.includes(path)) paths.push(path)
+              this.clipboardPaths = paths
+              this.clipboardMode = 'copy'
+            }
+            else if(index === 5){
+              let paths = Object.keys(this.selectedMap)
+              if(!paths.includes(path)) paths.push(path)
+              this.clipboardPaths = paths
+              this.clipboardMode = 'cut'
+            }
+            else if(index === 7 && this.clipboardPaths.length) this.onPaste()
+            else if(index === 6){
+              let paths = Object.keys(this.selectedMap)
+              if(!paths.includes(path)) paths.push(path)
               this.confirmMoveToTrash(paths)
             }
           }else{
             if(index === 0) this.startRename(path)
             else if(index === 1){
+              let paths = Object.keys(this.selectedMap)
+              if(!paths.includes(path)) paths.push(path)
+              this.clipboardPaths = paths
+              this.clipboardMode = 'copy'
+            }
+            else if(index === 2){
+              let paths = Object.keys(this.selectedMap)
+              if(!paths.includes(path)) paths.push(path)
+              this.clipboardPaths = paths
+              this.clipboardMode = 'cut'
+            }
+            else if(index === 4 && this.clipboardPaths.length) this.onPaste()
+            else if(index === 3){
               let paths = Object.keys(this.selectedMap)
               if(!paths.includes(path)) paths.push(path)
               this.confirmMoveToTrash(paths)
@@ -550,6 +601,146 @@
         if(!paths.length) return
         this.confirmMoveToTrash(paths)
       },
+      onCopy(){
+        let paths = Object.keys(this.selectedMap)
+        if(!paths.length) return
+        this.clipboardPaths = [...paths]
+        this.clipboardMode = 'copy'
+      },
+      onCut(){
+        let paths = Object.keys(this.selectedMap)
+        if(!paths.length) return
+        this.clipboardPaths = [...paths]
+        this.clipboardMode = 'cut'
+      },
+      async onPaste(){
+        if(!this.clipboardPaths.length) return
+        const paths = [...this.clipboardPaths]
+        const destDir = this.currentDir
+        if(this.clipboardMode === 'cut'){
+          let totalBytes = 0
+          const fileSizes = []
+          for (const p of paths) {
+            try {
+              const s = await window.electron.stat(p)
+              totalBytes += s.size
+              fileSizes.push(s.size)
+            } catch (e) {
+              fileSizes.push(0)
+            }
+          }
+          const task = createTask(this.taskName(paths, 'Move'), {
+            originalPaths: [...paths],
+            destDir,
+            operation: 'move',
+            errorLog: []
+          })
+          task.totalSize = totalBytes
+          task.from = paths.length === 1 ? paths[0] : paths[0] + ' (+' + (paths.length - 1) + ')'
+          task.to = destDir
+          const total = paths.length
+          let done = 0
+          let errors = 0
+          let copiedBytes = 0
+          window.electron.ipcRenderer.on('move-progress', (_, { taskId, copiedBytes: bytes }) => {
+            if(task.id !== taskId) return
+            if(task.status === 'cancelled' || task.status === 'done' || task.status === 'undone') return
+            const completedBytes = fileSizes.slice(0, done).reduce((a, b) => a + b, 0)
+            const totalCopied = completedBytes + (bytes || 0)
+            const totalForProgress = totalBytes > 0 ? totalBytes : 1048576
+            const progress = Math.min(Math.round((totalCopied / totalForProgress) * 100), 99)
+            updateTask(task.id, { progress, totalSize: totalBytes })
+          })
+          for(const src of paths){
+            const name = src.split('/').pop()
+            const dest = destDir + '/' + name
+            try {
+              const result = await window.electron.ipcRenderer.invoke('move-file', src, dest, task.id)
+              if(result && result.cancelled) break
+              if(result && result.error) throw new Error(result.error)
+              done++
+              const cur = task.progress || 0
+              const fileProgress = Math.round((done / total) * 100)
+              updateTask(task.id, { progress: Math.max(cur, fileProgress) })
+            } catch(e){
+              errors++
+              if(task.data && task.data.errorLog) task.data.errorLog.push(e.message || String(e))
+              this.showToast('Failed to move: ' + e.message)
+            }
+          }
+          window.electron.ipcRenderer.removeAllListeners('move-progress')
+          this.clipboardPaths = []
+          this.clipboardMode = ''
+          if (task.status === 'cancelling') {
+            cancelTask(task.id)
+            await this.refreshDir()
+            return
+          }
+          const successCount = done
+          updateTask(task.id, {
+            progress: 100,
+            status: errors && !successCount ? 'error' : errors ? 'partial' : 'done',
+            name: this.taskName(paths, 'Move'),
+            timeRemaining: 0
+          })
+          await this.refreshDir()
+          return
+        }
+        const task = createTask(this.taskName(paths, 'Copy'), {
+          originalPaths: [...paths],
+          destDir,
+          operation: 'copy',
+          errorLog: []
+        })
+        task.from = paths.length === 1 ? paths[0] : paths[0] + ' (+' + (paths.length - 1) + ')'
+        task.to = destDir
+          window.electron.ipcRenderer.on('file-copy-progress', (_, { done, total, errors, copiedBytes, totalBytes, currentFile }) => {
+          if(task.status === 'cancelled' || task.status === 'paused') return
+          const progress = totalBytes > 0 && copiedBytes != null
+            ? Math.round((copiedBytes / totalBytes) * 100)
+            : Math.round((done / total) * 100)
+          const successCount = done - errors
+          updateTask(task.id, {
+            progress,
+            totalSize: totalBytes || task.totalSize,
+            timeRemaining: null,
+            status: done >= total ? (errors ? (successCount > 0 ? 'partial' : 'error') : 'done') : 'active'
+          })
+        })
+        try {
+          let result = await window.electron.ipcRenderer.invoke('file-copy', JSON.parse(JSON.stringify(paths)), destDir, task.id)
+          window.electron.ipcRenderer.removeAllListeners('file-copy-progress')
+          if(task.status === 'cancelled'){
+            await this.refreshDir()
+            return
+          }
+          const successCount = paths.length - result.errors
+          updateTask(task.id, {
+            progress: 100,
+            status: result.errors ? (successCount > 0 ? 'partial' : 'error') : 'done',
+            name: this.taskName(paths, 'Copy'),
+            timeRemaining: 0
+          })
+          if(result.copiedPaths) task.data.copiedPaths = result.copiedPaths
+          if(result.errors && result.lastError) task.data.errorLog.push(result.lastError)
+          await this.refreshDir()
+        } catch(e) {
+          window.electron.ipcRenderer.removeAllListeners('file-copy-progress')
+          if(task.status === 'cancelled'){
+            await this.refreshDir()
+            return
+          }
+          if(task.data && task.data.errorLog) task.data.errorLog.push(e.message || String(e))
+          updateTask(task.id, { status: 'error', name: this.taskName(paths, 'Copy'), progress: 100 })
+          this.showToast('Failed to copy files')
+        }
+      },
+      taskFileLabel(paths){
+        return paths.length === 1 ? paths[0].split('/').pop() : paths.length + ' files'
+      },
+      taskName(paths, action){
+        return action + ' ' + this.taskFileLabel(paths)
+      },
       prepareTrashPaths(paths){
         let sorted = [...paths].sort((a, b) => b.length - a.length)
         let result = []
@@ -578,26 +769,26 @@
         if(!paths.length) return
 
         const parentDir = paths[0].replace(/\/[^/]+\/?$/, '') || '/'
-        const task = createTask('Moving to trash…', {
+        const task = createTask('Move ' + this.taskFileLabel(paths) + ' to trash', {
           originalPaths: [...paths],
           parentDir,
           operation: 'trash',
-          from: paths.length === 1 ? paths[0] : paths[0] + ' (+' + (paths.length - 1) + ')',
-          to: '~/.local/share/Trash/files'
+          errorLog: []
         })
+        task.from = paths.length === 1 ? paths[0] : paths[0] + ' (+' + (paths.length - 1) + ')'
 
         window.electron.ipcRenderer.on('trash-progress', (_, { done, total, errors, copiedBytes, totalBytes, currentFile }) => {
-          if(task.status === 'cancelled') return
+          if(task.status === 'cancelled' || task.status === 'paused') return
           const progress = totalBytes > 0 && copiedBytes != null
             ? Math.round((copiedBytes / totalBytes) * 100)
             : Math.round((done / total) * 100)
           const fileLabel = currentFile || paths[0].split('/').pop()
+          const successCount = done - errors
           updateTask(task.id, {
             progress,
             totalSize: totalBytes || task.totalSize,
             timeRemaining: null,
-            status: done >= total ? (errors ? 'error' : 'done') : 'active',
-            name: errors ? `Moving to trash (${errors} errors)` : `Moving ${fileLabel} to trash`
+            status: done >= total ? (errors ? (successCount > 0 ? 'partial' : 'error') : 'done') : 'active'
           })
         })
 
@@ -609,12 +800,14 @@
             await this.refreshDir()
             return
           }
+          const successCount = paths.length - result.errors
           updateTask(task.id, {
             progress: 100,
-            status: result.errors ? 'error' : 'done',
-            name: result.errors ? `Moving to trash (${result.errors} failed)` : paths.length === 1 ? `Moved ${paths[0].split('/').pop()} to trash` : `Moved ${paths.length} files to trash`,
+            status: result.errors ? (successCount > 0 ? 'partial' : 'error') : 'done',
+            name: 'Move ' + this.taskFileLabel(paths) + ' to trash',
             timeRemaining: 0
           })
+          if(result.errors && result.lastError) task.data.errorLog.push(result.lastError)
           if(result.errors){
             this.showToast('Failed to move to trash: ' + result.lastError)
           }else{
@@ -627,7 +820,8 @@
             removeTask(task.id)
             return
           }
-          updateTask(task.id, { status: 'error', name: 'Moving to trash failed', progress: 100 })
+          if(task.data && task.data.errorLog) task.data.errorLog.push(e.message || String(e))
+          updateTask(task.id, { status: 'error', name: 'Move ' + this.taskFileLabel(paths) + ' to trash', progress: 100 })
           this.showToast('Failed to move to trash')
         }
       },
@@ -657,21 +851,20 @@
         this.trashActionPaths = []
       },
       async _runTrashDelete(paths, parentDir){
-        const task = createTask('Deleting from trash…', {
+        const task = createTask('Delete ' + this.taskFileLabel(paths) + ' from trash', {
           originalPaths: [...paths],
           parentDir,
           operation: 'trash-delete',
-          from: '~/.local/share/Trash/files',
-          to: ''
+          errorLog: []
         })
         window.electron.ipcRenderer.on('trash-permanent-delete-progress', (_, { done, total, errors, currentFile }) => {
-          if(task.status === 'cancelled') return
+          if(task.status === 'cancelled' || task.status === 'paused') return
           const fileLabel = currentFile || ''
+          const successCount = done - errors
           updateTask(task.id, {
             progress: Math.round((done / total) * 100),
             timeRemaining: null,
-            status: done >= total ? (errors ? 'error' : 'done') : 'active',
-            name: errors ? `Deleting from trash (${errors} errors)` : `Deleting ${fileLabel} from trash`
+            status: done >= total ? (errors ? (successCount > 0 ? 'partial' : 'error') : 'done') : 'active'
           })
         })
         try {
@@ -681,12 +874,14 @@
             removeTask(task.id)
             return { cancelled: true }
           }
+          const successCount = paths.length - result.errors
           updateTask(task.id, {
             progress: 100,
-            status: result.errors ? 'error' : 'done',
-            name: result.errors ? `Deleting from trash (${result.errors} failed)` : paths.length === 1 ? `Deleted ${paths[0].split('/').pop()} from trash` : `Deleted ${paths.length} files from trash`,
+            status: result.errors ? (successCount > 0 ? 'partial' : 'error') : 'done',
+            name: 'Delete ' + this.taskFileLabel(paths) + ' from trash',
             timeRemaining: 0
           })
+          if(result.errors && result.lastError) task.data.errorLog.push(result.lastError)
           return { task, result }
         } catch(e) {
           window.electron.ipcRenderer.removeAllListeners('trash-permanent-delete-progress')
@@ -694,31 +889,32 @@
             removeTask(task.id)
             return { cancelled: true }
           }
-          updateTask(task.id, { status: 'error', name: 'Delete failed', progress: 100 })
+          if(task.data && task.data.errorLog) task.data.errorLog.push(e.message || String(e))
+          updateTask(task.id, { status: 'error', name: 'Delete ' + this.taskFileLabel(paths) + ' from trash', progress: 100 })
           return { task, result: { errors: 1 } }
         }
       },
       async _runTrashRestore(restoreItems, parentDir, originalPaths){
-        const task = createTask('Restoring from trash…', {
+        const task = createTask('Restore ' + this.taskFileLabel(originalPaths) + ' from trash', {
           originalPaths: [...originalPaths],
           trashNames: restoreItems.map(i => i.trashName),
           parentDir,
           operation: 'trash-restore',
-          from: '~/.local/share/Trash/files',
-          to: parentDir
+          errorLog: []
         })
+        task.to = parentDir
         window.electron.ipcRenderer.on('trash-restore-progress', (_, { done, total, errors, copiedBytes, totalBytes, currentFile }) => {
-          if(task.status === 'cancelled') return
+          if(task.status === 'cancelled' || task.status === 'paused') return
           const progress = totalBytes > 0 && copiedBytes != null
             ? Math.round((copiedBytes / totalBytes) * 100)
             : Math.round((done / total) * 100)
           const fileLabel = currentFile || ''
+          const successCount = done - errors
           updateTask(task.id, {
             progress,
             totalSize: totalBytes || task.totalSize,
             timeRemaining: null,
-            status: done >= total ? (errors ? 'error' : 'done') : 'active',
-            name: errors ? `Restoring from trash (${errors} errors)` : `Restoring ${fileLabel} from trash`
+            status: done >= total ? (errors ? (successCount > 0 ? 'partial' : 'error') : 'done') : 'active'
           })
         })
         try {
@@ -729,12 +925,14 @@
             await this.refreshDir()
             return { cancelled: true }
           }
+          const successCount = originalPaths.length - result.errors
           updateTask(task.id, {
             progress: 100,
-            status: result.errors ? 'error' : 'done',
-            name: result.errors ? `Restore failed (${result.errors})` : originalPaths.length === 1 ? `Restored ${originalPaths[0].split('/').pop()} from trash` : `Restored ${originalPaths.length} files from trash`,
+            status: result.errors ? (successCount > 0 ? 'partial' : 'error') : 'done',
+            name: 'Restore ' + this.taskFileLabel(originalPaths) + ' from trash',
             timeRemaining: 0
           })
+          if(result.errors && result.lastError) task.data.errorLog.push(result.lastError)
           return { task, result }
         } catch(e) {
           window.electron.ipcRenderer.removeAllListeners('trash-restore-progress')
@@ -742,7 +940,8 @@
             removeTask(task.id)
             return { cancelled: true }
           }
-          updateTask(task.id, { status: 'error', name: 'Restore failed', progress: 100 })
+          if(task.data && task.data.errorLog) task.data.errorLog.push(e.message || String(e))
+          updateTask(task.id, { status: 'error', name: 'Restore ' + this.taskFileLabel(originalPaths) + ' from trash', progress: 100 })
           return { task, result: { errors: 1 } }
         }
       },
@@ -778,13 +977,14 @@
             ? restoreItems[0].originalPath.replace(/\/[^/]+\/?$/, '') || '/'
             : '/'
 
-          const { cancelled, result } = await this._runTrashRestore(restoreItems, parentDir, paths)
+          const { cancelled, result } = await this._runTrashRestore(restoreItems, parentDir, restoreItems.map(i => i.originalPath))
           if(cancelled) return
           if(result.errors){
             this.showToast('Failed to restore: ' + result.lastError)
           }else{
             this.clearSelection()
-            await this.refreshDir()
+            const names = restoreItems.map(i => i.originalPath.split('/').pop())
+            await this._openLocationAndReveal(parentDir, names)
           }
         }
       },
@@ -795,8 +995,38 @@
           if(op === 'trash') window.electron.ipcRenderer.send('trash-cancel', taskId)
           else if(op === 'trash-restore') window.electron.ipcRenderer.send('trash-restore-cancel', taskId)
           else if(op === 'trash-delete') window.electron.ipcRenderer.send('trash-delete-cancel', taskId)
+          else if(op === 'copy') window.electron.ipcRenderer.send('file-copy-cancel', taskId)
+          else if(op === 'move'){
+            window.electron.ipcRenderer.send('move-cancel', taskId)
+            const task_ = tasks.find(t => t.id === taskId)
+            const label = task_ && task_.data && task_.data.originalPaths ? this.taskName(task_.data.originalPaths, 'Move') : ''
+            updateTask(taskId, { status: 'cancelling', name: label })
+            return
+          }
         }
         cancelTask(taskId)
+      },
+      onTaskPause(taskId){
+        const task = tasks.find(t => t.id === taskId)
+        if(task){
+          const op = task.data && task.data.operation
+          if(op === 'copy') window.electron.ipcRenderer.send('file-copy-pause', taskId)
+          else if(op === 'trash') window.electron.ipcRenderer.send('trash-pause', taskId)
+          else if(op === 'trash-restore') window.electron.ipcRenderer.send('trash-restore-pause', taskId)
+          else if(op === 'trash-delete') window.electron.ipcRenderer.send('trash-delete-pause', taskId)
+          updateTask(taskId, { status: 'paused' })
+        }
+      },
+      onTaskResume(taskId){
+        const task = tasks.find(t => t.id === taskId)
+        if(task){
+          const op = task.data && task.data.operation
+          if(op === 'copy') window.electron.ipcRenderer.send('file-copy-resume', taskId)
+          else if(op === 'trash') window.electron.ipcRenderer.send('trash-resume', taskId)
+          else if(op === 'trash-restore') window.electron.ipcRenderer.send('trash-restore-resume', taskId)
+          else if(op === 'trash-delete') window.electron.ipcRenderer.send('trash-delete-resume', taskId)
+          updateTask(taskId, { status: 'active' })
+        }
       },
       async onTaskRetry(task){
         const oldId = task.id
@@ -805,24 +1035,24 @@
           const paths = task.data.originalPaths
           removeTask(oldId)
           const parentDir = paths[0].replace(/\/[^/]+\/?$/, '') || '/'
-          const newTask = createTask('Moving to trash…', {
+          const newTask = createTask('Move ' + this.taskFileLabel(paths) + ' to trash', {
             originalPaths: [...paths],
             parentDir,
             operation: 'trash',
-            from: paths.length === 1 ? paths[0] : paths[0] + ' (+' + (paths.length - 1) + ')',
-            to: '~/.local/share/Trash/files'
+            errorLog: []
           })
+          newTask.from = paths.length === 1 ? paths[0] : paths[0] + ' (+' + (paths.length - 1) + ')'
           window.electron.ipcRenderer.on('trash-progress', (_, { done, total, errors, copiedBytes, totalBytes, currentFile }) => {
             const progress = totalBytes > 0 && copiedBytes != null
               ? Math.round((copiedBytes / totalBytes) * 100)
               : Math.round((done / total) * 100)
             const fileLabel = currentFile || paths[0].split('/').pop()
+            const successCount = done - errors
             updateTask(newTask.id, {
               progress,
               totalSize: totalBytes || newTask.totalSize,
               timeRemaining: null,
-              status: done >= total ? (errors ? 'error' : 'done') : 'active',
-              name: errors ? `Moving to trash (${errors} errors)` : `Moving ${fileLabel} to trash`
+              status: done >= total ? (errors ? (successCount > 0 ? 'partial' : 'error') : 'done') : 'active'
             })
           })
           window.electron.ipcRenderer.invoke('trash-items', JSON.parse(JSON.stringify(paths)), newTask.id).then(result => {
@@ -832,12 +1062,14 @@
               this.refreshDir()
               return
             }
+            const successCount = paths.length - result.errors
             updateTask(newTask.id, {
               progress: 100,
-              status: result.errors ? 'error' : 'done',
-              name: result.errors ? `Moving to trash (${result.errors} failed)` : paths.length === 1 ? `Moved ${paths[0].split('/').pop()} to trash` : `Moved ${paths.length} files to trash`,
+              status: result.errors ? (successCount > 0 ? 'partial' : 'error') : 'done',
+              name: 'Move ' + this.taskFileLabel(paths) + ' to trash',
               timeRemaining: 0
             })
+            if(result.errors && result.lastError) newTask.data.errorLog.push(result.lastError)
             if(result.errors){
               this.showToast('Failed to move to trash: ' + result.lastError)
             }else{
@@ -846,7 +1078,8 @@
             }
           }).catch(() => {
             window.electron.ipcRenderer.removeAllListeners('trash-progress')
-            updateTask(newTask.id, { status: 'error', name: 'Moving to trash failed', progress: 100 })
+            if(newTask.data && newTask.data.errorLog) newTask.data.errorLog.push('Failed to move to trash')
+            updateTask(newTask.id, { status: 'error', name: 'Move ' + this.taskFileLabel(paths) + ' to trash', progress: 100 })
             this.showToast('Failed to move to trash')
           })
         }
@@ -877,26 +1110,283 @@
             await this.refreshDir()
           }
         }
+        if(op === 'copy' && task.data.originalPaths){
+          const paths = task.data.originalPaths
+          const destDir = task.data.destDir
+          removeTask(oldId)
+          const newTask = createTask(this.taskName(paths, 'Copy'), {
+            originalPaths: [...paths],
+            destDir,
+            operation: 'copy',
+            errorLog: []
+          })
+          newTask.from = paths.length === 1 ? paths[0] : paths[0] + ' (+' + (paths.length - 1) + ')'
+          newTask.to = destDir
+          window.electron.ipcRenderer.on('file-copy-progress', (_, { done, total, errors, copiedBytes, totalBytes, currentFile }) => {
+            if(newTask.status === 'cancelled' || newTask.status === 'paused') return
+            const progress = totalBytes > 0 && copiedBytes != null
+              ? Math.round((copiedBytes / totalBytes) * 100)
+              : Math.round((done / total) * 100)
+            const fileLabel = currentFile || paths[0].split('/').pop()
+            const errorCount = newTask.data.errorLog.length
+            updateTask(newTask.id, {
+              progress,
+              totalSize: totalBytes || newTask.totalSize,
+              timeRemaining: null,
+              status: done >= total ? (errors > errorCount ? (errorCount >= total ? 'error' : 'partial') : 'done') : 'active'
+            })
+          })
+          try {
+            let result = await window.electron.ipcRenderer.invoke('file-copy', JSON.parse(JSON.stringify(paths)), destDir, newTask.id)
+            window.electron.ipcRenderer.removeAllListeners('file-copy-progress')
+            if(newTask.status === 'cancelled'){
+              removeTask(newTask.id)
+              await this.refreshDir()
+              return
+            }
+            const errorCount = newTask.data.errorLog.length
+            updateTask(newTask.id, {
+              progress: 100,
+              status: result.errors ? (errorCount >= paths.length ? 'error' : 'partial') : 'done',
+              name: this.taskName(paths, 'Copy'),
+              timeRemaining: 0
+            })
+            if(result.copiedPaths) newTask.data.copiedPaths = result.copiedPaths
+            await this.refreshDir()
+          } catch(e) {
+            window.electron.ipcRenderer.removeAllListeners('file-copy-progress')
+            if(newTask.status === 'cancelled'){
+              await this.refreshDir()
+              return
+            }
+            if(newTask.data && newTask.data.errorLog) newTask.data.errorLog.push(e.message || String(e))
+            updateTask(newTask.id, { status: 'error', name: this.taskName(paths, 'Copy'), progress: 100 })
+            this.showToast('Failed to copy files')
+          }
+        }
       },
-      async onTaskUndo(task){
+      async onTaskRetryFailed(task){
+        const oldId = task.id
+        const op = task.data && task.data.operation
+        if(op === 'copy' && task.data.originalPaths && task.data.failedPaths){
+          const paths = task.data.failedPaths
+          const destDir = task.data.destDir
+          removeTask(oldId)
+          const newTask = createTask(this.taskName(paths, 'Copy'), {
+            originalPaths: [...paths],
+            destDir,
+            operation: 'copy',
+            errorLog: []
+          })
+          newTask.from = paths.length === 1 ? paths[0] : paths[0] + ' (+' + (paths.length - 1) + ')'
+          newTask.to = destDir
+          window.electron.ipcRenderer.on('file-copy-progress', (_, { done, total, errors, copiedBytes, totalBytes, currentFile }) => {
+            if(newTask.status === 'cancelled' || newTask.status === 'paused') return
+            const progress = totalBytes > 0 && copiedBytes != null
+              ? Math.round((copiedBytes / totalBytes) * 100)
+              : Math.round((done / total) * 100)
+            const fileLabel = currentFile || paths[0].split('/').pop()
+            const errorCount = newTask.data.errorLog.length
+            updateTask(newTask.id, {
+              progress,
+              totalSize: totalBytes || newTask.totalSize,
+              timeRemaining: null,
+              status: done >= total ? (errors > errorCount ? (errorCount >= total ? 'error' : 'partial') : 'done') : 'active'
+            })
+          })
+          try {
+            let result = await window.electron.ipcRenderer.invoke('file-copy', JSON.parse(JSON.stringify(paths)), destDir, newTask.id)
+            window.electron.ipcRenderer.removeAllListeners('file-copy-progress')
+            if(newTask.status === 'cancelled'){
+              removeTask(newTask.id)
+              await this.refreshDir()
+              return
+            }
+            const errorCount = newTask.data.errorLog.length
+            updateTask(newTask.id, {
+              progress: 100,
+              status: result.errors ? (errorCount >= paths.length ? 'error' : 'partial') : 'done',
+              name: this.taskName(paths, 'Copy'),
+              timeRemaining: 0
+            })
+            if(result.copiedPaths) newTask.data.copiedPaths = result.copiedPaths
+            await this.refreshDir()
+          } catch(e) {
+            window.electron.ipcRenderer.removeAllListeners('file-copy-progress')
+            if(newTask.status === 'cancelled'){
+              await this.refreshDir()
+              return
+            }
+            if(newTask.data && newTask.data.errorLog) newTask.data.errorLog.push(e.message || String(e))
+            updateTask(newTask.id, { status: 'error', name: this.taskName(paths, 'Copy'), progress: 100 })
+            this.showToast('Failed to copy files')
+          }
+        }
+      },
+      onTaskUndo(task){
         if(!task.data || !task.data.originalPaths) return
-        const items = task.data.originalPaths.map(p => ({
-          trashName: p.split('/').pop(),
-          originalPath: p
-        }))
-        updateTask(task.id, { status: 'active', name: 'Restoring from trash…', progress: 0, from: '~/.local/share/Trash/files', to: task.data.parentDir || '' })
+        if(task.data.operation === 'trash-delete') return
+        this._undoThrottle(task.id, () => this._performUndo(task))
+      },
+      async _performUndo(task){
+        const op = task.data.operation
+
+        if(op === 'move'){
+          const destDir = task.data.destDir
+          const paths = task.data.originalPaths
+          const items = paths.map(p => ({
+            original: p,
+            dest: destDir + '/' + p.split('/').pop()
+          }))
+          const label = this.taskName(paths, 'Move back')
+          updateTask(task.id, { status: 'active', name: label, progress: 0, from: destDir, to: '' })
+          window.electron.ipcRenderer.on('trash-restore-progress', (_, { done, total, errors, copiedBytes, totalBytes, currentFile }) => {
+            if(task.status === 'cancelled' || task.status === 'paused') return
+            const progress = totalBytes > 0 && copiedBytes != null
+              ? Math.round((copiedBytes / totalBytes) * 100)
+              : Math.round((done / total) * 100)
+            const successCount = done - errors
+            updateTask(task.id, {
+              progress,
+              timeRemaining: null,
+              status: done >= total ? (errors ? (successCount > 0 ? 'partial' : 'error') : 'done') : 'active'
+            })
+          })
+          try {
+            let result = await window.electron.ipcRenderer.invoke('move-undo', items, task.id)
+            window.electron.ipcRenderer.removeAllListeners('trash-restore-progress')
+            if(task.status === 'cancelled'){
+              removeTask(task.id)
+              await this.refreshDir()
+              return
+            }
+            if(result.errors){
+              updateTask(task.id, { status: 'error', name: label, progress: 100 })
+              this.showToast('Failed to undo move: ' + result.lastError)
+            }else{
+              updateTask(task.id, { status: 'undone', name: label, progress: 100 })
+              if(this.currentDir === destDir){
+                await this.refreshDir()
+              }else{
+                await this.jump(destDir)
+                await this.refreshDir()
+              }
+            }
+          }catch(e){
+            window.electron.ipcRenderer.removeAllListeners('trash-restore-progress')
+            updateTask(task.id, { status: 'error', name: label, progress: 100 })
+          }
+          return
+        }
+
+        if(op === 'copy'){
+          const destDir = task.data.destDir
+          const paths = task.data.originalPaths
+          const copiedPaths = task.data.copiedPaths || paths.map(p => destDir + '/' + p.split('/').pop())
+          const label = this.taskName(paths, 'Remove')
+          updateTask(task.id, { status: 'active', name: label, progress: 0, from: destDir, to: '' })
+          window.electron.ipcRenderer.on('trash-restore-progress', (_, { done, total, errors, currentFile }) => {
+            if(task.status === 'cancelled' || task.status === 'paused') return
+            const progress = total > 0 ? Math.round((done / total) * 100) : 0
+            const successCount = done - errors
+            updateTask(task.id, {
+              progress,
+              timeRemaining: null,
+              status: done >= total ? (errors ? (successCount > 0 ? 'partial' : 'error') : 'done') : 'active'
+            })
+          })
+          try {
+            let result = await window.electron.ipcRenderer.invoke('copy-undo', JSON.parse(JSON.stringify(copiedPaths)), task.id)
+            window.electron.ipcRenderer.removeAllListeners('trash-restore-progress')
+            if(task.status === 'cancelled'){
+              removeTask(task.id)
+              await this.refreshDir()
+              return
+            }
+            if(result.errors){
+              updateTask(task.id, { status: 'error', name: label, progress: 100 })
+              this.showToast('Failed to remove: ' + result.lastError)
+            }else{
+              updateTask(task.id, { status: 'undone', name: label, progress: 100 })
+              if(this.currentDir === destDir){
+                await this.refreshDir()
+              }else{
+                await this.jump(destDir)
+                await this.refreshDir()
+              }
+            }
+          }catch(e){
+            window.electron.ipcRenderer.removeAllListeners('trash-restore-progress')
+            updateTask(task.id, { status: 'error', name: label, progress: 100 })
+          }
+          return
+        }
+
+        if(op === 'trash-restore'){
+          const parentDir = task.data.parentDir || ''
+          const paths = task.data.originalPaths || (task.data.trashNames || []).map(name => parentDir + '/' + name)
+          const label = 'Move ' + this.taskFileLabel(paths) + ' back to trash'
+          updateTask(task.id, { status: 'active', name: label, progress: 0, from: parentDir, to: '' })
+          window.electron.ipcRenderer.on('trash-progress', (_, { done, total, errors, copiedBytes, totalBytes, currentFile }) => {
+            if(task.status === 'cancelled' || task.status === 'paused') return
+            const progress = totalBytes > 0 && copiedBytes != null
+              ? Math.round((copiedBytes / totalBytes) * 100)
+              : Math.round((done / total) * 100)
+            const successCount = done - errors
+            updateTask(task.id, {
+              progress,
+              totalSize: totalBytes || task.totalSize,
+              timeRemaining: null,
+              status: done >= total ? (errors ? (successCount > 0 ? 'partial' : 'error') : 'done') : 'active'
+            })
+          })
+          try {
+            let result = await window.electron.ipcRenderer.invoke('trash-items', JSON.parse(JSON.stringify(paths)), task.id)
+            window.electron.ipcRenderer.removeAllListeners('trash-progress')
+            if(task.status === 'cancelled'){
+              removeTask(task.id)
+              await this.refreshDir()
+              return
+            }
+            if(result.errors){
+              updateTask(task.id, { status: 'error', name: label, progress: 100 })
+              this.showToast('Failed to undo restore: ' + result.lastError)
+            }else{
+              updateTask(task.id, { status: 'undone', name: label, progress: 100 })
+              const trashDir = window.electron.join(homedir, '.local', 'share', 'Trash', 'files')
+              await this._openLocationAndReveal(trashDir, (task.data.trashNames || []))
+            }
+          }catch(e){
+            window.electron.ipcRenderer.removeAllListeners('trash-progress')
+            updateTask(task.id, { status: 'error', name: label, progress: 100 })
+            this.showToast('Failed to undo restore')
+          }
+          return
+        }
+
+        const paths = task.data.originalPaths
+        const infoDir = window.electron.join(homedir, '.local', 'share', 'Trash', 'info')
+        const allTrashInfo = await window.electron.readAllTrashInfo(infoDir)
+        const items = paths
+          .map(p => {
+            const found = allTrashInfo.find(i => i.originalPath === p)
+            return { trashName: found ? found.trashName : p.split('/').pop(), originalPath: p }
+          })
+          .filter(i => i.trashName)
+        const label = 'Move ' + this.taskFileLabel(paths) + ' to trash'
+        updateTask(task.id, { status: 'active', name: label, progress: 0, from: '~/.local/share/Trash/files', to: task.data.parentDir || '' })
         window.electron.ipcRenderer.on('trash-restore-progress', (_, { done, total, errors, copiedBytes, totalBytes, currentFile }) => {
-          if(task.status === 'cancelled') return
+          if(task.status === 'cancelled' || task.status === 'paused') return
           const progress = totalBytes > 0 && copiedBytes != null
             ? Math.round((copiedBytes / totalBytes) * 100)
             : Math.round((done / total) * 100)
           const fileLabel = currentFile || ''
+          const successCount = done - errors
           updateTask(task.id, {
             progress,
             totalSize: totalBytes || task.totalSize,
             timeRemaining: null,
-            status: done >= total ? (errors ? 'error' : 'done') : 'active',
-            name: errors ? `Restoring from trash (${errors} errors)` : `Restoring ${fileLabel} from trash`
+            status: done >= total ? (errors ? (successCount > 0 ? 'partial' : 'error') : 'done') : 'active'
           })
         })
         try {
@@ -908,81 +1398,98 @@
             return
           }
           if(result.errors){
-            updateTask(task.id, { status: 'error', name: `Restore failed (${result.errors})`, progress: 100 })
+            updateTask(task.id, { status: 'error', name: label, progress: 100 })
             this.showToast('Failed to restore from trash: ' + result.lastError)
           }else{
-            removeTask(task.id)
+            updateTask(task.id, { status: 'undone', name: label, progress: 100 })
             const parentDir = task.data.parentDir
             const names = task.data.originalPaths.map(p => p.split('/').pop())
-            if(this.currentDir === parentDir){
-              await this.refreshDir()
-            }else{
-              await this.jump(parentDir)
-              await this.refreshDir()
-            }
-            const next = {}
-            for(let entry of this.entries){
-              const entryPath = entry.path || window.electron.join(this.currentDir, entry.name)
-              if(names.includes(entry.name)) next[entryPath] = true
-            }
-            this.selectedMap = next
-            this.previewPath = Object.keys(next).pop() || null
-            this.lastClickedPath = this.previewPath
+            await this._openLocationAndReveal(parentDir, names)
           }
         } catch(e) {
           window.electron.ipcRenderer.removeAllListeners('trash-restore-progress')
-          updateTask(task.id, { status: 'error', name: 'Restore failed', progress: 100 })
+          updateTask(task.id, { status: 'error', name: label, progress: 100 })
           this.showToast('Failed to restore from trash')
         }
       },
       async onTaskOpenFolder(task){
         if(!task.data || !task.data.originalPaths) return
         const op = task.data.operation
+        const trashDir = window.electron.join(homedir, '.local', 'share', 'Trash', 'files')
+        const infoDir = window.electron.join(homedir, '.local', 'share', 'Trash', 'info')
+        const originDir = task.data.originalPaths[0].replace(/\/[^/]+$/, '') || '/'
+        const isReverted = task.status === 'undone' || task.status === 'cancelled' || task.status === 'error'
 
-        if(op === 'trash-restore'){
-          const parentDir = task.data.parentDir
-          if(this.currentDir === parentDir){
-            await this.refreshDir()
+        let targetDir
+        let names
+
+        if(op === 'copy' || op === 'move'){
+          targetDir = isReverted ? originDir : task.data.destDir
+          if(op === 'copy' && !isReverted && task.data.copiedPaths && task.data.copiedPaths.length){
+            names = task.data.copiedPaths.map(p => p.split('/').pop())
           }else{
-            await this.jump(parentDir)
-            await this.refreshDir()
+            names = task.data.originalPaths.map(p => p.split('/').pop())
           }
-          const names = task.data.originalPaths.map(p => p.split('/').pop())
-          if(names.length){
-            const next = {}
-            for(let entry of this.entries){
-              const entryPath = entry.path || window.electron.join(this.currentDir, entry.name)
-              if(names.includes(entry.name)) next[entryPath] = true
-            }
-            this.selectedMap = next
-            this.previewPath = Object.keys(next).pop() || null
-            this.lastClickedPath = this.previewPath
+        }else if(op === 'trash'){
+          targetDir = isReverted ? (task.data.parentDir || originDir) : trashDir
+          if(isReverted){
+            names = task.data.originalPaths.map(p => p.split('/').pop())
+          }else{
+            const allTrashInfo = await window.electron.readAllTrashInfo(infoDir)
+            names = task.data.originalPaths
+              .map(p => {
+                const found = allTrashInfo.find(i => i.originalPath === p)
+                return found ? found.trashName : null
+              })
+              .filter(Boolean)
           }
+        }else if(op === 'trash-restore'){
+          targetDir = isReverted ? trashDir : (task.data.parentDir || originDir)
+          if(isReverted){
+            names = (task.data.trashNames || [])
+          }else{
+            names = task.data.originalPaths.map(p => p.split('/').pop())
+          }
+        }else if(op === 'trash-delete'){
+          targetDir = trashDir
+          const allTrashInfo = await window.electron.readAllTrashInfo(infoDir)
+          names = task.data.originalPaths
+            .map(p => {
+              const found = allTrashInfo.find(i => i.originalPath === p)
+              return found ? found.trashName : null
+            })
+            .filter(Boolean)
+        }else{
           return
         }
 
-        const trashDir = window.electron.join(homedir, '.local', 'share', 'Trash', 'files')
-        const infoDir = window.electron.join(homedir, '.local', 'share', 'Trash', 'info')
-        const trashNameMap = await window.electron.readTrashInfo(infoDir)
-        const trashNames = task.data.originalPaths
-          .map(p => trashNameMap[p.split('/').pop()])
-          .filter(Boolean)
-        if(this.currentDir === trashDir){
+        await this._openLocationAndReveal(targetDir, names)
+      },
+      async _openLocationAndReveal(targetDir, names){
+        if(this.currentDir === targetDir){
           await this.refreshDir()
         }else{
-          await this.jump(trashDir)
+          await this.jump(targetDir)
           await this.refreshDir()
         }
-        if(trashNames.length){
+        if(names && names.length){
           const next = {}
           for(let entry of this.entries){
             const entryPath = entry.path || window.electron.join(this.currentDir, entry.name)
-            if(trashNames.includes(entry.name)) next[entryPath] = true
+            if(names.includes(entry.name)) next[entryPath] = true
           }
-          this.selectedMap = next
-          this.previewPath = Object.keys(next).pop() || null
-          this.lastClickedPath = this.previewPath
+          await this._revealFirstSelected(next)
         }
+      },
+      async _revealFirstSelected(selectedMap){
+        const paths = Object.keys(selectedMap)
+        this.selectedMap = selectedMap
+        this.previewPath = paths[paths.length - 1] || null
+        this.lastClickedPath = this.previewPath
+        if(!paths.length) return
+        await this.$nextTick()
+        const wz = this.$refs.workzone
+        if(wz && wz.scrollToPath) wz.scrollToPath(paths[0])
       },
       showToast(text){
         if(this.toastTimer) clearTimeout(this.toastTimer);
@@ -1040,6 +1547,7 @@
     },
     
     async mounted(){
+      window.__tasks = { tasks, createTask, updateTask, cancelTask, removeTask, pauseTask, resumeTask }
       this.tabs.push({ id: ++this.tabIdCounter, history: [], historyIndex: -1, scrollTop: 0 });
       this.activeTabIndex = 0;
       await this.jump(homedir)
@@ -1050,12 +1558,27 @@
           let paths = Object.keys(this.selectedMap)
           if(paths.length) this.confirmMoveToTrash(paths)
         }
+        if(e.ctrlKey && (e.key === 'c' || e.code === 'KeyC') && !this.renamingPath && document.activeElement?.tagName !== 'INPUT'){
+          e.preventDefault()
+          this.onCopy()
+        }
+        if(e.ctrlKey && (e.key === 'x' || e.code === 'KeyX') && !this.renamingPath && document.activeElement?.tagName !== 'INPUT'){
+          e.preventDefault()
+          this.onCut()
+        }
+        if(e.ctrlKey && (e.key === 'v' || e.code === 'KeyV') && !this.renamingPath && document.activeElement?.tagName !== 'INPUT'){
+          e.preventDefault()
+          this.onPaste()
+        }
       }
       document.addEventListener('keydown', this._onKeydown)
       on('task-cancel', this.onTaskCancel)
       on('task-retry', this.onTaskRetry)
       on('task-undo', this.onTaskUndo)
       on('task-open-folder', this.onTaskOpenFolder)
+      on('task-pause', this.onTaskPause)
+      on('task-resume', this.onTaskResume)
+      on('task-retry-failed', this.onTaskRetryFailed)
     },
     beforeUnmount(){
       document.removeEventListener('keydown', this._onKeydown)
@@ -1063,6 +1586,9 @@
       off('task-retry', this.onTaskRetry)
       off('task-undo', this.onTaskUndo)
       off('task-open-folder', this.onTaskOpenFolder)
+      off('task-pause', this.onTaskPause)
+      off('task-resume', this.onTaskResume)
+      off('task-retry-failed', this.onTaskRetryFailed)
     },
     
     computed:{

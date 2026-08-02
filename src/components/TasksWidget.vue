@@ -1,93 +1,102 @@
 <template>
-  <div class="wrapper" v-if="displayTasks.length">
+  <div class="wrapper" v-if="hasTasks">
     <button
       class="widget-button"
       :class="{ active: open }"
       @click="open = !open"
     >
       <template v-if="allFinished">
-        <span v-if="hasErrors" class="checkmark warning">⚠</span>
-        <span v-else class="checkmark">✔</span>
+        <span v-if="hasErrors" class="checkmark warning">&#9888;</span>
+        <span v-else class="checkmark">&#10004;</span>
       </template>
       <template v-else>
         <span class="eta">{{ eta }}</span>
         <span class="bar-wrap"><span class="bar" :style="{ width: overallProgress + '%' }"></span></span>
       </template>
     </button>
-    <Teleport to="body">
-      <div class="popup" v-if="open" ref="popup" :style="popupStyle">
+      <div class="popup" v-if="open" ref="popup">
         <div class="arrow"></div>
         <div class="popup-inner">
-            <div class="task-list" ref="taskList" :class="{ 'has-overflow': hasOverflow }">
+            <div class="task-list" ref="taskList">
             <div class="task" v-for="task in displayTasks" :key="task.id">
               <div class="task-icon" :class="'op-' + (task.data && task.data.operation || 'default')">
                 <span v-html="taskIcon(task)"></span>
               </div>
               <div class="task-main">
                 <div class="task-header">
-                    <span class="task-name">{{ task.name }}<span class="task-size" v-if="task.totalSize">{{ formatSize(task.totalSize) }}</span></span>
-                  <span class="task-pct" v-if="!isFinished(task) && task.status !== 'cancelled'">{{ Math.round(task.progress) }}%</span>
+                    <span class="task-name-wrap"><span class="task-name" :title="task.name">{{ task.name }}</span><span class="task-size" v-if="task.totalSize">{{ formatSize(task.totalSize) }}</span></span>
+                  <span class="task-pct" v-if="!isFinished(task)">{{ Math.round(task.progress) }}%</span>
                 </div>
-                <template v-if="!isFinished(task) && task.status !== 'cancelled'">
-                  <div class="progress-track">
-                    <div class="progress-fill" :style="{ width: task.progress + '%' }"></div>
-                  </div>
-                  <div class="task-footer">
-                    <span v-if="task.from" class="task-status" :data-status="task.status">
+                <div v-if="!isFinished(task)" class="progress-track">
+                  <div class="progress-fill" :style="{ width: task.progress + '%' }"></div>
+                </div>
+                <div v-else class="progress-track progress-track-done"></div>
+                <div class="task-footer">
+                  <span v-if="!isFinished(task) && task.status !== 'paused' && task.data && task.data.operation" class="task-status" :data-status="task.status">
+                    <template v-if="task.data.operation === 'copy' || task.data.operation === 'move'">
                       <span class="status-static">From</span>
-                      <span class="status-path">{{ task.from }}</span>
+                      <span class="status-path" :title="task.from">{{ task.from }}</span>
                       <template v-if="task.to">
                         <span class="status-static">to</span>
-                        <span class="status-path">{{ task.to }}</span>
+                        <span class="status-path" :title="task.to">{{ task.to }}</span>
                       </template>
-                    </span>
-                    <span v-else class="task-status" :data-status="task.status">{{ statusLabel(task) }}</span>
-                  </div>
-                </template>
-                <template v-else-if="task.status !== 'cancelled'">
-                  <div class="progress-track progress-track-done"></div>
-                  <div class="task-footer">
-                    <span class="task-status" :data-status="task.status">{{ statusLabel(task) }}</span>
-                  </div>
-                </template>
-                <template v-else>
-                  <div class="progress-track progress-track-done"></div>
-                  <div class="task-footer">
-                    <span class="task-status" :data-status="task.status">{{ statusLabel(task) }}</span>
-                  </div>
-                </template>
+                    </template>
+                    <template v-else-if="task.data.operation === 'trash'">
+                      <span class="status-static">From</span>
+                      <span class="status-path" :title="task.from">{{ task.from }}</span>
+                    </template>
+                    <template v-else-if="task.data.operation === 'trash-restore'">
+                      <span class="status-static">To</span>
+                      <span class="status-path" :title="task.to">{{ task.to }}</span>
+                    </template>
+                    <template v-else>
+                      {{ statusLabel(task) }}
+                    </template>
+                  </span>
+                  <span v-else class="task-status" :data-status="task.status">{{ statusLabel(task) }}</span>
+                </div>
               </div>
-              <div class="task-speed-block">
-                <span class="task-speed">{{ taskSpeed(task) }}</span>
+              <div class="task-speed-block" v-if="task.status === 'active' || task.status === 'paused' || task.status === 'counting' || task.status === 'cancelling'">
+                <span class="task-speed" v-if="task.status !== 'paused'">{{ taskSpeed(task) }}</span>
                 <span class="task-time" v-if="task.status === 'active'">{{ formatTime(task.timeRemaining) }}</span>
               </div>
-              <div class="task-actions" v-if="task.status !== 'cancelled'">
-                <button
-                  v-if="task.status === 'done'"
-                  class="action-btn action-folder"
-                  title="Show in folder"
-                  @click="open = false; emit('task-open-folder', task)"
-                >&#xf07b;</button>
-                <button
-                  v-if="task.status === 'active'"
-                  class="action-btn action-cancel"
-                  title="Cancel"
-                  @click="emit('task-cancel', task.id)"
-                >&#xf073a;</button>
-                <button
-                  v-if="task.status === 'error'"
-                  class="action-btn action-retry"
-                  title="Retry"
-                  @click="emit('task-retry', task)"
-                >&#xf021;</button>
-                <button
-                  v-if="task.status === 'done'"
-                  class="action-btn action-undo"
-                  title="Undo"
-                  @click="emit('task-undo', task)"
-                >&#xf0e2;</button>
+              <div class="task-actions" :class="{ 'actions-4': task.status === 'partial' && canUndo(task) }">
+                <template v-if="task.status === 'active'">
+                  <button class="action-btn action-cancel" title="Cancel" @click="emit('task-cancel', task.id)">&#xf073a;</button>
+                  <button class="action-btn action-pause" title="Pause" @click="emit('task-pause', task.id)">&#xf04c;</button>
+                </template>
+                <template v-else-if="task.status === 'paused'">
+                  <button class="action-btn action-cancel" title="Cancel" @click="emit('task-cancel', task.id)">&#xf073a;</button>
+                  <button class="action-btn action-resume" title="Resume" @click="emit('task-resume', task.id)">&#xf04b;</button>
+                </template>
+                <template v-else-if="task.status === 'counting'">
+                  <button class="action-btn action-cancel" title="Cancel" @click="emit('task-cancel', task.id)">&#xf073a;</button>
+                </template>
+                <template v-else-if="task.status === 'cancelling'">
+                </template>
+                <template v-else-if="task.status === 'done'">
+                  <button class="action-btn action-folder" title="Show in folder" @click="open = false; emit('task-open-folder', task)">&#xf07b;</button>
+                  <button v-if="canUndo(task)" class="action-btn action-undo" title="Undo" @click="emit('task-undo', task)">&#xf0e2;</button>
+                </template>
+                <template v-else-if="task.status === 'error'">
+                  <button class="action-btn action-folder" title="Show in folder" @click="open = false; emit('task-open-folder', task)">&#xf07b;</button>
+                  <button class="action-btn action-retry" title="Retry" @click="emit('task-retry', task)">&#xf021;</button>
+                </template>
+                <template v-else-if="task.status === 'cancelled'">
+                  <button class="action-btn action-folder" title="Show in folder" @click="open = false; emit('task-open-folder', task)">&#xf07b;</button>
+                </template>
+                <template v-else-if="task.status === 'undone'">
+                  <button class="action-btn action-folder" title="Show in folder" @click="open = false; emit('task-open-folder', task)">&#xf07b;</button>
+                </template>
+                <template v-else-if="task.status === 'partial'">
+                  <button class="action-btn action-folder" title="Show in folder" @click="open = false; emit('task-open-folder', task)">&#xf07b;</button>
+                  <button v-if="canUndo(task)" class="action-btn action-undo" title="Undo" @click="emit('task-undo', task)">&#xf0e2;</button>
+                  <button class="action-btn action-retry-failed" title="Retry failed files" @click="emit('task-retry-failed', task)">&#xf021;</button>
+                  <button class="action-btn action-info" title="Info" @click="showInfo(task)">&#xf129;</button>
+                </template>
               </div>
             </div>
+            <div v-if="hideInactive && !displayTasks.length" class="empty-msg">No active tasks</div>
           </div>
           <div class="popup-footer">
             <span class="stats-text">
@@ -99,7 +108,18 @@
           </div>
         </div>
       </div>
-    </Teleport>
+      <div class="info-popup-overlay" v-if="infoTask" @click.self="infoTask = null">
+        <div class="info-popup">
+          <div class="info-header">
+            <span class="info-title">Error log — {{ infoTask.name }}</span>
+            <button class="info-close" @click="infoTask = null">&#xf00d;</button>
+          </div>
+          <div class="info-log">
+            <div v-for="(entry, i) in (infoTask.data && infoTask.data.errorLog || [])" :key="i" class="log-entry">{{ entry }}</div>
+            <div v-if="!(infoTask.data && infoTask.data.errorLog && infoTask.data.errorLog.length)" class="log-empty">No errors logged</div>
+          </div>
+        </div>
+    </div>
   </div>
 </template>
 
@@ -108,48 +128,27 @@ import theme from '../../theme.json'
 import { tasks, removeTask, formatTime } from '../stores/tasks'
 import { emit } from '../stores/events'
 
-const MOCK_TASKS = [
-  { id: 1, name: 'Copying very long documents folder with nested subdirectories to backup drive…', progress: 72, status: 'active', timeRemaining: 35, startedAt: Date.now() - 120000, speed: '12.4 MB/s', totalSize: 1572864000, from: '/home/user/Projects/file-manager/src/components/very-long-folder-name', to: '/mnt/backup/2024-archives/important-documents', data: { operation: 'copy' } },
-  { id: 2, name: 'Moving photos to archive folder…', progress: 100, status: 'done', timeRemaining: 0, startedAt: Date.now() - 300000, speed: '8.2 MB/s', totalSize: 5368709120, from: '/home/user/Photos', to: '/mnt/archive/Photos', data: { operation: 'move' } },
-  { id: 3, name: 'Deleting old cache files…', progress: 100, status: 'done', timeRemaining: 0, startedAt: Date.now() - 250000, speed: '45.0 MB/s', totalSize: 268435456, from: '/home/user/.cache', to: '', data: { operation: 'trash' } },
-  { id: 4, name: 'Renaming project folders…', progress: 100, status: 'error', timeRemaining: 0, startedAt: Date.now() - 200000, speed: '', totalSize: 0, from: '/home/user/projects', to: '', data: {} },
-  { id: 5, name: 'Compressing logs directory…', progress: 100, status: 'done', timeRemaining: 0, startedAt: Date.now() - 180000, speed: '3.1 MB/s', totalSize: 1073741824, from: '/var/log', to: '/tmp/logs.tar.gz', data: { operation: 'trash' } },
-  { id: 6, name: 'Syncing workspace to remote…', progress: 45, status: 'active', timeRemaining: 60, startedAt: Date.now() - 90000, speed: '2.8 MB/s', totalSize: 2147483648, from: '/home/user/workspace/another-very-long-path-that-keeps-going', to: 'remote-server.example.com:/data/backups/2024/workspace-sync', data: { operation: 'copy' } },
-  { id: 8, name: 'Moving config files…', progress: 30, status: 'active', timeRemaining: 5, startedAt: Date.now() - 10000, speed: '1.2 MB/s', totalSize: 4096, from: '/etc', to: '/tmp/bak', data: { operation: 'move' } },
-  { id: 7, name: 'Extracting downloaded archives…', progress: 100, status: 'cancelled', timeRemaining: 0, startedAt: Date.now() - 150000, speed: '', totalSize: 734003200, from: '/home/user/Downloads/extracted-with-a-very-long-folder-name', to: '/home/user/Extracted/destination-folder', data: {} },
-]
-
 export default {
   data() {
     return {
       open: false,
       theme,
       hideInactive: false,
-      useMock: false,
-      scrollbarWidth: 17,
-      hasOverflow: false,
-      _tick: 0,
+      infoTask: null,
     }
-  },
-  watch: {
-    open(val) { if (val) this.checkOverflow() },
-    displayTasks() { this.checkOverflow() },
   },
   computed: {
     displayTasks() {
-      if (this.useMock) {
-        if (this.hideInactive) {
-          return MOCK_TASKS.filter(t => t.status === 'active')
-        }
-        return MOCK_TASKS
-      }
       if (this.hideInactive) {
         return tasks.filter(t => t.status === 'active')
       }
       return tasks
     },
+    hasTasks() {
+      return tasks.length > 0
+    },
     allFinished() {
-      return this.displayTasks.length > 0 && this.displayTasks.every(t => t.status === 'done' || t.status === 'error' || t.status === 'cancelled')
+      return this.displayTasks.every(t => t.status === 'done' || t.status === 'error' || t.status === 'cancelled' || t.status === 'partial' || t.status === 'undone')
     },
     hasErrors() {
       return this.displayTasks.some(t => t.status === 'error')
@@ -158,9 +157,9 @@ export default {
       return this.displayTasks.filter(t => t.status === 'active')
     },
     overallProgress() {
-      const active = this.activeTasks
-      if (!active.length) return 0
-      return active.reduce((s, t) => s + t.progress, 0) / active.length
+      const inFlight = this.displayTasks.filter(t => !this.isFinished(t))
+      if (!inFlight.length) return 0
+      return inFlight.reduce((s, t) => s + (t.progress || 0), 0) / inFlight.length
     },
     eta() {
       const times = this.activeTasks.filter(t => t.timeRemaining != null).map(t => t.timeRemaining)
@@ -168,24 +167,16 @@ export default {
       return formatTime(Math.min(...times))
     },
     stats() {
-      const all = this.useMock ? MOCK_TASKS : tasks
+      const all = tasks
       return {
         total: all.length,
         done: all.filter(t => t.status === 'done').length,
         active: all.filter(t => t.status === 'active').length,
         error: all.filter(t => t.status === 'error').length,
         cancelled: all.filter(t => t.status === 'cancelled').length,
+        undone: all.filter(t => t.status === 'undone').length,
       }
     },
-    popupStyle() {
-      if (!this.$el) return {}
-      let rect = this.$el.getBoundingClientRect()
-      return {
-        position: 'fixed',
-        top: (rect.bottom + 6) + 'px',
-        right: (window.innerWidth - rect.right) + 'px'
-      }
-    }
   },
   methods: {
     formatTime,
@@ -198,7 +189,13 @@ export default {
     },
     emit,
     isFinished(task) {
-      return task.status === 'done' || task.status === 'error'
+      return task.status === 'done' || task.status === 'error' || task.status === 'cancelled' || task.status === 'partial' || task.status === 'undone'
+    },
+    canUndo(task) {
+      return task.data && task.data.operation && task.data.operation !== 'trash-delete'
+    },
+    isCancelling(task) {
+      return task.status === 'cancelling'
     },
     taskIcon(task) {
       const op = task.data && task.data.operation
@@ -213,7 +210,9 @@ export default {
       }
     },
     taskSpeed(task) {
-      void this._tick
+      if (task.status === 'paused') return 'Paused'
+      if (task.status === 'counting') return ''
+      if (task.status === 'cancelling') return ''
       if (task.status !== 'active') return ''
       if (!task.progress || !task.startedAt) return '…'
       const elapsed = (Date.now() - task.startedAt) / 1000
@@ -231,41 +230,32 @@ export default {
       switch(task.status) {
         case 'active': return 'In progress'
         case 'paused': return 'Paused'
+        case 'counting': return 'Counting files…'
+        case 'cancelling': return 'Cancelling…'
         case 'done': return 'Completed'
         case 'error': return 'Error'
         case 'cancelled': return 'Cancelled'
+        case 'undone': return 'Undone'
+        case 'partial': return 'Partial success'
         default: return task.status
       }
     },
     closePopup() {
       this.open = false
     },
-    checkOverflow() {
-      this.$nextTick(() => {
-        const el = this.$refs.taskList
-        if (el) this.hasOverflow = el.scrollHeight > el.clientHeight
-      })
-    },
-    measureScrollbar() {
-      const el = document.createElement('div')
-      el.style.cssText = 'position:absolute;top:-9999px;width:100px;height:100px;overflow:scroll;'
-      document.body.appendChild(el)
-      this.scrollbarWidth = el.offsetWidth - el.clientWidth
-      document.body.removeChild(el)
+    showInfo(task) {
+      this.infoTask = task
     },
     onClickOutside(e) {
-      if (!this.$el.contains(e.target) && !(this.$refs.popup && this.$refs.popup.contains(e.target))) {
+      if (this.$el && !this.$el.contains(e.target)) {
         this.open = false
       }
     }
   },
   mounted() {
-    this.measureScrollbar()
-    this._timer = setInterval(() => { this._tick++ }, 1000)
     document.addEventListener('click', this.onClickOutside)
   },
   beforeUnmount() {
-    clearInterval(this._timer)
     document.removeEventListener('click', this.onClickOutside)
   }
 }
@@ -331,6 +321,9 @@ export default {
   color: v-bind('theme.topPanelIconColor');
 }
 .popup {
+  position: absolute;
+  top: 100%;
+  right: 0;
   z-index: 9999;
   width: 520px;
 }
@@ -377,20 +370,25 @@ export default {
   max-height: 340px;
   overflow-y: auto;
   padding: 4px 0;
-  scrollbar-width: none;
+  scrollbar-gutter: stable;
 }
-.task-list.has-overflow {
-  padding-right: var(--sb-w, 17px);
+.task-list::-webkit-scrollbar-thumb {
+  background: #fff;
 }
-.task-list::-webkit-scrollbar {
-  display: none;
+.popup-inner:hover .task-list::-webkit-scrollbar-thumb {
+  background-color: rgba(150, 150, 150, 0.6);
+  border: 2px solid rgba(0, 0, 0, 0);
+  background-clip: padding-box;
+  border-radius: 6px;
 }
-.popup-inner:hover .task-list {
-  scrollbar-width: auto;
-  padding-right: 0;
+.popup-inner:hover .task-list::-webkit-scrollbar-thumb:hover {
+  background-color: rgba(100, 100, 100, 0.8);
 }
-.popup-inner:hover .task-list::-webkit-scrollbar {
-  display: block;
+.empty-msg {
+  padding: 24px 16px;
+  text-align: center;
+  color: v-bind('theme.tableRow.params');
+  font-size: 13px;
 }
 .task {
   display: flex;
@@ -410,9 +408,15 @@ export default {
 }
 .task-header {
   display: flex;
-  justify-content: space-between;
   align-items: center;
   margin-bottom: 4px;
+}
+.task-name-wrap {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  overflow: hidden;
 }
 .task-name {
   font-size: 13px;
@@ -421,19 +425,21 @@ export default {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  flex: 1;
-  margin-right: 8px;
+  min-width: 0;
 }
 .task-size {
   font-size: 11px;
   color: v-bind('theme.tableRow.params');
   font-weight: normal;
-  margin-left: 4px;
+  margin-left: 2px;
+  flex-shrink: 0;
+  white-space: nowrap;
 }
 .task-pct {
   font-size: 12px;
   color: v-bind('theme.tableRow.params');
   flex-shrink: 0;
+  margin-left: 4px;
 }
 .progress-track {
   height: 6px;
@@ -486,6 +492,18 @@ export default {
 }
 .task-status[data-status="error"] {
   color: #e74c3c;
+}
+.task-status[data-status="paused"] {
+  color: #e67e22;
+}
+.task-status[data-status="partial"] {
+  color: #f39c12;
+}
+.task-status[data-status="cancelling"] {
+  color: #95a5a6;
+}
+.task-status[data-status="counting"] {
+  color: #95a5a6;
 }
 .task-eta {
   font-size: 11px;
@@ -556,6 +574,11 @@ export default {
   align-items: center;
   gap: 2px;
   flex-shrink: 0;
+  min-width: 46px;
+  justify-content: flex-end;
+}
+.task-actions.actions-4 {
+  min-width: 94px;
 }
 .action-btn {
   display: flex;
@@ -595,6 +618,113 @@ export default {
 }
 .action-folder:hover {
   background: rgba(39, 174, 96, 0.15);
+}
+.action-pause {
+  color: #e67e22;
+}
+.action-pause:hover {
+  background: rgba(230, 126, 34, 0.15);
+}
+.action-resume {
+  color: #27ae60;
+}
+.action-resume:hover {
+  background: rgba(39, 174, 96, 0.15);
+}
+.action-retry-failed {
+  color: #e67e22;
+}
+.action-retry-failed:hover {
+  background: rgba(230, 126, 34, 0.15);
+}
+.action-info {
+  color: #7f8c8d;
+}
+.action-info:hover {
+  background: rgba(127, 140, 141, 0.15);
+}
+.info-popup-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background: rgba(0,0,0,0.3);
+  z-index: 10000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.info-popup {
+  background: v-bind('theme.dropDown.background');
+  border: 1px solid v-bind('theme.dropDown.borderColor');
+  border-radius: 6px;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.2);
+  width: 440px;
+  max-height: 360px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.info-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 14px;
+  border-bottom: 1px solid rgba(0,0,0,0.08);
+  flex-shrink: 0;
+}
+.info-title {
+  font-size: 13px;
+  font-family: v-bind('theme.font');
+  font-weight: 600;
+  color: v-bind('theme.fontColor');
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex: 1;
+  min-width: 0;
+}
+.info-close {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border: none;
+  background: transparent;
+  color: v-bind('theme.tableRow.params');
+  cursor: pointer;
+  border-radius: 3px;
+  font-family: PureNerdFont, "Symbols Nerd Font Mono", "Noto Sans Nerd Font", "Meslo Nerd Font", "FiraCode Nerd Font", sans-serif;
+  font-size: 12px;
+  flex-shrink: 0;
+  margin-left: 8px;
+}
+.info-close:hover {
+  background: rgba(128,128,128,0.15);
+}
+.info-log {
+  flex: 1;
+  overflow-y: auto;
+  padding: 8px 14px;
+  font-size: 12px;
+  font-family: monospace;
+  color: v-bind('theme.fontColor');
+  line-height: 1.5;
+}
+.log-entry {
+  padding: 2px 0;
+  border-bottom: 1px solid rgba(0,0,0,0.04);
+  word-break: break-all;
+}
+.log-entry:last-child {
+  border-bottom: none;
+}
+.log-empty {
+  color: v-bind('theme.tableRow.params');
+  text-align: center;
+  padding: 20px 0;
 }
 .popup-footer {
   display: flex;

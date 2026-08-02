@@ -225,6 +225,7 @@ contextBridge.exposeInMainWorld(
     readFile,getImageDataUri,
     getUserName: _ => require("os").userInfo().username,
     isDir: async pathname => (await lstat(pathname)).isDirectory(),
+    stat: async pathname => lstat(pathname),
     rename: async (oldPath, newPath) => { await fsRename(oldPath, newPath) },
     readTrashInfo: async (infoDir) => {
       const fsp = require("fs/promises")

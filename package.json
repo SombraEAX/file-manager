@@ -7,7 +7,11 @@
     "start": "vue-cli-service build && npx cross-env NODE_ENV=production electron .",
     "serve": "concurrently \"vue-cli-service serve\" \"npx wait-on http://localhost:8081 && npx cross-env NODE_ENV=development electron .\"",
     "build": "vue-cli-service build",
-    "lint": "vue-cli-service lint"
+    "lint": "vue-cli-service lint",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:e2e": "npx playwright test --config=playwright.config.js",
+    "test:e2e:headed": "npx playwright test --config=playwright.config.js --headed"
   },
   "eslintConfig": {
     "root": true,
@@ -52,7 +56,12 @@
     "webpack-dev-server": "^5.2.3"
   },
   "devDependencies": {
+    "@playwright/test": "^1.62.0",
+    "@vitejs/plugin-vue": "^6.0.8",
+    "@vue/test-utils": "^2.4.11",
     "concurrently": "^9.1.2",
+    "jsdom": "^30.0.0",
+    "vitest": "^4.1.10",
     "wait-on": "^8.0.3"
   }
 }
