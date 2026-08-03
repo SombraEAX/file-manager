@@ -100,6 +100,7 @@
         @select     = "selectEntry"
         @selectRange = "selectRange"
         @contextMenu = "onContextMenu"
+        @backgroundContextMenu = "onBackgroundContextMenu"
         @confirmRename = "confirmRename"
         @cancelRename = "cancelRename"
         @update:renamingValue = "renamingValue = $event"
@@ -394,29 +395,30 @@
         let items = isDir
           ? [{ label: 'Open' }, { label: 'Open in new tab' }, { type: 'separator' }, { label: 'Rename' }, { label: 'Copy' }, { label: 'Cut' }, { type: 'separator' }, { label: 'Move to Trash' }]
           : [{ label: 'Rename' }, { label: 'Copy' }, { label: 'Cut' }, { type: 'separator' }, { label: 'Move to Trash' }]
+        const pasteIndex = items.length
         if(this.clipboardPaths.length){
           items.push({ label: 'Paste' })
         }
         window.electron.ipcRenderer.send('show-menu', { items, x, y })
         window.electron.ipcRenderer.once('show-menu-reply', (_, index) => {
+          if(index === pasteIndex && this.clipboardPaths.length){ this.onPaste(); return }
           if(isDir){
             if(index === 0) this.openDir(path)
             else if(index === 1) this.openInNewTab(path)
-            else if(index === 3) this.startRename(path)
-            else if(index === 4){
+            else if(index === 2) this.startRename(path)
+            else if(index === 3){
               let paths = Object.keys(this.selectedMap)
               if(!paths.includes(path)) paths.push(path)
               this.clipboardPaths = paths
               this.clipboardMode = 'copy'
             }
-            else if(index === 5){
+            else if(index === 4){
               let paths = Object.keys(this.selectedMap)
               if(!paths.includes(path)) paths.push(path)
               this.clipboardPaths = paths
               this.clipboardMode = 'cut'
             }
-            else if(index === 7 && this.clipboardPaths.length) this.onPaste()
-            else if(index === 6){
+            else if(index === 5){
               let paths = Object.keys(this.selectedMap)
               if(!paths.includes(path)) paths.push(path)
               this.confirmMoveToTrash(paths)
@@ -435,13 +437,23 @@
               this.clipboardPaths = paths
               this.clipboardMode = 'cut'
             }
-            else if(index === 4 && this.clipboardPaths.length) this.onPaste()
             else if(index === 3){
               let paths = Object.keys(this.selectedMap)
               if(!paths.includes(path)) paths.push(path)
               this.confirmMoveToTrash(paths)
             }
           }
+        })
+      },
+      onBackgroundContextMenu({ x, y }){
+        let items = [
+          { label: 'New folder' },
+          { label: 'New file' }
+        ]
+        window.electron.ipcRenderer.send('show-menu', { items, x, y })
+        window.electron.ipcRenderer.once('show-menu-reply', (_, index) => {
+          if(index === 0) this.createNewFolder()
+          else if(index === 1) this.createNewFile()
         })
       },
 
@@ -589,6 +601,57 @@
       },
       cancelRename(){
         this.renamingPath = null
+      },
+      async _uniqueName(dir, base){
+        let name = base
+        let counter = 1
+        let entries = await window.electron.readdir(dir)
+        let names = new Set(entries.map(e => e.name))
+        while(names.has(name)){
+          counter++
+          name = base + ' (' + counter + ')'
+        }
+        return name
+      },
+      async createNewFolder(){
+        if(this.isTrash){
+          this.showToast('Cannot create a folder here')
+          return
+        }
+        try{
+          let dir = this.currentDir
+          let name = await this._uniqueName(dir, 'New folder')
+          let newPath = window.electron.join(dir, name)
+          await window.electron.mkdir(newPath)
+          this.selectedMap = { [newPath]: true }
+          this.lastClickedPath = newPath
+          this.previewPath = newPath
+          await this.refreshDir()
+          this.startRename(newPath)
+        }catch(e){
+          console.error('create folder failed:', e)
+          this.showToast('Failed to create folder')
+        }
+      },
+      async createNewFile(){
+        if(this.isTrash){
+          this.showToast('Cannot create a file here')
+          return
+        }
+        try{
+          let dir = this.currentDir
+          let name = await this._uniqueName(dir, 'New file')
+          let newPath = window.electron.join(dir, name)
+          await window.electron.writeFile(newPath, '')
+          this.selectedMap = { [newPath]: true }
+          this.lastClickedPath = newPath
+          this.previewPath = newPath
+          await this.refreshDir()
+          this.startRename(newPath)
+        }catch(e){
+          console.error('create file failed:', e)
+          this.showToast('Failed to create file')
+        }
       },
       renameSelected(){
         let paths = Object.keys(this.selectedMap)

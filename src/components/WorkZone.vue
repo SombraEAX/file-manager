@@ -1,7 +1,7 @@
 <template>
   <div class="outer" :class="{ 'table-mode': view === 'table' }">
     <div class="scroll-wrap" ref="scrollWrap">
-      <div class="inner" :class="{ padded: view !== 'table' }" ref="inner" @scroll="onScroll" @mousedown.self="onMouseDown" @click.self="deselectAll">
+      <div class="inner" :class="{ padded: view !== 'table' }" ref="inner" @scroll="onScroll" @mousedown.self="onMouseDown" @click.self="deselectAll" @contextmenu.self.prevent="onBackgroundContextMenu">
         <TableHeader
           v-if="view == 'table'"
           :columns="columns"
@@ -12,7 +12,7 @@
           @moveColumn="moveColumn"
           @toggleColumnVisible="toggleColumnVisible"
         />
-        <div class="virtual-body" :style="{ height: totalHeight + 'px' }" @mousedown="onMouseDown" @click.self="deselectAll">
+        <div class="virtual-body" :style="{ height: totalHeight + 'px' }" @mousedown="onMouseDown" @click.self="deselectAll" @contextmenu.self.prevent="onBackgroundContextMenu">
           <div
             v-for="item in visibleItems"
             :key="item.key"
@@ -75,7 +75,7 @@
             </div>
           </div>
         </div>
-        <div v-if="isTrash" class="trash-bottom-spacer" @mousedown="onMouseDown" @click.self="deselectAll"></div>
+        <div v-if="isTrash" class="trash-bottom-spacer" @mousedown="onMouseDown" @click.self="deselectAll" @contextmenu.self.prevent="onBackgroundContextMenu"></div>
       </div>
       <div class="rubber-band" v-if="rubberBand" :style="rubberBandStyle"></div>
       <div class="spacer"></div>
@@ -98,7 +98,7 @@
   const ICONS_LABEL_H = 50
 
   export default {
-    emits: ['openDir', 'changeSort', 'contextMenu', 'select', 'selectRange', 'confirmRename', 'cancelRename', 'update:renamingValue'],
+    emits: ['openDir', 'changeSort', 'contextMenu', 'backgroundContextMenu', 'select', 'selectRange', 'confirmRename', 'cancelRename', 'update:renamingValue'],
     components:{
       TableHeader,
       DirEntry
@@ -395,6 +395,9 @@
       },
       onContextMenu(e){
         this.$emit('contextMenu', e);
+      },
+      onBackgroundContextMenu(event){
+        this.$emit('backgroundContextMenu', { x: event.clientX, y: event.clientY })
       },
       changeSort(col,sort){
         this.$emit('changeSort',col,sort)
