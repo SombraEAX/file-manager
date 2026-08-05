@@ -5,6 +5,45 @@ const {readdir, lstat, stat, readFile, access, constants, rename: fsRename, mkdi
 const filetypes = Object.entries(require('../filetypes'))
 const path = require('path')
 const { clipboard } = require('electron')
+const os = require('os')
+
+const TRASH_PATH = 'trash://'
+
+function trashDirs(){
+  const base = path.join(os.homedir(), '.local', 'share', 'Trash')
+  return { dir: base, files: path.join(base, 'files'), info: path.join(base, 'info') }
+}
+
+async function readTrashDir(){
+  const { files } = trashDirs()
+  const names = await readdir(files).catch(() => [])
+  const result = await Promise.all(names.map(async name => {
+    const full = path.join(files, name)
+    let st
+    try{ st = await lstat(full) }catch(e){ return null }
+    let [typeId, typeLabel] = type(st)
+    st.name     = name
+    st.type     = typeId
+    st.filetype = typeLabel
+    st.modified = new Date(st.mtimeMs)
+    st.path     = TRASH_PATH + name
+    if(st.type !== 'file' && st.type !== 'symlink'){
+      return st
+    }
+    if(name[0] === '.'){
+      st.filetype = 'Dotfile'
+      st.ext = 'dotfile'
+    }else if(~name.indexOf('.')){
+      let ext = st.ext = name.split('.').pop().toLowerCase()
+      let ft = filetypes.find(
+        ([type,extensions]) => ~extensions.indexOf(ext)
+      )
+      if(ft) st.filetype = ft[0]
+    }
+    return st
+  }))
+  return result.filter(Boolean)
+}
 
 function type(entry){
   switch(true){
@@ -150,6 +189,7 @@ contextBridge.exposeInMainWorld(
   'electron',
   {
     async readdir(addr){
+      if(addr === TRASH_PATH) return readTrashDir()
       let files = await readdir(addr)
       let stats = await Promise.all(files.map(
         file => lstat(join(addr,file))
@@ -223,8 +263,10 @@ contextBridge.exposeInMainWorld(
       removeAllListeners: ipcRenderer.removeAllListeners.bind(ipcRenderer)
     },
     readFile,getImageDataUri,
+    trashPath: TRASH_PATH,
+    trashDirs,
     getUserName: _ => require("os").userInfo().username,
-    isDir: async pathname => (await lstat(pathname)).isDirectory(),
+    isDir: async pathname => pathname === TRASH_PATH || (await lstat(pathname)).isDirectory(),
     stat: async pathname => lstat(pathname),
     rename: async (oldPath, newPath) => { await fsRename(oldPath, newPath) },
     mkdir: async pathname => { await mkdir(pathname) },
@@ -233,18 +275,22 @@ contextBridge.exposeInMainWorld(
       const fsp = require("fs/promises")
       const path = require("path")
       const entries = await fsp.readdir(infoDir).catch(() => [])
-      const map = {}
-      for (const name of entries) {
-        if (!name.endsWith('.trashinfo')) continue
+      const files = entries.filter(name => name.endsWith('.trashinfo'))
+      const results = await Promise.all(files.map(async name => {
         try {
           const content = await fsp.readFile(path.join(infoDir, name), 'utf-8')
           const match = content.match(/Path=(.+)/)
           if (match) {
             const originalName = path.basename(match[1])
             const trashName = name.replace(/\.trashinfo$/, '')
-            map[originalName] = trashName
+            return [originalName, trashName]
           }
         } catch (e) {}
+        return null
+      }))
+      const map = {}
+      for (const pair of results) {
+        if (pair) map[pair[0]] = pair[1]
       }
       return map
     },
@@ -252,21 +298,21 @@ contextBridge.exposeInMainWorld(
       const fsp = require("fs/promises")
       const path = require("path")
       const entries = await fsp.readdir(infoDir).catch(() => [])
-      const result = []
-      for (const name of entries) {
-        if (!name.endsWith('.trashinfo')) continue
+      const files = entries.filter(name => name.endsWith('.trashinfo'))
+      const results = await Promise.all(files.map(async name => {
         try {
           const content = await fsp.readFile(path.join(infoDir, name), 'utf-8')
           const match = content.match(/Path=(.+)/)
           if (match) {
-            result.push({
+            return {
               trashName: name.replace(/\.trashinfo$/, ''),
               originalPath: match[1]
-            })
+            }
           }
         } catch (e) {}
-      }
-      return result
+        return null
+      }))
+      return results.filter(Boolean)
     }
   }
 )

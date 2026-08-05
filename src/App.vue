@@ -158,6 +158,9 @@
                 Permanently delete {{ trashActionPaths.length }} files?
               </template>
             </template>
+            <template v-if="trashActionMode === 'empty'">
+              Permanently delete all {{ trashActionPaths.length }} items from trash?
+            </template>
             <template v-if="trashActionMode === 'restore'">
               <template v-if="trashActionPaths.length === 1">
                 Restore "{{ trashActionPaths[0].split('/').pop() }}"?
@@ -166,11 +169,14 @@
                 Restore {{ trashActionPaths.length }} files?
               </template>
             </template>
+            <template v-if="trashActionMode === 'restore-all'">
+              Restore all {{ trashActionPaths.length }} items from trash?
+            </template>
           </div>
           <div class="trash-confirm-actions">
             <button class="trash-confirm-btn cancel" @click="cancelTrashAction">Cancel</button>
             <button class="trash-confirm-btn confirm" @click="executeTrashAction">
-              {{ trashActionMode === 'delete' ? 'Delete' : 'Restore' }}
+              {{ trashActionMode === 'delete' || trashActionMode === 'empty' ? 'Delete' : 'Restore' }}
             </button>
           </div>
         </div>
@@ -195,6 +201,7 @@
 
   const username = window.electron.getUserName()
   const homedir  = `/home/${username}`
+  const TRASH_PATH = 'trash://'
   const KB = 1024
   const MB = 1024 * 1024
   const GB = 1024 * 1024 * 1024
@@ -271,6 +278,7 @@
     methods:{
     
       async openDir(dirname){
+        if(this.isTrash) return
         const absolute = dirname.startsWith('/')
         const target = absolute
           ? dirname
@@ -383,6 +391,17 @@
       },
 
       onContextMenu({ path, x, y }){
+        if(this.isTrash){
+          let items = [{ label: 'Delete' }, { label: 'Restore' }]
+          window.electron.ipcRenderer.send('show-menu', { items, x, y })
+          window.electron.ipcRenderer.once('show-menu-reply', (_, index) => {
+            let paths = Object.keys(this.selectedMap)
+            if(!paths.includes(path)) paths.push(path)
+            if(index === 0) this.beginTrashAction('delete', paths)
+            else if(index === 1) this.beginTrashAction('restore', paths)
+          })
+          return
+        }
         let isDir = false
         let source = this.isSearchMode && this.searchResults ? this.searchResults : this.entries
         for(let entry of source){
@@ -402,42 +421,46 @@
         window.electron.ipcRenderer.send('show-menu', { items, x, y })
         window.electron.ipcRenderer.once('show-menu-reply', (_, index) => {
           if(index === pasteIndex && this.clipboardPaths.length){ this.onPaste(); return }
+          let idx = index
+          for(let i = 0; i <= index; i++){
+            if(items[i] && items[i].type === 'separator') idx--
+          }
           if(isDir){
-            if(index === 0) this.openDir(path)
-            else if(index === 1) this.openInNewTab(path)
-            else if(index === 2) this.startRename(path)
-            else if(index === 3){
+            if(idx === 0) this.openDir(path)
+            else if(idx === 1) this.openInNewTab(path)
+            else if(idx === 2) this.startRename(path)
+            else if(idx === 3){
               let paths = Object.keys(this.selectedMap)
               if(!paths.includes(path)) paths.push(path)
               this.clipboardPaths = paths
               this.clipboardMode = 'copy'
             }
-            else if(index === 4){
+            else if(idx === 4){
               let paths = Object.keys(this.selectedMap)
               if(!paths.includes(path)) paths.push(path)
               this.clipboardPaths = paths
               this.clipboardMode = 'cut'
             }
-            else if(index === 5){
+            else if(idx === 5){
               let paths = Object.keys(this.selectedMap)
               if(!paths.includes(path)) paths.push(path)
               this.confirmMoveToTrash(paths)
             }
           }else{
-            if(index === 0) this.startRename(path)
-            else if(index === 1){
+            if(idx === 0) this.startRename(path)
+            else if(idx === 1){
               let paths = Object.keys(this.selectedMap)
               if(!paths.includes(path)) paths.push(path)
               this.clipboardPaths = paths
               this.clipboardMode = 'copy'
             }
-            else if(index === 2){
+            else if(idx === 2){
               let paths = Object.keys(this.selectedMap)
               if(!paths.includes(path)) paths.push(path)
               this.clipboardPaths = paths
               this.clipboardMode = 'cut'
             }
-            else if(index === 3){
+            else if(idx === 3){
               let paths = Object.keys(this.selectedMap)
               if(!paths.includes(path)) paths.push(path)
               this.confirmMoveToTrash(paths)
@@ -446,6 +469,15 @@
         })
       },
       onBackgroundContextMenu({ x, y }){
+        if(this.isTrash){
+          let items = [{ label: 'Restore all' }, { label: 'Empty trash' }]
+          window.electron.ipcRenderer.send('show-menu', { items, x, y })
+          window.electron.ipcRenderer.once('show-menu-reply', (_, index) => {
+            if(index === 0) this.confirmRestoreAll()
+            else if(index === 1) this.confirmEmptyTrash()
+          })
+          return
+        }
         let items = [
           { label: 'New folder' },
           { label: 'New file' }
@@ -559,6 +591,7 @@
         this.renamingValue = name
       },
       async confirmRename(newName){
+        if(this.isTrash) return
         if(!this.renamingPath) return
         let oldPath = this.renamingPath
         this.renamingPath = null
@@ -654,23 +687,27 @@
         }
       },
       renameSelected(){
+        if(this.isTrash) return
         let paths = Object.keys(this.selectedMap)
         if(paths.length === 1){
           this.startRename(paths[0])
         }
       },
       moveToTrashFromMenu(){
+        if(this.isTrash) return
         let paths = Object.keys(this.selectedMap)
         if(!paths.length) return
         this.confirmMoveToTrash(paths)
       },
       onCopy(){
+        if(this.isTrash) return
         let paths = Object.keys(this.selectedMap)
         if(!paths.length) return
         this.clipboardPaths = [...paths]
         this.clipboardMode = 'copy'
       },
       onCut(){
+        if(this.isTrash) return
         let paths = Object.keys(this.selectedMap)
         if(!paths.length) return
         this.clipboardPaths = [...paths]
@@ -678,6 +715,10 @@
       },
       async onPaste(){
         if(!this.clipboardPaths.length) return
+        if(this.isTrash){
+          this.showToast('Cannot paste here')
+          return
+        }
         const paths = [...this.clipboardPaths]
         const destDir = this.currentDir
         if(this.clipboardMode === 'cut'){
@@ -893,20 +934,43 @@
         if(!paths.length){
           paths = this.entries.map(e => e.path || window.electron.join(this.currentDir, e.name))
         }
-        if(!paths.length) return
-        this.trashActionMode = 'delete'
-        this.trashActionPaths = paths
-        this.trashActionVisible = true
+        this.beginTrashAction('delete', paths)
       },
       trashRestore(){
         let paths = Object.keys(this.selectedMap)
         if(!paths.length){
           paths = this.entries.map(e => e.path || window.electron.join(this.currentDir, e.name))
         }
+        this.beginTrashAction('restore', paths)
+      },
+      confirmEmptyTrash(){
+        let paths = this.entries.map(e => e.path || window.electron.join(this.currentDir, e.name))
+        if(!paths.length){
+          this.showToast('Trash is empty')
+          return
+        }
+        this.beginTrashAction('empty', paths)
+      },
+      confirmRestoreAll(){
+        let paths = this.entries.map(e => e.path || window.electron.join(this.currentDir, e.name))
+        if(!paths.length){
+          this.showToast('Trash is empty')
+          return
+        }
+        this.beginTrashAction('restore-all', paths)
+      },
+      beginTrashAction(mode, paths){
+        paths = this.prepareTrashPaths(paths)
         if(!paths.length) return
-        this.trashActionMode = 'restore'
+        this.trashActionMode = mode
         this.trashActionPaths = paths
         this.trashActionVisible = true
+      },
+      trashNameOf(path){
+        return path.replace(/^trash:\/\//, '')
+      },
+      toTrashRealPath(path){
+        return window.electron.trashDirs().files + '/' + this.trashNameOf(path)
       },
       cancelTrashAction(){
         this.trashActionVisible = false
@@ -1016,8 +1080,9 @@
         this.trashActionPaths = []
         if(!paths.length) return
 
-        if(mode === 'delete'){
-          const { cancelled, result } = await this._runTrashDelete(paths, this.currentDir)
+        if(mode === 'delete' || mode === 'empty'){
+          const realPaths = paths.map(p => this.toTrashRealPath(p))
+          const { cancelled, result } = await this._runTrashDelete(realPaths, this.currentDir)
           if(cancelled) return
           if(result.errors){
             this.showToast('Failed to delete: ' + result.lastError)
@@ -1027,11 +1092,11 @@
           }
         }
 
-        if(mode === 'restore'){
-          const trashInfoDir = window.electron.join(this.currentDir, '..', 'info')
+        if(mode === 'restore' || mode === 'restore-all'){
+          const trashInfoDir = window.electron.trashDirs().info
           const allTrashInfo = await window.electron.readAllTrashInfo(trashInfoDir)
           const restoreItems = paths.map(p => {
-            const name = p.split('/').pop()
+            const name = this.trashNameOf(p)
             const found = allTrashInfo.find(i => i.trashName === name)
             return { trashName: name, originalPath: found ? found.originalPath : p }
           })
@@ -1046,6 +1111,10 @@
             this.showToast('Failed to restore: ' + result.lastError)
           }else{
             this.clearSelection()
+            if(mode === 'restore-all'){
+              await this.refreshDir()
+              return
+            }
             const names = restoreItems.map(i => i.originalPath.split('/').pop())
             await this._openLocationAndReveal(parentDir, names)
           }
@@ -1416,8 +1485,7 @@
               this.showToast('Failed to undo restore: ' + result.lastError)
             }else{
               updateTask(task.id, { status: 'undone', name: label, progress: 100 })
-              const trashDir = window.electron.join(homedir, '.local', 'share', 'Trash', 'files')
-              await this._openLocationAndReveal(trashDir, (task.data.trashNames || []))
+              await this._openLocationAndReveal(TRASH_PATH, (task.data.trashNames || []))
             }
           }catch(e){
             window.electron.ipcRenderer.removeAllListeners('trash-progress')
@@ -1478,7 +1546,7 @@
       async onTaskOpenFolder(task){
         if(!task.data || !task.data.originalPaths) return
         const op = task.data.operation
-        const trashDir = window.electron.join(homedir, '.local', 'share', 'Trash', 'files')
+        const trashDir = TRASH_PATH
         const infoDir = window.electron.join(homedir, '.local', 'share', 'Trash', 'info')
         const originDir = task.data.originalPaths[0].replace(/\/[^/]+$/, '') || '/'
         const isReverted = task.status === 'undone' || task.status === 'cancelled' || task.status === 'error'
@@ -1591,12 +1659,15 @@
         }
       },
       async refreshDir(){
-        if(!this.currentDir) return
+        const target = this.currentDir
+        if(!target) return
         try {
           let folders = 0
           let files   = 0
-          this._allEntries = await window.electron.readdir(this.currentDir)
-          let filtered = this.showHidden ? this._allEntries : this._allEntries.filter(e => e.name[0] !== '.')
+          const allEntries = await window.electron.readdir(target)
+          if(this.currentDir !== target) return
+          this._allEntries = allEntries
+          let filtered = this.showHidden ? allEntries : allEntries.filter(e => e.name[0] !== '.')
           for(let entry of filtered){
             if(entry.type === 'directory') folders++
             if(entry.type === 'file')      files++
@@ -1619,7 +1690,10 @@
         if(e.key === 'Escape' && this.trashActionVisible) this.cancelTrashAction()
         if(e.key === 'Delete' && !this.renamingPath && !this.trashPopupVisible && !this.trashActionVisible && document.activeElement?.tagName !== 'INPUT'){
           let paths = Object.keys(this.selectedMap)
-          if(paths.length) this.confirmMoveToTrash(paths)
+          if(paths.length){
+            if(this.isTrash) this.beginTrashAction('delete', paths)
+            else this.confirmMoveToTrash(paths)
+          }
         }
         if(e.ctrlKey && (e.key === 'c' || e.code === 'KeyC') && !this.renamingPath && document.activeElement?.tagName !== 'INPUT'){
           e.preventDefault()
@@ -1698,7 +1772,7 @@
       },
 
       isTrash(){
-        return this.currentDir && this.currentDir.endsWith('/.local/share/Trash/files')
+        return this.currentDir === TRASH_PATH
       },
 
       trashSelectedCount(){
@@ -1748,13 +1822,16 @@
       },
 
       async currentDir(){
+        const target = this.currentDir
         this.isSearchMode = false;
         this.searchResults = null;
         try {
           let folders = 0
           let files   = 0
-          this._allEntries = await window.electron.readdir(this.currentDir)
-          let filtered = this.showHidden ? this._allEntries : this._allEntries.filter(e => e.name[0] !== '.')
+          const allEntries = await window.electron.readdir(target)
+          if(this.currentDir !== target) return
+          this._allEntries = allEntries
+          let filtered = this.showHidden ? allEntries : allEntries.filter(e => e.name[0] !== '.')
           
           for(let entry of filtered){
             if(entry.type === 'directory') folders++
@@ -1767,7 +1844,7 @@
           this.files   = files
           this.$nextTick(() => this.restoreScroll());
         } catch(e) {
-          this.showToast('Folder not found');
+          if(this.currentDir === target) this.showToast('Folder not found');
         }
       }
     }

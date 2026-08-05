@@ -84,7 +84,7 @@
         this.$refs.addressInput.select()
       },
       gotopath(pathname){
-        if(pathname !== '/') pathname = pathname.replace(/\/$/,'')
+        if(pathname !== '/' && pathname !== 'trash://') pathname = pathname.replace(/\/$/,'')
         this.$emit('jump', pathname)
       },
       showHistory(){

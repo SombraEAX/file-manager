@@ -201,10 +201,14 @@ export default {
     isSearch(){
       let text = this.tmp.trim()
       if(!text) return false
-      return text[0] !== '/'
+      return text[0] !== '/' && !text.includes('://')
+    },
+    isTrash(){
+      return this.address === 'trash://'
     },
     breadcrumbParts() {
-      let breadcrumbs = this.tmp ? this.tmp.split('/').filter(part => part) : []; 
+      if(this.isTrash) return ['Trash']
+      let breadcrumbs = this.tmp ? this.tmp.split('/').filter(part => part) : [];
       breadcrumbs.unshift()
       return breadcrumbs
     },
@@ -212,6 +216,7 @@ export default {
       return this._dirItems
     },
     currentFolderType() {
+      if (this.isTrash) return 'trash'
       if (!this.address || this.address === homedir) return 'home'
       const name = this.address.split('/').filter(Boolean).pop()
       return name && this.folderType(name) || ''
@@ -294,6 +299,11 @@ export default {
     },
     goToSegment(index) {
       this.closeDropdown();
+      if(this.isTrash){
+        this.tmp = "trash://";
+        this.$emit("jump", "trash://");
+        return;
+      }
       let newPath = '/' + this.breadcrumbParts.slice(0, index + 1).join('/');
       this.tmp = newPath;
       this.$emit("jump", newPath); 
@@ -381,7 +391,7 @@ export default {
         return;
       }
       let pathname = this.tmp;
-      if (pathname !== "/") pathname = pathname.replace(/\/$/, ""); 
+      if (pathname !== "/" && pathname !== "trash://") pathname = pathname.replace(/\/$/, "");
       this.$emit("jump", pathname);
       this.finishEditing(); 
     }
@@ -400,6 +410,10 @@ export default {
       this.selectedLocation = newAddress;
       if(this.isExecutingSearch){
         this.cancelSearch();
+      }
+      if(newAddress === 'trash://'){
+        this._dirItems = []
+        return
       }
       try {
         let items = await window.electron.readdir(newAddress)

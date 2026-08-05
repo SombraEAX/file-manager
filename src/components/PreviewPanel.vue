@@ -173,6 +173,7 @@
     watch:{
       async path(path){
         if(!path){ this.text = null; this.type = null; this.imageStyle = null; return }
+        if(path.startsWith('trash://')){ this.text = null; this.type = null; this.imageStyle = null; return }
         let {type,language} = getFileType(path)
 
         switch(this.type = type){

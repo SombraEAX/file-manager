@@ -59,7 +59,7 @@
               { name: 'Pictures', pathname: window.electron.join(homedir, 'Pictures') },
               { name: 'Public', pathname: window.electron.join(homedir, 'Public') },
               { name: 'Videos', pathname: window.electron.join(homedir, 'Videos') },
-              { name: 'Trash', pathname: window.electron.join(homedir, '.local/share/Trash/files'), caption: 'Trash' },
+              { name: 'Trash', pathname: 'trash://', caption: 'Trash' },
               { name: '/', pathname: '/', caption: 'System root' }
             ]
           }

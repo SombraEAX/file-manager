@@ -60,18 +60,17 @@ async function revealFile(dirPath, filename) {
   const names = (await fsp.readdir(dirPath)).sort((a, b) => a.localeCompare(b))
   const index = names.findIndex(n => n === filename)
   if (index < 0) throw new Error('file not found in dir listing: ' + filename)
-  const scrollState = await page.evaluate((index) => {
+  await page.evaluate((index) => {
     const row = document.querySelector('.virtual-row')
     const rowHeight = row ? parseFloat(row.style.height) : 22
     const el = document.querySelector('.scroll-wrap .inner')
     if (el) el.scrollTop = Math.max(0, index * rowHeight - el.clientHeight / 2)
-    return { rowHeight, clientHeight: el ? el.clientHeight : 0 }
   }, index)
-  await page.waitForTimeout(400)
-  const foundAfter = await page.evaluate((filename) => {
-    return [...document.querySelectorAll('.label')].some(l => l.textContent.includes(filename))
-  }, filename)
-  if (!foundAfter) throw new Error('file not revealed in trash view: ' + filename)
+  await expect.poll(async () => {
+    return page.evaluate((filename) => {
+      return [...document.querySelectorAll('.label')].some(l => l.textContent.includes(filename))
+    }, filename)
+  }, { timeout: 15000 }).toBe(true)
 }
 
 async function trashSelected() {
@@ -253,11 +252,8 @@ test('folder after trash shows file in trash', async () => {
 
   await openPopup()
   await clickFolder()
-  const trashFiles = path.join(os.homedir(), '.local', 'share', 'Trash', 'files')
-  expect(await currentAddress()).toBe(trashFiles)
-  await expect.poll(async () => (await selectedNames()).length, { timeout: 10000 }).toBeGreaterThan(0)
-  const names = await selectedNames()
-  expect(names.some(n => n.includes(file))).toBe(true)
+  await expect.poll(async () => currentAddress(), { timeout: 30000 }).toBe('trash://')
+  await expect.poll(async () => (await selectedNames()).some(n => n.includes(file)), { timeout: 15000 }).toBe(true)
 })
 
 test('folder after trash-delete navigates to trash dir', async () => {
@@ -273,7 +269,7 @@ test('folder after trash-delete navigates to trash dir', async () => {
   expect(await waitDone()).toBeTruthy()
 
   const trashFiles = path.join(os.homedir(), '.local', 'share', 'Trash', 'files')
-  await nav(trashFiles)
+  await nav('trash://')
   await revealFile(trashFiles, file)
   await selectFile(file)
   const selected = await selectedNames()
@@ -293,7 +289,7 @@ test('folder after trash-delete navigates to trash dir', async () => {
 
   await openPopup()
   await clickFolder()
-  expect(await currentAddress()).toBe(trashFiles)
+  await expect.poll(async () => currentAddress(), { timeout: 30000 }).toBe('trash://')
 })
 
 test('folder after trash-restore shows original file', async () => {
@@ -308,7 +304,7 @@ test('folder after trash-restore shows original file', async () => {
   await trashSelected()
   expect(await waitDone()).toBeTruthy()
 
-  await nav(path.join(os.homedir(), '.local', 'share', 'Trash', 'files'))
+  await nav('trash://')
   await revealFile(path.join(os.homedir(), '.local', 'share', 'Trash', 'files'), file)
   await selectFile(file)
   await page.locator('button.trash-btn.restore').waitFor({ state: 'visible', timeout: 3000 })
@@ -326,8 +322,8 @@ test('folder after trash-restore shows original file', async () => {
 
   await openPopup()
   await clickFolder('Restore')
-  expect(await currentAddress()).toBe(srcDir)
-  expect(await selectedNames()).toContain(file)
+  await expect.poll(async () => currentAddress(), { timeout: 30000 }).toBe(srcDir)
+  await expect.poll(async () => (await selectedNames()).includes(file), { timeout: 15000 }).toBe(true)
 })
 
 test('folder after copy undo shows source file', async () => {
