@@ -304,6 +304,33 @@ async function getDirSize(dirPath) {
   return size
 }
 
+async function getDirInfo(dirPath) {
+  let size = 0
+  let count = 0
+  const entries = await fsp.readdir(dirPath, { withFileTypes: true })
+  for (const entry of entries) {
+    const fullPath = path.join(dirPath, entry.name)
+    if (entry.isDirectory()) {
+      const info = await getDirInfo(fullPath)
+      size += info.size
+      count += info.count + 1
+    } else {
+      const stat = await fsp.stat(fullPath)
+      size += stat.size
+      count++
+    }
+  }
+  return { size, count }
+}
+
+ipcMain.handle('get-dir-info', async (event, dirPath) => {
+  try {
+    return await getDirInfo(dirPath)
+  } catch (e) {
+    return { size: 0, count: 0 }
+  }
+})
+
 const cancelledTasks = new Set()
 const pausedTasks = new Set()
 ipcMain.on('trash-cancel', (event, taskId) => { cancelledTasks.add(taskId) })

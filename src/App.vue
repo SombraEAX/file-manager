@@ -185,6 +185,23 @@
       </div>
     </transition>
 
+    <transition name="trash-popup-fade">
+      <div class="trash-confirm-overlay" v-if="propsPopupVisible" @click.self="closeProperties">
+        <div class="props-popup">
+          <div class="props-title">{{ propsInfo.name }}</div>
+          <div class="props-body">
+            <div class="props-row" v-for="row in propsRows" :key="row.label">
+              <div class="props-label">{{ row.label }}</div>
+              <div class="props-value" :data-path="row.path">{{ row.value }}</div>
+            </div>
+          </div>
+          <div class="trash-confirm-actions">
+            <button class="trash-confirm-btn confirm props-close" @click="closeProperties">Close</button>
+          </div>
+        </div>
+      </div>
+    </transition>
+
   </div>
 </template>
 
@@ -268,6 +285,8 @@
         trashActionVisible: false,
         trashActionMode: '',
         trashActionPaths: [],
+        propsPopupVisible: false,
+        propsInfo: {},
         clipboardPaths: [],
         clipboardMode: '',
       }
@@ -424,8 +443,8 @@
           }
         }
         let items = isDir
-          ? [{ label: 'Open' }, { label: 'Open in new tab' }, { type: 'separator' }, { label: 'Rename' }, { label: 'Copy' }, { label: 'Cut' }, { type: 'separator' }, { label: 'Move to Trash' }]
-          : [{ label: 'Open' }, { type: 'separator' }, { label: 'Rename' }, { label: 'Copy' }, { label: 'Cut' }, { type: 'separator' }, { label: 'Move to Trash' }]
+          ? [{ label: 'Open' }, { label: 'Open in new tab' }, { type: 'separator' }, { label: 'Rename' }, { label: 'Copy' }, { label: 'Cut' }, { type: 'separator' }, { label: 'Move to Trash' }, { type: 'separator' }, { label: 'Properties' }]
+          : [{ label: 'Open' }, { type: 'separator' }, { label: 'Rename' }, { label: 'Copy' }, { label: 'Cut' }, { type: 'separator' }, { label: 'Move to Trash' }, { type: 'separator' }, { label: 'Properties' }]
         const pasteIndex = items.length
         if(this.clipboardPaths.length){
           items.push({ label: 'Paste' })
@@ -458,6 +477,7 @@
               if(!paths.includes(path)) paths.push(path)
               this.confirmMoveToTrash(paths)
             }
+            else if(idx === 6) this.showProperties(path)
           }else{
             if(idx === 0) this.openFile(path)
             else if(idx === 1) this.startRename(path)
@@ -478,6 +498,7 @@
               if(!paths.includes(path)) paths.push(path)
               this.confirmMoveToTrash(paths)
             }
+            else if(idx === 5) this.showProperties(path)
           }
         })
       },
@@ -1724,6 +1745,40 @@
         this.searchVersion++
         tab.historyIndex--
       },
+      async showProperties(path){
+        if(!path) return
+        let info = { name: path.split('/').pop(), location: path }
+        let stat = null
+        try { stat = await window.electron.stat(path) } catch(e) {}
+        const source = this.isSearchMode && this.searchResults ? this.searchResults : this.entries
+        const entry = source.find(en => (en.path || window.electron.join(this.currentDir, en.name)) === path)
+        const isDir = entry ? entry.type === 'directory' : false
+        const typeText = entry
+          ? (isDir ? 'Folder' : (entry.filetype || 'File'))
+          : (isDir ? 'Folder' : 'File')
+        info.typeText = typeText
+        const fmtDate = (ms) => ms ? new Date(ms).toISOString().replace('T',' ').replace(/:[^:]+$/,'') : ''
+        if(stat){
+          if(stat.birthtimeMs && stat.birthtimeMs > 0) info.createdText = fmtDate(stat.birthtimeMs)
+          info.modifiedText = fmtDate(stat.mtimeMs)
+          if(typeof stat.mode === 'number') info.permissionsText = (stat.mode & 0o777).toString(8)
+        }
+        if(isDir){
+          const dirInfo = await window.electron.getDirInfo(path).catch(() => null)
+          if(dirInfo){
+            info.sizeText = prettyBytes(dirInfo.size)
+            info.countText = dirInfo.count + ' item' + (dirInfo.count === 1 ? '' : 's')
+          }
+        } else if(stat){
+          info.sizeText = prettyBytes(stat.size)
+        }
+        this.propsInfo = info
+        this.propsPopupVisible = true
+      },
+      closeProperties(){
+        this.propsPopupVisible = false
+        this.propsInfo = {}
+      },
       showToast(text){
         if(this.toastTimer) clearTimeout(this.toastTimer);
         this.toastText = text;
@@ -1790,6 +1845,11 @@
       this._onKeydown = (e) => {
         if(e.key === 'Escape' && this.trashPopupVisible) this.cancelMoveToTrash()
         if(e.key === 'Escape' && this.trashActionVisible) this.cancelTrashAction()
+        if(e.key === 'Escape' && this.propsPopupVisible) this.closeProperties()
+        if(e.altKey && (e.key === 'Enter' || e.code === 'NumpadEnter') && !this.renamingPath && document.activeElement?.tagName !== 'INPUT'){
+          e.preventDefault()
+          this.showProperties(this.lastClickedPath || Object.keys(this.selectedMap)[0])
+        }
         if(e.key === 'Delete' && !this.renamingPath && !this.trashPopupVisible && !this.trashActionVisible && document.activeElement?.tagName !== 'INPUT'){
           let paths = Object.keys(this.selectedMap)
           if(paths.length){
@@ -1816,7 +1876,7 @@
           } else if(e.key === 'Home' || e.key === 'End'){
             e.preventDefault()
             this.keyMoveSelection(e, true)
-          } else if(e.key === 'Enter'){
+          } else if(e.key === 'Enter' && !e.altKey){
             e.preventDefault()
             this.keyOpenFocused()
           } else if(e.key === ' '){
@@ -1881,10 +1941,24 @@
         return groups
       },
           
-      currentDir(){
+          currentDir(){
         let tab = this.tabs[this.activeTabIndex];
         return tab ? tab.history[tab.historyIndex] : undefined;
       },
+
+      propsRows(){
+        const info = this.propsInfo
+        const rows = []
+        if(info.typeText) rows.push({ label: 'Type', value: info.typeText })
+        if(info.location) rows.push({ label: 'Location', value: info.location, path: true })
+        if(info.sizeText) rows.push({ label: 'Size', value: info.sizeText })
+        if(info.countText) rows.push({ label: 'Contains', value: info.countText })
+        if(info.modifiedText) rows.push({ label: 'Modified', value: info.modifiedText })
+        if(info.createdText) rows.push({ label: 'Created', value: info.createdText })
+        if(info.permissionsText) rows.push({ label: 'Permissions', value: info.permissionsText })
+        return rows
+      },
+
 
       searchFiles(){
         return this.searchResults ? this.searchResults.filter(e => e.type === 'file').length : 0;
@@ -2226,6 +2300,50 @@
   }
   .trash-confirm-btn.confirm:hover{
     background:#990000;
+  }
+  .props-popup{
+    background: v-bind('theme.dropDown.background');
+    border:1px solid v-bind('theme.dropDown.borderColor');
+    border-radius:8px;
+    padding:20px 24px;
+    box-shadow:0 8px 24px rgba(0,0,0,0.25);
+    min-width:360px;
+    max-width:460px;
+  }
+  .props-title{
+    font-family:v-bind('theme.font');
+    font-size:16px;
+    font-weight:bold;
+    color:v-bind('theme.fontColor');
+    margin-bottom:16px;
+    word-break:break-all;
+  }
+  .props-body{
+    margin-bottom:16px;
+  }
+  .props-row{
+    display:flex;
+    gap:16px;
+    padding:4px 0;
+    font-family:v-bind('theme.font');
+    font-size:13px;
+    color:v-bind('theme.fontColor');
+  }
+  .props-label{
+    flex:0 0 100px;
+    color:v-bind('theme.dropDown.textColor');
+    opacity:0.7;
+  }
+  .props-value{
+    flex:1;
+    word-break:break-all;
+  }
+  .props-close{
+    background:#4a90d9;
+    border-color:#3a7cc0;
+  }
+  .props-close:hover{
+    background:#3a7cc0;
   }
   .trash-popup-fade-enter-active, .trash-popup-fade-leave-active{
     transition:opacity .15s;
