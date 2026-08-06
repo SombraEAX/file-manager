@@ -12,7 +12,7 @@
           @moveColumn="moveColumn"
           @toggleColumnVisible="toggleColumnVisible"
         />
-        <div class="virtual-body" :style="{ height: totalHeight + 'px' }" @mousedown="onMouseDown" @click.self="deselectAll" @contextmenu.self.prevent="onBackgroundContextMenu">
+        <div class="virtual-body" ref="virtualBody" :style="{ height: totalHeight + 'px' }" @mousedown="onMouseDown" @click.self="deselectAll" @contextmenu.self.prevent="onBackgroundContextMenu">
           <div
             v-for="item in visibleItems"
             :key="item.key"
@@ -167,7 +167,6 @@
         _justDragged: false,
         _dragStartClientX: 0,
         _dragStartClientY: 0,
-        _scrollTopAtStart: 0,
         _lastClientX: 0,
         _lastClientY: 0,
         _autoScrollDir: 0,
@@ -271,8 +270,9 @@
           } else if (item.type === 'row') {
             const entryW = this.view === 'icons' ? Math.max(this.iconSize || 120, 120) + 20 : 150
             const gap = this.view === 'icons' ? ICONS_GAP : LIST_GAP
+            const padX = this.view === 'icons' ? 2 : 8
             for (let i = 0; i < item.entries.length; i++) {
-              rects.push({ path: item.paths[i], y: item.offset, height: item.height, x: i * (entryW + gap), width: entryW })
+              rects.push({ path: item.paths[i], y: item.offset, height: item.height, x: padX + i * (entryW + gap), width: entryW })
             }
           }
         }
@@ -315,7 +315,6 @@
         this._justDragged = false
         this._dragStartClientX = event.clientX
         this._dragStartClientY = event.clientY
-        this._scrollTopAtStart = this.scrollTop
         this.dragSelecting = true
         this.rubberBand = null
         this.$emit('select', null)
@@ -362,12 +361,12 @@
         const vh = Math.abs(this._lastClientY - this._dragStartClientY)
         this.rubberBand = { vx, vy, vw, vh }
 
-        const inner = this.$refs.inner
-        const iRect = inner.getBoundingClientRect()
-        const x1 = Math.min(this._dragStartClientX, this._lastClientX) - iRect.left
-        const x2 = Math.max(this._dragStartClientX, this._lastClientX) - iRect.left
-        const startDocY = this._dragStartClientY - iRect.top + this._scrollTopAtStart
-        const curDocY = this._lastClientY - iRect.top + this.scrollTop
+        const body = this.$refs.virtualBody
+        const bodyRect = body.getBoundingClientRect()
+        const x1 = Math.min(this._dragStartClientX, this._lastClientX) - bodyRect.left
+        const x2 = Math.max(this._dragStartClientX, this._lastClientX) - bodyRect.left
+        const startDocY = this._dragStartClientY - bodyRect.top
+        const curDocY = this._lastClientY - bodyRect.top
         const y1 = Math.min(startDocY, curDocY)
         const y2 = Math.max(startDocY, curDocY)
 
