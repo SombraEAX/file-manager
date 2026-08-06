@@ -44,7 +44,7 @@ export default {
   display: flex;
   flex-direction: row;
   align-items: stretch;
-  padding: 0 7px;
+  padding: 4px 7px 0 7px;
   min-height: v-bind('theme.tabBar.height');
   gap: 0;
 }

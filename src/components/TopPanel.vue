@@ -48,6 +48,13 @@
       @click="$emit('togglePreviewPanel')"
     ></button>
     <TasksWidget ref="tasksWidget" />
+    <button
+      class="icon icon-menu"
+      ref="menuButton"
+      v-if="!showMenuBar"
+      @click="openMenu"
+      title="Menu"
+    ></button>
   </div>
 </template>
 <script>
@@ -56,7 +63,7 @@
   import TasksWidget from "./TasksWidget.vue"
   
   export default {
-    emits: ['back', 'forward', 'up', 'jump', 'changeHistoryIndex', 'search', 'changeView', 'togglePreviewPanel'],
+    emits: ['back', 'forward', 'up', 'jump', 'changeHistoryIndex', 'search', 'changeView', 'togglePreviewPanel', 'openRootMenu'],
     components:{
       AddressBar,
       TasksWidget
@@ -70,7 +77,8 @@
       historyIndex: Number,
       searchVersion: Number,
       view: String,
-      previewPanelVisible: Boolean
+      previewPanelVisible: Boolean,
+      showMenuBar: Boolean
     },
     data(){
       return {
@@ -102,6 +110,10 @@
           'show-history-menu-reply',
           (_, index) => this.$emit('changeHistoryIndex', index)
         )
+      },
+      openMenu(){
+        let rect = this.$refs.menuButton.getBoundingClientRect()
+        this.$emit('openRootMenu', rect.x, rect.y + rect.height)
       },
       closeDropdowns(){
         let ab = this.$refs.addressBar
@@ -187,6 +199,7 @@
   .top-panel .icon-table::before{ content:"" }
   .top-panel .icon-icons::before{ content:"󰀻" }
   .top-panel .icon-panel::before{ content:"\ebf4" }
+  .top-panel .icon-menu::before{ content:"\f0c9" }
   .top-panel .icon.active{
     color:v-bind('theme.topPanelIconHoverColor')
   }

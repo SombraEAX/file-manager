@@ -11,6 +11,8 @@
         @mouseenter="showTopPanel"
       >
         <menu-bar
+          ref               = "menuBar"
+          :class            = "{ hidden: !showMenuBar }"
           :view             = "view"
           :sortColumn       = "sortColumn"
           :sortOrder        = "sortOrder"
@@ -19,6 +21,7 @@
           :autohideLeftPanel = "autohideLeftPanel"
           :autohideTopPanel  = "autohideTopPanel"
           :showHidden        = "showHidden"
+          :showMenuBar       = "showMenuBar"
           @changeView       = "ev => view = ev"
           @changeSortColumn = "ev => sortColumn = ev"
           @changeSortOrder  = "ev => sortOrder = ev"
@@ -26,6 +29,7 @@
           @toggleAutohideLeftPanel = "autohideLeftPanel = !autohideLeftPanel"
           @toggleAutohideTopPanel  = "autohideTopPanel = !autohideTopPanel"
           @toggleShowHidden = "showHidden = !showHidden"
+          @toggleShowMenuBar = "showMenuBar = !showMenuBar"
           @selectAll       = "selectAllEntries"
           @invertSelection = "invertSelection"
           @rename          = "renameSelected"
@@ -57,6 +61,8 @@
           @changeView         = "ev => view = ev"
           @togglePreviewPanel = "rightPanelVisible = !rightPanelVisible"
           :previewPanelVisible="rightPanelVisible"
+          :showMenuBar        = "showMenuBar"
+          @openRootMenu       = "onOpenRootMenu"
         />
       </div>
     </div>
@@ -276,6 +282,7 @@
         _topPanelTimer: null,
         rightPanelVisible: localStorage.getItem('rightPanelVisible') !== 'false',
         showHidden: localStorage.getItem('showHidden') === 'true',
+        showMenuBar: localStorage.getItem('showMenuBar') !== 'false',
         selectedMap: {},
         lastClickedPath: null,
         renamingPath: null,
@@ -745,6 +752,9 @@
         if(!paths.length) return
         this.clipboardPaths = [...paths]
         this.clipboardMode = 'copy'
+      },
+      onOpenRootMenu(x, y){
+        this.$refs.menuBar.openRootMenu(x, y)
       },
       onCut(){
         if(this.isTrash) return
@@ -2016,6 +2026,9 @@
           this.folders = folders
           this.files   = files
         }
+      },
+      showMenuBar(val){
+        localStorage.setItem('showMenuBar', val)
       },
 
       async currentDir(){

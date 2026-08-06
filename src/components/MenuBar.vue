@@ -30,7 +30,8 @@
       isDev:      Boolean,
       autohideLeftPanel: Boolean,
       autohideTopPanel: Boolean,
-      showHidden: Boolean
+      showHidden: Boolean,
+      showMenuBar: Boolean
     },
 
     emits: [
@@ -41,6 +42,7 @@
       'toggleAutohideLeftPanel',
       'toggleAutohideTopPanel',
       'toggleShowHidden',
+      'toggleShowMenuBar',
       'selectAll',
       'invertSelection',
       'rename',
@@ -65,6 +67,14 @@
           items: menuItem.submenu,
           x: rect.x,
           y: rect.y + rect.height
+        })
+      },
+
+      openRootMenu(x, y){
+        ipcRenderer.send('show-menu-bar-submenu', {
+          items: this.items,
+          x,
+          y
         })
       },
 
@@ -111,6 +121,10 @@
           }
           case 'show-hidden': {
             this.$emit('toggleShowHidden')
+            break
+          }
+          case 'show-menu-bar': {
+            this.$emit('toggleShowMenuBar')
             break
           }
           case 'select-all': {
@@ -290,6 +304,12 @@
                 type: 'checkbox',
                 checked: this.showHidden
               },
+              {
+                label: 'Show menu bar',
+                id: 'show-menu-bar',
+                type: 'checkbox',
+                checked: this.showMenuBar
+              },
               { type: 'separator' },
               {
                 label: 'Autohide left panel',
@@ -317,6 +337,9 @@
     height:22px;
     background:transparent;
     flex-shrink:0
+  }
+  .menu-bar.hidden{
+    display:none
   }
   .menu-item{
     padding:2px 10px;
