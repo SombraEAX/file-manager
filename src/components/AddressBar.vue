@@ -217,6 +217,7 @@ export default {
     },
     currentFolderType() {
       if (this.isTrash) return 'trash'
+      if (this.address === '/') return 'root'
       if (!this.address || this.address === homedir) return 'home'
       const name = this.address.split('/').filter(Boolean).pop()
       return name && this.folderType(name) || ''

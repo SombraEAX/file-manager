@@ -58,6 +58,7 @@
     },
     methods:{
       folderType(dir) {
+        if (dir.name === '/') return 'root'
         const nameMap = {
           'home': 'home', 'desktop': 'desktop', 'documents': 'documents',
           'downloads': 'downloads', 'music': 'music', 'pictures': 'pictures',

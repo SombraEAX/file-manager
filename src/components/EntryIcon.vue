@@ -10,8 +10,9 @@
         color: iconColor,
       }"
     >
-      <div v-if="isDir" class="folder-back" :style="{ background: bgColor }"></div>
+      <div v-if="isDir" class="folder-back" :class="{ 'folder-back--root': type === 'root' }" :style="{ background: bgColor }"></div>
       <div v-if="isDir" class="folder-front" :style="{ background: bgColor }">
+        <span v-if="type === 'root'" class="root-dot"></span>
         <div v-if="preview && preview.length && size >= 32" class="preview-grid">
           <div v-for="(src, i) in preview.slice(0, 4)" :key="i" class="preview-cell">
             <img :src="src" class="preview-img" />
@@ -61,7 +62,10 @@
     },
     computed: {
       bgColor() {
-        if (this.isDir) return '#ffc966'
+        if (this.isDir) {
+          if (this.type === 'root') return '#a0a0a0'
+          return '#ffc966'
+        }
         const map = {
           txt: '#ccc',
           pdf: '#e74c3c',
@@ -254,6 +258,12 @@
     z-index:0;
     filter:brightness(0.75);
   }
+  .folder-back--root{
+    width:100%;
+    left:0;
+    border-radius:12.5% / 17.31%;
+    filter:brightness(1.2);
+  }
   .folder-front{
     position:absolute;
     bottom:0;
@@ -265,6 +275,16 @@
     display:flex;
     align-items:center;
     justify-content:center;
+  }
+  .root-dot{
+    position:absolute;
+    top:7%;
+    right:7%;
+    width:22%;
+    height:22%;
+    border-radius:50%;
+    background:#2ecc71;
+    z-index:2;
   }
   .preview-grid{
     display:grid;
