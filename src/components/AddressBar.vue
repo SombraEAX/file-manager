@@ -11,6 +11,7 @@
         <div v-if="!isEditing && !isExecutingSearch" class="breadcrumbs">
           <span class="breadcrumb-root" @click.stop="goToRoot">
             <EntryIcon :size="16" is-dir :type="currentFolderType" />
+            <span class="breadcrumb-root-label">{{ isTrash ? 'Trash' : 'root' }}</span>
           </span>
           <span
             v-if="breadcrumbParts.length > 0"
@@ -207,7 +208,7 @@ export default {
       return this.address === 'trash://'
     },
     breadcrumbParts() {
-      if(this.isTrash) return ['Trash']
+      if(this.isTrash) return []
       let breadcrumbs = this.tmp ? this.tmp.split('/').filter(part => part) : [];
       breadcrumbs.unshift()
       return breadcrumbs
@@ -295,6 +296,11 @@ export default {
     },
     goToRoot() {
       this.closeDropdown();
+      if(this.isTrash){
+        this.tmp = "trash://";
+        this.$emit("jump", "trash://");
+        return;
+      }
       this.tmp = "/";
       this.$emit("jump", "/");
     },
@@ -578,6 +584,16 @@ export default {
     padding: 0 5px 0 7px;
     display: flex;
     align-items: center;
+  }
+
+  .breadcrumb-root-label {
+    font-size: 14px;
+    padding: 0 5px 0 4px;
+  }
+
+  .breadcrumb-root:hover .breadcrumb-root-label {
+    text-decoration: underline;
+    color: v-bind('theme.linkHover');
   }
   
   .breadcrumb-root:hover {
