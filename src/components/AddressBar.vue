@@ -476,6 +476,9 @@ export default {
     cursor:text;
     box-sizing:border-box;
     border-radius: v-bind('theme.addressBar.borderRadius');
+    display:flex;
+    align-items:center;
+    flex-wrap:nowrap;
   }
   .first[data-editing="true"]{
     border: 2px solid v-bind('theme.textBoxesBorderColorActive');	    
@@ -614,7 +617,8 @@ export default {
     border:0px;
     background:transparent;
     flex:1;
-    outline:none
+    outline:none;
+    min-width:0;
   }
   
   .button{
@@ -625,6 +629,8 @@ export default {
     margin:auto;
     margin-right:5px;
     height:20px;
+    flex-shrink:0;
+    white-space:nowrap;
   }
 
   .button[disabled]{
@@ -688,7 +694,8 @@ export default {
     cursor:pointer;
     display:inline-flex;
     align-items:center;
-    justify-content:center
+    justify-content:center;
+    flex-shrink:0;
   }
   .go::before{
     font-family:PureNerdFont,"Symbols Nerd Font Mono","Noto Sans Nerd Font","Meslo Nerd Font","FiraCode Nerd Font",sans-serif;
