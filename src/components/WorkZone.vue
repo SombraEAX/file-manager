@@ -40,6 +40,7 @@
                 :clipboardMode="clipboardMode"
                 :clipboardPaths="clipboardPaths"
                 @openDir="openDir"
+                @openFile="openFile"
                 @contextMenu="onContextMenu"
                 @click="select(item.entry, $event)"
                 @confirmRename="$emit('confirmRename', $event)"
@@ -65,6 +66,7 @@
                   :clipboardMode="clipboardMode"
                   :clipboardPaths="clipboardPaths"
                   @openDir="openDir"
+                  @openFile="openFile"
                   @contextMenu="onContextMenu"
                   @click="select(entry, $event)"
                   @confirmRename="$emit('confirmRename', $event)"
@@ -98,7 +100,7 @@
   const ICONS_LABEL_H = 50
 
   export default {
-    emits: ['openDir', 'changeSort', 'contextMenu', 'backgroundContextMenu', 'select', 'selectRange', 'confirmRename', 'cancelRename', 'update:renamingValue'],
+    emits: ['openDir', 'openFile', 'changeSort', 'contextMenu', 'backgroundContextMenu', 'select', 'selectRange', 'confirmRename', 'cancelRename', 'update:renamingValue'],
     components:{
       TableHeader,
       DirEntry
@@ -392,6 +394,9 @@
       },
       openDir(dir){
         this.$emit('openDir',dir)
+      },
+      openFile(path){
+        this.$emit('openFile', path)
       },
       onContextMenu(e){
         this.$emit('contextMenu', e);

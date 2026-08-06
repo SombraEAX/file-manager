@@ -265,6 +265,7 @@ contextBridge.exposeInMainWorld(
     readFile,getImageDataUri,
     trashPath: TRASH_PATH,
     trashDirs,
+    openFile: async pathname => ipcRenderer.invoke('open-file', pathname),
     getUserName: _ => require("os").userInfo().username,
     isDir: async pathname => pathname === TRASH_PATH || (await lstat(pathname)).isDirectory(),
     stat: async pathname => lstat(pathname),

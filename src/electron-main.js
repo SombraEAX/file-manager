@@ -1,4 +1,5 @@
 const { app, BrowserWindow, ipcMain, Menu, MenuItem, clipboard, dialog } = require('electron')
+const { spawn } = require('child_process')
 
 const url = require("url")
 const path = require("path")
@@ -122,6 +123,45 @@ ipcMain.handle('open-directory-dialog', async () => {
     properties: ['openDirectory']
   });
   return result.canceled ? null : result.filePaths[0];
+});
+
+function openWithSystemHandler(pathname) {
+  return new Promise((resolve) => {
+    const isWin = process.platform === 'win32'
+    const command = process.platform === 'darwin' ? 'open'
+      : isWin ? 'cmd'
+      : 'xdg-open'
+    const args = process.platform === 'darwin' ? [pathname]
+      : isWin ? ['/c', 'start', '', pathname]
+      : [pathname]
+    const child = spawn(command, args, {
+      detached: !isWin,
+      stdio: ['ignore', 'ignore', 'pipe']
+    })
+    let stderr = ''
+    child.stderr.on('data', (chunk) => { stderr += String(chunk) })
+    let settled = false
+    const settle = (msg) => {
+      if (settled) return
+      settled = true
+      resolve(msg)
+    }
+    child.on('error', (e) => settle(e.message || String(e)))
+    child.on('exit', (code) => {
+      settle(code === 0 ? '' : (stderr.trim() || `Failed to open (exit code ${code})`))
+    })
+    setTimeout(() => settle(''), 3000)
+  })
+}
+
+ipcMain.handle('open-file', async (event, pathname) => {
+  let error = ''
+  try {
+    error = await openWithSystemHandler(pathname)
+  } catch (e) {
+    error = e.message || String(e)
+  }
+  return { error }
 });
 
 ipcMain.on('show-history-menu', (event, { history, current, x, y }) => {

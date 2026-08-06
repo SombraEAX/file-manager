@@ -97,6 +97,7 @@
         :clipboardPaths = "clipboardPaths"
         @changeSort = "changeSort"
         @openDir    = "openDir"
+        @openFile   = "openFile"
         @select     = "selectEntry"
         @selectRange = "selectRange"
         @contextMenu = "onContextMenu"
@@ -298,6 +299,16 @@
         await this.jump(target);
       },
 
+      async openFile(pathname){
+        if(this.isTrash || !pathname) return
+        try {
+          const { error } = await window.electron.openFile(pathname)
+          if(error) this.showToast('Failed to open: ' + error)
+        } catch(e) {
+          this.showToast('Failed to open: ' + (e.message || String(e)))
+        }
+      },
+
       onSearchResults({ query, results }){
         if(results === null){
           this.isSearchMode = false;
@@ -413,7 +424,7 @@
         }
         let items = isDir
           ? [{ label: 'Open' }, { label: 'Open in new tab' }, { type: 'separator' }, { label: 'Rename' }, { label: 'Copy' }, { label: 'Cut' }, { type: 'separator' }, { label: 'Move to Trash' }]
-          : [{ label: 'Rename' }, { label: 'Copy' }, { label: 'Cut' }, { type: 'separator' }, { label: 'Move to Trash' }]
+          : [{ label: 'Open' }, { type: 'separator' }, { label: 'Rename' }, { label: 'Copy' }, { label: 'Cut' }, { type: 'separator' }, { label: 'Move to Trash' }]
         const pasteIndex = items.length
         if(this.clipboardPaths.length){
           items.push({ label: 'Paste' })
@@ -447,20 +458,21 @@
               this.confirmMoveToTrash(paths)
             }
           }else{
-            if(idx === 0) this.startRename(path)
-            else if(idx === 1){
+            if(idx === 0) this.openFile(path)
+            else if(idx === 1) this.startRename(path)
+            else if(idx === 2){
               let paths = Object.keys(this.selectedMap)
               if(!paths.includes(path)) paths.push(path)
               this.clipboardPaths = paths
               this.clipboardMode = 'copy'
             }
-            else if(idx === 2){
+            else if(idx === 3){
               let paths = Object.keys(this.selectedMap)
               if(!paths.includes(path)) paths.push(path)
               this.clipboardPaths = paths
               this.clipboardMode = 'cut'
             }
-            else if(idx === 3){
+            else if(idx === 4){
               let paths = Object.keys(this.selectedMap)
               if(!paths.includes(path)) paths.push(path)
               this.confirmMoveToTrash(paths)
@@ -1629,7 +1641,7 @@
         this.toastTimer = setTimeout(() => {
           this.toastVisible = false;
           this.toastTimer = null;
-        }, 2500);
+        }, 5000);
       },
       getGroup(entry){
         switch(this.groupBy){

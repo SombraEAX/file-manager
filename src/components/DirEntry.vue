@@ -5,6 +5,7 @@
     :data-selected="selected" 
     :data-cut="isCut"
     @click="onClick"
+    @dblclick.stop="onDoubleClick"
     @contextmenu.prevent="onContextMenu"
   >
     <EntryIcon :size="entryIconSize" :is-dir="params.type === 'directory'" :type="entryType" />
@@ -52,7 +53,7 @@
   }
 
   export default {
-    emits: ['openDir', 'contextMenu', 'click', 'confirmRename', 'cancelRename', 'update:renamingValue'],
+    emits: ['openDir', 'openFile', 'contextMenu', 'click', 'confirmRename', 'cancelRename', 'update:renamingValue'],
     components: { EntryIcon },
     props: {
       view:String,
@@ -77,7 +78,6 @@
     },
     data(){
       return {
-        clicked:null,
         theme
       }
     },
@@ -127,17 +127,16 @@
         const xdg = getXdgDirs()
         return xdg[name] || ''
       },
-      doubleClick(){
+      onDoubleClick(){
         if(this.params.type === 'directory')
           this.$emit('openDir', this.params.path || this.params.name)
+        else
+          this.$emit('openFile', this.params.path || window.electron.join(this.address, this.params.name))
       },
       onContextMenu(e){
         this.$emit('contextMenu', { path: this.params.path || window.electron.join(this.address, this.params.name), x: e.clientX, y: e.clientY });
       },
       onClick($event){
-        if(this.clicked && Date.now() - this.clicked < 500)
-          this.doubleClick()
-        this.clicked = Date.now()
         this.$emit('click', $event)
       },
       columnStyle(col,index){
