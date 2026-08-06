@@ -35,7 +35,7 @@
         <input
           v-if="isEditing"
           class="address"
-          @keydown.enter="gotopath"
+          @keydown.enter.stop="gotopath"
           @keydown.esc="finishEditing"
           v-model="tmp"
           ref="addressInput"
