@@ -31,7 +31,8 @@
       autohideLeftPanel: Boolean,
       autohideTopPanel: Boolean,
       showHidden: Boolean,
-      showMenuBar: Boolean
+      showMenuBar: Boolean,
+      tabsInSidePanel: Boolean
     },
 
     emits: [
@@ -43,6 +44,7 @@
       'toggleAutohideTopPanel',
       'toggleShowHidden',
       'toggleShowMenuBar',
+      'toggleTabsInSidePanel',
       'selectAll',
       'invertSelection',
       'rename',
@@ -125,6 +127,10 @@
           }
           case 'show-menu-bar': {
             this.$emit('toggleShowMenuBar')
+            break
+          }
+          case 'tabs-in-side-panel': {
+            this.$emit('toggleTabsInSidePanel')
             break
           }
           case 'select-all': {
@@ -309,6 +315,12 @@
                 id: 'show-menu-bar',
                 type: 'checkbox',
                 checked: this.showMenuBar
+              },
+              {
+                label: 'Tabs in side panel',
+                id: 'tabs-in-side-panel',
+                type: 'checkbox',
+                checked: this.tabsInSidePanel
               },
               { type: 'separator' },
               {

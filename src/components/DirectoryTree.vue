@@ -16,6 +16,16 @@
               @select="(ev) => $emit('select', ev)"
             />
           </div>
+          <div class="section" v-if="tabsInSidePanel && tabs.length > 1">
+            <div class="section-title">Tabs</div>
+            <directory-list
+              :dirs="tabsDirs"
+              :selected="activeTabPath"
+              closable
+              @select="onTabSelect"
+              @close="onTabClose"
+            />
+          </div>
         </div>
       </div>
       <div class="counts">
@@ -35,13 +45,16 @@
   const username = window.electron.getUserName()
 
   export default {
-    emits: ['select', 'resize'],
+    emits: ['select', 'resize', 'select-tab', 'close-tab'],
     props: {
       width: Number,
       selected: String,
       items: Number,
       files: Number,
-      dirsCount: Number
+      dirsCount: Number,
+      tabs: Array,
+      activeTabIndex: Number,
+      tabsInSidePanel: Boolean
     },
     components: { DirectoryList, SideBar },
     data(){
@@ -64,6 +77,32 @@
             ]
           }
         ]
+      }
+    },
+    computed: {
+      tabsDirs(){
+        return this.tabs.map((tab, i) => ({
+          name: this.tabTitle(tab),
+          pathname: '#tab-' + i
+        }))
+      },
+      activeTabPath(){
+        return '#tab-' + this.activeTabIndex
+      }
+    },
+    methods: {
+      tabTitle(tab){
+        let path = tab.history[tab.historyIndex]
+        if (!path || path === '/') return '/'
+        return path.split('/').filter(Boolean).pop()
+      },
+      onTabSelect(pathname){
+        const m = String(pathname).match(/^#tab-(\d+)$/)
+        if (m) this.$emit('select-tab', parseInt(m[1], 10))
+      },
+      onTabClose(pathname){
+        const m = String(pathname).match(/^#tab-(\d+)$/)
+        if (m) this.$emit('close-tab', parseInt(m[1], 10))
       }
     }
   }

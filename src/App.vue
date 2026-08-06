@@ -22,6 +22,7 @@
           :autohideTopPanel  = "autohideTopPanel"
           :showHidden        = "showHidden"
           :showMenuBar       = "showMenuBar"
+          :tabsInSidePanel   = "tabsInSidePanel"
           @changeView       = "ev => view = ev"
           @changeSortColumn = "ev => sortColumn = ev"
           @changeSortOrder  = "ev => sortOrder = ev"
@@ -30,6 +31,7 @@
           @toggleAutohideTopPanel  = "autohideTopPanel = !autohideTopPanel"
           @toggleShowHidden = "showHidden = !showHidden"
           @toggleShowMenuBar = "showMenuBar = !showMenuBar"
+          @toggleTabsInSidePanel = "tabsInSidePanel = !tabsInSidePanel"
           @selectAll       = "selectAllEntries"
           @invertSelection = "invertSelection"
           @rename          = "renameSelected"
@@ -39,6 +41,7 @@
           @paste           = "onPaste"
         />
         <tab-bar
+          v-if         = "!tabsInSidePanel"
           :tabs        = "tabs"
           :active-index = "activeTabIndex"
           @select      = "switchTab"
@@ -82,8 +85,13 @@
           :items      = "isSearchMode && searchResults ? searchResults.length : entries.length"
           :files      = "isSearchMode && searchResults ? searchFiles : files"
           :dirsCount  = "isSearchMode && searchResults ? searchDirs : folders"
+          :tabs       = "tabs"
+          :activeTabIndex = "activeTabIndex"
+          :tabsInSidePanel = "tabsInSidePanel"
           @resize     = "w => leftPanelWidth = w"
           @select     = "jump"
+          @select-tab = "switchTab"
+          @close-tab  = "closeTab"
           @mouseenter = "showLeftPanel"
           @mouseleave = "scheduleHideLeftPanel"
         />
@@ -283,6 +291,7 @@
         rightPanelVisible: localStorage.getItem('rightPanelVisible') !== 'false',
         showHidden: localStorage.getItem('showHidden') === 'true',
         showMenuBar: localStorage.getItem('showMenuBar') !== 'false',
+        tabsInSidePanel: localStorage.getItem('tabsInSidePanel') === 'true',
         selectedMap: {},
         lastClickedPath: null,
         renamingPath: null,
@@ -2029,6 +2038,9 @@
       },
       showMenuBar(val){
         localStorage.setItem('showMenuBar', val)
+      },
+      tabsInSidePanel(val){
+        localStorage.setItem('tabsInSidePanel', val)
       },
 
       async currentDir(){

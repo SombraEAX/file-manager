@@ -7,6 +7,7 @@
           <span v-show="hoveredDir === dir.pathname" class="expand-icon" :class="dir.open ? 'expanded' : 'collapsed'"></span>
         </div>
         <div class="caption" @click="$emit('select',dir.pathname)">{{dir.caption || dir.name}}</div>
+        <span v-if="closable" class="tab-close" @click.stop="$emit('close',dir.pathname)">&times;</span>
       </div>
       <div class="subtree" v-if="dir.dirs && dir.open">
         <directory-list
@@ -40,14 +41,15 @@
   }
 
   export default {
-    emits: ['select'],
+    emits: ['select', 'close'],
     components: { EntryIcon },
     props: {
       dirs: {
         type: Array,
         default: () => []
       },
-      selected:String
+      selected: String,
+      closable: Boolean
     },
     name:'DirectoryList',
     data(){			
@@ -135,16 +137,38 @@
   }
   .caption{
     flex:1;
+    min-width:0;
     margin:auto;
     text-align:left;
     margin-left:5px;
     font-family:v-bind('theme.font');
     white-space: nowrap;
+    overflow:hidden;
+    text-overflow:ellipsis;
     cursor:pointer
   }
   .caption:hover{
     text-decoration:underline;
     color:v-bind('theme.linkHover')
+  }
+
+  .tab-close{
+    display:none;
+    margin:auto;
+    margin-left:6px;
+    margin-right:14px;
+    font-size:18px;
+    font-weight:bold;
+    line-height:1;
+    cursor:pointer;
+    flex-shrink:0;
+    color:v-bind('theme.sidebarTextColor')
+  }
+  .dir-label:hover .tab-close{
+    display:block
+  }
+  .tab-close:hover{
+    color:v-bind('theme.tabBar.closeHoverColor')
   }
 
   .selected>.dir-label>.caption{
