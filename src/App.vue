@@ -95,6 +95,7 @@
         :renamingValue = "renamingValue"
         :clipboardMode = "clipboardMode"
         :clipboardPaths = "clipboardPaths"
+        :focusedPath  = "previewPath"
         @changeSort = "changeSort"
         @openDir    = "openDir"
         @openFile   = "openFile"
@@ -1640,6 +1641,89 @@
         const wz = this.$refs.workzone
         if(wz && wz.scrollToPath) wz.scrollToPath(paths[0])
       },
+      flatPathList(){
+        const list = []
+        for(const group of this.groups){
+          for(const entry of group.entries){
+            list.push(entry.path || window.electron.join(this.currentDir, entry.name))
+          }
+        }
+        return list
+      },
+      _scrollToKeyPath(path){
+        this.$nextTick(() => {
+          const wz = this.$refs.workzone
+          if(wz && wz.scrollToPath) wz.scrollToPath(path)
+        })
+      },
+      keyMoveSelection(e, jumpToEnd){
+        const list = this.flatPathList()
+        if(!list.length) return
+        const anchor = this.lastClickedPath && list.includes(this.lastClickedPath) ? this.lastClickedPath : null
+        const cursor = this.previewPath && list.includes(this.previewPath) ? this.previewPath : null
+        const curIdx = cursor ? list.indexOf(cursor) : (anchor ? list.indexOf(anchor) : 0)
+        const wz = this.$refs.workzone
+        const perRow = wz && wz.itemsPerRow ? wz.itemsPerRow : 1
+        let delta
+        if(jumpToEnd){
+          delta = e.key === 'Home' ? -Number.MAX_SAFE_INTEGER : Number.MAX_SAFE_INTEGER
+        } else if(e.key === 'ArrowDown'){
+          delta = curIdx + perRow < list.length ? perRow : 0
+        } else if(e.key === 'ArrowUp'){
+          delta = curIdx >= perRow ? -perRow : 0
+        } else {
+          delta = e.key === 'ArrowRight' ? 1 : -1
+        }
+        const nextIdx = Math.max(0, Math.min(list.length - 1, curIdx + delta))
+        const target = list[nextIdx]
+        if(e.shiftKey && anchor){
+          const anchorIdx = list.indexOf(anchor)
+          const start = Math.min(anchorIdx, nextIdx)
+          const end = Math.max(anchorIdx, nextIdx)
+          const next = {}
+          for(let i = start; i <= end; i++) next[list[i]] = true
+          this.selectedMap = next
+          this.previewPath = target
+        } else if(e.ctrlKey){
+          this.previewPath = target
+          this.lastClickedPath = target
+        } else {
+          this.selectedMap = { [target]: true }
+          this.previewPath = target
+          this.lastClickedPath = target
+        }
+        this._scrollToKeyPath(target)
+      },
+      keyOpenFocused(){
+        const list = this.flatPathList()
+        const path = this.lastClickedPath || list[0]
+        if(!path) return
+        const source = this.isSearchMode && this.searchResults ? this.searchResults : this.entries
+        const entry = source.find(en => (en.path || window.electron.join(this.currentDir, en.name)) === path)
+        if(!entry) return
+        if(entry.type === 'directory') this.openDir(path)
+        else this.openFile(path)
+      },
+      keyToggleFocused(){
+        const path = this.lastClickedPath
+        if(!path) return
+        if(this.selectedMap[path]){
+          const next = { ...this.selectedMap }
+          delete next[path]
+          this.selectedMap = next
+        } else {
+          this.selectedMap = { ...this.selectedMap, [path]: true }
+        }
+        this.previewPath = path
+      },
+      keyBack(){
+        const tab = this.tabs[this.activeTabIndex]
+        if(!tab || tab.historyIndex <= 0) return
+        this.isSearchMode = false
+        this.searchResults = null
+        this.searchVersion++
+        tab.historyIndex--
+      },
       showToast(text){
         if(this.toastTimer) clearTimeout(this.toastTimer);
         this.toastText = text;
@@ -1724,6 +1808,27 @@
         if(e.ctrlKey && (e.key === 'v' || e.code === 'KeyV') && !this.renamingPath && document.activeElement?.tagName !== 'INPUT'){
           e.preventDefault()
           this.onPaste()
+        }
+        if(!this.renamingPath && !this.trashPopupVisible && !this.trashActionVisible && document.activeElement === document.body){
+          if(e.key === 'ArrowDown' || e.key === 'ArrowUp' || e.key === 'ArrowRight' || e.key === 'ArrowLeft'){
+            e.preventDefault()
+            this.keyMoveSelection(e, false)
+          } else if(e.key === 'Home' || e.key === 'End'){
+            e.preventDefault()
+            this.keyMoveSelection(e, true)
+          } else if(e.key === 'Enter'){
+            e.preventDefault()
+            this.keyOpenFocused()
+          } else if(e.key === ' '){
+            e.preventDefault()
+            this.keyToggleFocused()
+          } else if(e.key === 'Backspace'){
+            e.preventDefault()
+            this.keyBack()
+          } else if(e.ctrlKey && (e.key === 'a' || e.code === 'KeyA')){
+            e.preventDefault()
+            this.selectAllEntries()
+          }
         }
       }
       document.addEventListener('keydown', this._onKeydown)

@@ -3,6 +3,7 @@
     class="main"
     :data-variant="view" 
     :data-selected="selected" 
+    :data-focused="focused"
     :data-cut="isCut"
     @click="onClick"
     @dblclick.stop="onDoubleClick"
@@ -67,6 +68,7 @@
         default: () => []
       },
       selected:Boolean,
+      focused:Boolean,
       iconSize:Number,
       renaming:Boolean,
       renamingValue:String,
@@ -170,6 +172,11 @@
     background: v-bind('theme.fileIcon.selected.background');
     color:      v-bind('theme.fileIcon.selected.fontColor');
     border-radius:3px;
+  }
+  [data-focused="true"]{
+    outline:2px solid rgba(66,133,244,0.9);
+    outline-offset:-2px;
+    border-radius:6px;
   }
   [data-variant="table"]{
     min-width: min-content;

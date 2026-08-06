@@ -33,6 +33,7 @@
                 :params="item.entry"
                 :view="view"
                 :selected="item.entry.selected"
+                :focused="focusedPath === item.path"
                 :iconSize="iconSize"
                 :address="address"
                 :renaming="renamingPath === item.path"
@@ -59,6 +60,7 @@
                   :params="entry"
                   :view="view"
                   :selected="entry.selected"
+                  :focused="focusedPath === (entry.path || address + '/' + entry.name)"
                   :iconSize="iconSize"
                   :address="address"
                   :renaming="renamingPath === (entry.path || address + '/' + entry.name)"
@@ -122,7 +124,8 @@
       clipboardPaths: {
         type: Array,
         default: () => []
-      }
+      },
+      focusedPath: String
     },
     data(){
       return {
