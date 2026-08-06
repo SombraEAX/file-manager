@@ -561,9 +561,15 @@
         }
         this.lastClickedPath = path
       },
-      selectRange(paths){
-        const next = {}
-        for (const p of paths) next[p] = true
+      selectRange(paths, additive){
+        let next
+        if (additive) {
+          next = { ...this.selectedMap }
+          for (const p of paths) next[p] = true
+        } else {
+          next = {}
+          for (const p of paths) next[p] = true
+        }
         this.selectedMap = next
         this.lastClickedPath = paths.length ? paths[paths.length - 1] : null
         this.previewPath = paths.length ? paths[paths.length - 1] : null

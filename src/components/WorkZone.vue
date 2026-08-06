@@ -165,6 +165,7 @@
         containerWidth: 300,
         dragSelecting: false,
         _justDragged: false,
+        _dragAdditive: false,
         _dragStartClientX: 0,
         _dragStartClientY: 0,
         _lastClientX: 0,
@@ -313,11 +314,12 @@
         if (event.button !== 0) return
         if (event.target.closest('[data-variant]')) return
         this._justDragged = false
+        this._dragAdditive = event.ctrlKey || event.metaKey
         this._dragStartClientX = event.clientX
         this._dragStartClientY = event.clientY
         this.dragSelecting = true
         this.rubberBand = null
-        this.$emit('select', null)
+        if(!this._dragAdditive) this.$emit('select', null)
         document.addEventListener('mousemove', this.onDragMove)
         document.addEventListener('mouseup', this.onDragEnd)
       },
@@ -373,7 +375,7 @@
         const paths = this.entryRects
           .filter(r => r.x < x2 && r.x + r.width > x1 && r.y < y2 && r.y + r.height > y1)
           .map(r => r.path)
-        this.$emit('selectRange', paths)
+        this.$emit('selectRange', paths, this._dragAdditive)
       },
       onDragEnd(){
         this.dragSelecting = false
