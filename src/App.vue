@@ -23,6 +23,7 @@
           :showHidden        = "showHidden"
           :showMenuBar       = "showMenuBar"
           :tabsInSidePanel   = "tabsInSidePanel"
+          :hasSelection      = "hasSelection"
           @changeView       = "ev => view = ev"
           @changeSortColumn = "ev => sortColumn = ev"
           @changeSortOrder  = "ev => sortOrder = ev"
@@ -2059,6 +2060,10 @@
 
       isTrash(){
         return this.currentDir === TRASH_PATH
+      },
+
+      hasSelection(){
+        return Object.keys(this.selectedMap).length > 0
       },
 
       trashSelectedCount(){

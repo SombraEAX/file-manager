@@ -68,6 +68,7 @@ ipcMain.on('show-menu-bar-submenu', (event, {items,x,y}) => {
           opts.type = item.type || 'normal'
           opts.label = item.label
           if(item.checked !== undefined) opts.checked = item.checked
+          if(item.enabled !== undefined) opts.enabled = item.enabled
         }
         if(item.id) opts.click = () => event.reply('show-menu-bar-submenu-reply', item.id)
         let menuItem

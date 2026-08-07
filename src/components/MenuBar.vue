@@ -32,7 +32,8 @@
       autohideTopPanel: Boolean,
       showHidden: Boolean,
       showMenuBar: Boolean,
-      tabsInSidePanel: Boolean
+      tabsInSidePanel: Boolean,
+      hasSelection: Boolean
     },
 
     emits: [
@@ -207,16 +208,19 @@
               { type: 'separator' },
               {
                 label: 'Open',
-                id: 'open'
+                id: 'open',
+                enabled: this.hasSelection
               },
               {
                 label: 'Open in new tab',
-                id: 'open-in-new-tab'
+                id: 'open-in-new-tab',
+                enabled: this.hasSelection
               },
               { type: 'separator' },
               {
                 label: 'Properties',
-                id: 'properties'
+                id: 'properties',
+                enabled: this.hasSelection
               }
             ]
           },
@@ -234,16 +238,19 @@
               { type: 'separator' },
               {
                 label: 'Rename',
-                id: 'rename'
+                id: 'rename',
+                enabled: this.hasSelection
               },
               { type: 'separator' },
               {
                 label: 'Copy',
-                id: 'copy'
+                id: 'copy',
+                enabled: this.hasSelection
               },
               {
                 label: 'Cut',
-                id: 'cut'
+                id: 'cut',
+                enabled: this.hasSelection
               },
               {
                 label: 'Paste',
@@ -252,7 +259,8 @@
               { type: 'separator' },
               {
                 label: 'Move to Trash',
-                id: 'move-to-trash'
+                id: 'move-to-trash',
+                enabled: this.hasSelection
               }
             ]
           },
