@@ -69,7 +69,7 @@
         <button
           class="bookmark-star"
           :class="{ filled: isBookmarked }"
-          v-if="!isExecutingSearch"
+          v-if="!isEditing && !isExecutingSearch"
           @click.stop="$emit('toggleBookmark')"
           :title="isBookmarked ? 'Remove from bookmarks' : 'Add to bookmarks'"
         ></button>
