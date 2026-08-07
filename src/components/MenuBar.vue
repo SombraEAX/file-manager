@@ -51,7 +51,12 @@
       'moveToTrash',
       'copy',
       'cut',
-      'paste'
+      'paste',
+      'createFile',
+      'createFolder',
+      'open',
+      'openInNewTab',
+      'properties'
     ],
 
     data(){
@@ -161,6 +166,26 @@
             this.$emit('paste')
             break
           }
+          case 'new-file': {
+            this.$emit('createFile')
+            break
+          }
+          case 'new-folder': {
+            this.$emit('createFolder')
+            break
+          }
+          case 'open': {
+            this.$emit('open')
+            break
+          }
+          case 'open-in-new-tab': {
+            this.$emit('openInNewTab')
+            break
+          }
+          case 'properties': {
+            this.$emit('properties')
+            break
+          }
         }
       }
     },
@@ -168,6 +193,33 @@
     computed: {
       items(){
         return [
+          {
+            label: 'File',
+            submenu: [
+              {
+                label: 'New file',
+                id: 'new-file'
+              },
+              {
+                label: 'New folder',
+                id: 'new-folder'
+              },
+              { type: 'separator' },
+              {
+                label: 'Open',
+                id: 'open'
+              },
+              {
+                label: 'Open in new tab',
+                id: 'open-in-new-tab'
+              },
+              { type: 'separator' },
+              {
+                label: 'Properties',
+                id: 'properties'
+              }
+            ]
+          },
           {
             label: 'Edit',
             submenu: [

@@ -39,6 +39,11 @@
           @copy            = "onCopy"
           @cut             = "onCut"
           @paste           = "onPaste"
+          @createFile      = "createNewFile"
+          @createFolder    = "createNewFolder"
+          @open            = "menuOpen"
+          @openInNewTab    = "menuOpenInNewTab"
+          @properties      = "menuProperties"
         />
         <tab-bar
           v-if         = "!tabsInSidePanel"
@@ -775,6 +780,40 @@
         if(paths.length === 1){
           this.startRename(paths[0])
         }
+      },
+      _entryType(path){
+        if(path === 'trash://') return 'directory'
+        const source = this.isSearchMode && this.searchResults ? this.searchResults : this.entries
+        for(let entry of source){
+          let entryPath = entry.path || window.electron.join(this.currentDir, entry.name)
+          if(entryPath === path) return entry.type
+        }
+        return null
+      },
+      focusedPath(){
+        return this.lastClickedPath || Object.keys(this.selectedMap)[0]
+      },
+      async menuOpen(){
+        let path = this.focusedPath()
+        if(!path){
+          if(this.currentDir) await this.jump(this.currentDir)
+          return
+        }
+        if(this._entryType(path) === 'directory') await this.openDir(path)
+        else await this.openFile(path)
+      },
+      async menuOpenInNewTab(){
+        let path = this.focusedPath()
+        if(!path){
+          if(this.currentDir) await this.openInNewTab(this.currentDir)
+          return
+        }
+        if(this._entryType(path) === 'directory') await this.openInNewTab(path)
+        else await this.openFile(path)
+      },
+      menuProperties(){
+        let path = this.focusedPath() || this.currentDir
+        if(path) this.showProperties(path)
       },
       moveToTrashFromMenu(){
         if(this.isTrash) return
