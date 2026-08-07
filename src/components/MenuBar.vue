@@ -57,7 +57,10 @@
       'createFolder',
       'open',
       'openInNewTab',
-      'properties'
+      'properties',
+      'about',
+      'github',
+      'hotkeys'
     ],
 
     data(){
@@ -185,6 +188,18 @@
           }
           case 'properties': {
             this.$emit('properties')
+            break
+          }
+          case 'about': {
+            this.$emit('about')
+            break
+          }
+          case 'github': {
+            this.$emit('github')
+            break
+          }
+          case 'hotkeys': {
+            this.$emit('hotkeys')
             break
           }
         }
@@ -396,6 +411,24 @@
                 checked: this.autohideTopPanel
               },
               { role: 'toggleDevTools', visible: this.isDev }              
+            ]
+          },
+          {
+            label: 'Help',
+            submenu: [
+              {
+                label: 'About Sombra Manager',
+                id: 'about'
+              },
+              {
+                label: 'GitHub Repository',
+                id: 'github'
+              },
+              { type: 'separator' },
+              {
+                label: 'Keyboard Shortcuts',
+                id: 'hotkeys'
+              }
             ]
           }
         ]

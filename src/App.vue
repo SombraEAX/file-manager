@@ -45,6 +45,9 @@
           @open            = "menuOpen"
           @openInNewTab    = "menuOpenInNewTab"
           @properties      = "menuProperties"
+          @about           = "openAbout"
+          @github          = "openGithub"
+          @hotkeys         = "openHotkeys"
         />
         <tab-bar
           v-if         = "!tabsInSidePanel"
@@ -227,6 +230,57 @@
       </div>
     </transition>
 
+    <transition name="trash-popup-fade">
+      <div class="trash-confirm-overlay" v-if="aboutPopupVisible" @click.self="closeAbout">
+        <div class="about-popup">
+          <img class="about-header" :src="aboutHeader" alt="Sombra Manager" />
+          <div class="about-title">Sombra Manager</div>
+          <div class="about-body">
+            <div class="about-row">
+              <div class="about-label">Version</div>
+              <div class="about-value">{{ version }}</div>
+            </div>
+            <div class="about-row">
+              <div class="about-label">Developer</div>
+              <div class="about-value">Mira Tosca</div>
+            </div>
+            <div class="about-row">
+              <div class="about-label">Website</div>
+              <div class="about-value">
+                <span class="about-link" @click="openWebsite">sombraeax.github.io</span>
+              </div>
+            </div>
+            <div class="about-row">
+              <div class="about-label">Repository</div>
+              <div class="about-value">
+                <span class="about-link" @click="openGithub">github.com/SombraEAX/file-manager</span>
+              </div>
+            </div>
+          </div>
+          <div class="trash-confirm-actions">
+            <button class="trash-confirm-btn confirm props-close" @click="closeAbout">Close</button>
+          </div>
+        </div>
+      </div>
+    </transition>
+
+    <transition name="trash-popup-fade">
+      <div class="trash-confirm-overlay" v-if="hotkeysPopupVisible" @click.self="closeHotkeys">
+        <div class="hotkeys-popup">
+          <div class="props-title">Keyboard Shortcuts</div>
+          <div class="hotkeys-body">
+            <div class="hotkey-row" v-for="row in hotkeysRows" :key="row.keys + row.action">
+              <div class="hotkey-keys">{{ row.keys }}</div>
+              <div class="hotkey-action">{{ row.action }}</div>
+            </div>
+          </div>
+          <div class="trash-confirm-actions">
+            <button class="trash-confirm-btn confirm props-close" @click="closeHotkeys">Close</button>
+          </div>
+        </div>
+      </div>
+    </transition>
+
   </div>
 </template>
 
@@ -239,6 +293,8 @@
   import MenuBar from './components/MenuBar.vue'
   import TabBar from './components/TabBar.vue'
   import EntryIcon from './components/EntryIcon.vue'
+  import aboutHeader from './assets/about-header.png'
+  import pkg from '../package.json'
   import prettyBytes from 'pretty-bytes'
   import { tasks, createTask, updateTask, cancelTask, removeTask, pauseTask, resumeTask, createThrottledRunner } from './stores/tasks'
   import { on, off } from './stores/events'
@@ -266,6 +322,7 @@
     data(){      
       return {
         previewPath: null,
+        aboutHeader,
         leftPanelWidth: 200,
         rightPanelWidth: 300,
         theme,
@@ -285,6 +342,7 @@
         sortOrder: 'asc',
         groupBy: null,
         isDev: location.href.includes('localhost'),
+        version: pkg.version,
         toastText: '',
         toastVisible: false,
         toastTimer: null,
@@ -315,6 +373,8 @@
         trashActionPaths: [],
         propsPopupVisible: false,
         propsInfo: {},
+        aboutPopupVisible: false,
+        hotkeysPopupVisible: false,
         clipboardPaths: [],
         clipboardMode: '',
       }
@@ -1865,6 +1925,24 @@
         this.propsPopupVisible = false
         this.propsInfo = {}
       },
+      openAbout(){
+        this.aboutPopupVisible = true
+      },
+      closeAbout(){
+        this.aboutPopupVisible = false
+      },
+      openHotkeys(){
+        this.hotkeysPopupVisible = true
+      },
+      closeHotkeys(){
+        this.hotkeysPopupVisible = false
+      },
+      openGithub(){
+        window.electron.openExternal('https://github.com/SombraEAX/file-manager')
+      },
+      openWebsite(){
+        window.electron.openExternal('https://sombraeax.github.io/')
+      },
       showToast(text){
         if(this.toastTimer) clearTimeout(this.toastTimer);
         this.toastText = text;
@@ -1932,6 +2010,8 @@
         if(e.key === 'Escape' && this.trashPopupVisible) this.cancelMoveToTrash()
         if(e.key === 'Escape' && this.trashActionVisible) this.cancelTrashAction()
         if(e.key === 'Escape' && this.propsPopupVisible) this.closeProperties()
+        if(e.key === 'Escape' && this.aboutPopupVisible) this.closeAbout()
+        if(e.key === 'Escape' && this.hotkeysPopupVisible) this.closeHotkeys()
         if(e.altKey && (e.key === 'Enter' || e.code === 'NumpadEnter') && !this.renamingPath && document.activeElement?.tagName !== 'INPUT'){
           e.preventDefault()
           this.showProperties(this.lastClickedPath || Object.keys(this.selectedMap)[0])
@@ -2092,6 +2172,23 @@
         let n = this.trashSelectedCount
         if(!n) return 'Restore all files'
         return n === 1 ? 'Restore selected file' : 'Restore selected files'
+      },
+
+      hotkeysRows(){
+        return [
+          { keys: 'Ctrl + C', action: 'Copy selected items' },
+          { keys: 'Ctrl + X', action: 'Cut selected items' },
+          { keys: 'Ctrl + V', action: 'Paste' },
+          { keys: 'Ctrl + A', action: 'Select all items' },
+          { keys: 'Delete',   action: 'Move selected items to Trash' },
+          { keys: 'Alt + Enter', action: 'Show properties' },
+          { keys: 'Enter',    action: 'Open selected item' },
+          { keys: 'Space',    action: 'Toggle selection' },
+          { keys: 'Backspace', action: 'Go to parent folder' },
+          { keys: 'Arrow keys', action: 'Navigate' },
+          { keys: 'Home / End', action: 'Jump to first / last item' },
+          { keys: 'Ctrl + / - / 0', action: 'Zoom in / out / reset (icons view)' }
+        ]
       }
       
     },
@@ -2462,6 +2559,89 @@
   }
   .props-close:hover{
     background:#3a7cc0;
+  }
+  .about-popup{
+    background: v-bind('theme.dropDown.background');
+    border:1px solid v-bind('theme.dropDown.borderColor');
+    border-radius:8px;
+    overflow:hidden;
+    box-shadow:0 8px 24px rgba(0,0,0,0.25);
+    min-width:380px;
+    max-width:480px;
+  }
+  .about-header{
+    display:block;
+    width:100%;
+    height:180px;
+    object-fit:cover;
+  }
+  .about-title{
+    font-family:v-bind('theme.font');
+    font-size:18px;
+    font-weight:bold;
+    color:v-bind('theme.fontColor');
+    text-align:center;
+    margin:14px 24px 4px;
+  }
+  .about-body{
+    padding:10px 24px 16px;
+  }
+  .about-row{
+    display:flex;
+    gap:16px;
+    padding:4px 0;
+    font-family:v-bind('theme.font');
+    font-size:13px;
+    color:v-bind('theme.fontColor');
+  }
+  .about-label{
+    flex:0 0 90px;
+    color:v-bind('theme.dropDown.textColor');
+    opacity:0.7;
+  }
+  .about-value{
+    flex:1;
+    word-break:break-all;
+  }
+  .about-link{
+    color:#4a90d9;
+    cursor:pointer;
+  }
+  .about-link:hover{
+    text-decoration:underline;
+  }
+  .about-popup .trash-confirm-actions{
+    padding:0 24px 16px;
+  }
+  .hotkeys-popup{
+    background: v-bind('theme.dropDown.background');
+    border:1px solid v-bind('theme.dropDown.borderColor');
+    border-radius:8px;
+    padding:20px 24px;
+    box-shadow:0 8px 24px rgba(0,0,0,0.25);
+    min-width:360px;
+    max-width:480px;
+    max-height:80vh;
+    overflow-y:auto;
+  }
+  .hotkeys-body{
+    margin-bottom:16px;
+  }
+  .hotkey-row{
+    display:flex;
+    gap:16px;
+    padding:4px 0;
+    font-family:v-bind('theme.font');
+    font-size:13px;
+    color:v-bind('theme.fontColor');
+  }
+  .hotkey-keys{
+    flex:0 0 130px;
+    color:#4a90d9;
+    white-space:nowrap;
+  }
+  .hotkey-action{
+    flex:1;
   }
   .trash-popup-fade-enter-active, .trash-popup-fade-leave-active{
     transition:opacity .15s;

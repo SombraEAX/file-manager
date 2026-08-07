@@ -263,6 +263,7 @@ contextBridge.exposeInMainWorld(
       removeAllListeners: ipcRenderer.removeAllListeners.bind(ipcRenderer)
     },
     readFile,getImageDataUri,
+    openExternal: url => ipcRenderer.send('open-external', url),
     trashPath: TRASH_PATH,
     trashDirs,
     openFile: async pathname => ipcRenderer.invoke('open-file', pathname),

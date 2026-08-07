@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, Menu, MenuItem, clipboard, dialog } = require('electron')
+const { app, BrowserWindow, ipcMain, Menu, MenuItem, clipboard, dialog, shell } = require('electron')
 const { spawn } = require('child_process')
 
 const url = require("url")
@@ -18,6 +18,7 @@ function createWindow() {
   mainWindow = new BrowserWindow({
     width: 800,
     height: 600,
+    title: 'Sombra Manager',
     webPreferences: {
       nodeIntegration: true,
       preload: path.join(__dirname, 'preload.js')
@@ -113,6 +114,10 @@ ipcMain.on('show-menu', (event, {items,x,y}) => {
 
 ipcMain.on('copy-to-clipboard', (event, text) => {
   clipboard.writeText(text); 
+});
+
+ipcMain.on('open-external', (event, url) => {
+  shell.openExternal(url)
 });
 
 ipcMain.handle('get-from-clipboard', () => {
