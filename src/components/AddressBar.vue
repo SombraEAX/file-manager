@@ -64,7 +64,15 @@
           v-if="isEditing"
           @click.stop="gotopath"
         >
-        </button>  
+        </button>
+
+        <button
+          class="bookmark-star"
+          :class="{ filled: isBookmarked }"
+          v-if="!isExecutingSearch"
+          @click.stop="$emit('toggleBookmark')"
+          :title="isBookmarked ? 'Remove from bookmarks' : 'Add to bookmarks'"
+        ></button>
       </div>
 
       <div class="items-outer editing-dropdown" v-if="isEditing && !isSearch">
@@ -158,7 +166,12 @@ export default {
   components: { DropDown, AppCheckbox, EntryIcon },
   props: {
     address: String,
-    searchVersion: Number
+    searchVersion: Number,
+    bookmarks: {
+      type: Array,
+      default: () => []
+    },
+    isBookmarked: Boolean
   },
   data() {
     return {
@@ -724,6 +737,32 @@ export default {
   }
   .go:hover{
     filter: hue-rotate(90deg);
+  }
+  .bookmark-star{
+    margin:auto;
+    width:20px;
+    height:20px;
+    border:0px;
+    background-color:transparent;
+    margin-right:5px;
+    cursor:pointer;
+    display:inline-flex;
+    align-items:center;
+    justify-content:center;
+    flex-shrink:0;
+    color:v-bind('theme.bookmarkColor');
+  }
+  .bookmark-star::before{
+    font-family:PureNerdFont,"Symbols Nerd Font Mono","Noto Sans Nerd Font","Meslo Nerd Font","FiraCode Nerd Font",sans-serif;
+    content:"\f006";
+    font-size:16px;
+    line-height:1
+  }
+  .bookmark-star.filled::before{
+    content:"\f005"
+  }
+  .bookmark-star:hover{
+    color:v-bind('theme.topPanelIconHoverColor')
   }
   .form-row{
     display:flex;

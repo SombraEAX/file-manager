@@ -16,6 +16,16 @@
               @select="(ev) => $emit('select', ev)"
             />
           </div>
+          <div class="section" v-if="bookmarks.length">
+            <div class="section-title">Bookmarks</div>
+            <directory-list
+              :dirs="bookmarkDirs"
+              :selected="selected"
+              closable
+              @select="(ev) => $emit('select', ev)"
+              @close="$emit('remove-bookmark', $event)"
+            />
+          </div>
           <div class="section" v-if="tabsInSidePanel && tabs.length > 1">
             <div class="section-title">Tabs</div>
             <directory-list
@@ -45,7 +55,7 @@
   const username = window.electron.getUserName()
 
   export default {
-    emits: ['select', 'resize', 'select-tab', 'close-tab'],
+    emits: ['select', 'resize', 'select-tab', 'close-tab', 'remove-bookmark'],
     props: {
       width: Number,
       selected: String,
@@ -54,7 +64,11 @@
       dirsCount: Number,
       tabs: Array,
       activeTabIndex: Number,
-      tabsInSidePanel: Boolean
+      tabsInSidePanel: Boolean,
+      bookmarks: {
+        type: Array,
+        default: () => []
+      }
     },
     components: { DirectoryList, SideBar },
     data(){
@@ -80,6 +94,12 @@
       }
     },
     computed: {
+      bookmarkDirs(){
+        return this.bookmarks.map(pathname => ({
+          name: this.pathName(pathname),
+          pathname
+        }))
+      },
       tabsDirs(){
         return this.tabs.map((tab, i) => ({
           name: this.tabTitle(tab),
@@ -91,6 +111,12 @@
       }
     },
     methods: {
+      pathName(pathname){
+        if(pathname === 'trash://') return 'Trash'
+        if(!pathname) return ''
+        if(pathname === '/') return '/'
+        return pathname.replace(/\/$/, '').split('/').filter(Boolean).pop() || '/'
+      },
       tabTitle(tab){
         let path = tab.history[tab.historyIndex]
         if (!path || path === '/') return '/'

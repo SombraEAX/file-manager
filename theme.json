@@ -98,6 +98,7 @@
 	"sidebarTextColor": "#999",
 	"topPanelIconColor": "#3498db",
 	"topPanelIconHoverColor": "#e74c3c",
+	"bookmarkColor": "#3498db",
 	"treeExpandIconColor": "#3498db",
 	"sidebarSectionTitleColor": "#999",
 	"tabBar":{

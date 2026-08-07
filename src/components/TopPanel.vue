@@ -24,8 +24,11 @@
       ref="addressBar"
       :address="address"
       :search-version="searchVersion"
+      :bookmarks="bookmarks"
+      :is-bookmarked="isBookmarked"
       @jump="gotopath"
       @search="e => $emit('search', e)"
+      @toggle-bookmark="$emit('toggleBookmark')"
     />
     <button
       class="icon icon-list"
@@ -63,7 +66,7 @@
   import TasksWidget from "./TasksWidget.vue"
   
   export default {
-    emits: ['back', 'forward', 'up', 'jump', 'changeHistoryIndex', 'search', 'changeView', 'togglePreviewPanel', 'openRootMenu'],
+    emits: ['back', 'forward', 'up', 'jump', 'changeHistoryIndex', 'search', 'changeView', 'togglePreviewPanel', 'openRootMenu', 'toggleBookmark'],
     components:{
       AddressBar,
       TasksWidget
@@ -78,7 +81,12 @@
       searchVersion: Number,
       view: String,
       previewPanelVisible: Boolean,
-      showMenuBar: Boolean
+      showMenuBar: Boolean,
+      bookmarks: {
+        type: Array,
+        default: () => []
+      },
+      isBookmarked: Boolean
     },
     data(){
       return {

@@ -65,6 +65,9 @@
           @togglePreviewPanel = "rightPanelVisible = !rightPanelVisible"
           :previewPanelVisible="rightPanelVisible"
           :showMenuBar        = "showMenuBar"
+          :bookmarks          = "bookmarks"
+          :isBookmarked       = "isBookmarked"
+          @toggleBookmark     = "toggleBookmark"
           @openRootMenu       = "onOpenRootMenu"
         />
       </div>
@@ -88,10 +91,12 @@
           :tabs       = "tabs"
           :activeTabIndex = "activeTabIndex"
           :tabsInSidePanel = "tabsInSidePanel"
+          :bookmarks  = "bookmarks"
           @resize     = "w => leftPanelWidth = w"
           @select     = "jump"
           @select-tab = "switchTab"
           @close-tab  = "closeTab"
+          @remove-bookmark = "removeBookmark"
           @mouseenter = "showLeftPanel"
           @mouseleave = "scheduleHideLeftPanel"
         />
@@ -292,6 +297,7 @@
         showHidden: localStorage.getItem('showHidden') === 'true',
         showMenuBar: localStorage.getItem('showMenuBar') !== 'false',
         tabsInSidePanel: localStorage.getItem('tabsInSidePanel') === 'true',
+        bookmarks: JSON.parse(localStorage.getItem('bookmarks') || '[]'),
         selectedMap: {},
         lastClickedPath: null,
         renamingPath: null,
@@ -384,6 +390,27 @@
         this.activeTabIndex = index;
         this._restoreScrollPending = true;
         this.searchVersion++;
+      },
+
+      toggleBookmark(){
+        if(!this.currentDir || this.currentDir === 'trash://') return
+        if(this.bookmarks.includes(this.currentDir)){
+          this.removeBookmark(this.currentDir)
+        }else{
+          this.bookmarks.push(this.currentDir)
+          this._saveBookmarks()
+        }
+      },
+
+      removeBookmark(pathname){
+        const i = this.bookmarks.indexOf(pathname)
+        if(i === -1) return
+        this.bookmarks.splice(i, 1)
+        this._saveBookmarks()
+      },
+
+      _saveBookmarks(){
+        localStorage.setItem('bookmarks', JSON.stringify(this.bookmarks))
       },
 
       closeTab(index){
@@ -1965,6 +1992,10 @@
         return tab ? tab.history[tab.historyIndex] : undefined;
       },
 
+      isBookmarked(){
+        return this.currentDir && this.bookmarks.includes(this.currentDir)
+      },
+
       propsRows(){
         const info = this.propsInfo
         const rows = []
@@ -2041,6 +2072,12 @@
       },
       tabsInSidePanel(val){
         localStorage.setItem('tabsInSidePanel', val)
+      },
+      bookmarks: {
+        handler(val){
+          localStorage.setItem('bookmarks', JSON.stringify(val))
+        },
+        deep: true
       },
 
       async currentDir(){
