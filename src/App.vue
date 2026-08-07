@@ -1955,6 +1955,18 @@
           e.preventDefault()
           this.onPaste()
         }
+        if(this.view === 'icons' && e.ctrlKey && document.activeElement?.tagName !== 'INPUT'){
+          if(e.key === '+' || e.key === '=' || e.code === 'NumpadAdd' || e.code === 'Equal'){
+            e.preventDefault()
+            this.iconSize = Math.min(128, (this.iconSize || 120) + 10)
+          } else if(e.key === '-' || e.code === 'NumpadSubtract' || e.code === 'Minus'){
+            e.preventDefault()
+            this.iconSize = Math.max(40, (this.iconSize || 120) - 10)
+          } else if(e.key === '0' || e.code === 'Numpad0' || e.code === 'Digit0'){
+            e.preventDefault()
+            this.iconSize = 120
+          }
+        }
         if(!this.renamingPath && !this.trashPopupVisible && !this.trashActionVisible && document.activeElement === document.body){
           if(e.key === 'ArrowDown' || e.key === 'ArrowUp' || e.key === 'ArrowRight' || e.key === 'ArrowLeft'){
             e.preventDefault()
