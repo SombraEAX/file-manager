@@ -62,6 +62,8 @@
           @search             = "onSearchResults"
           :view               = "view"
           @changeView         = "ev => view = ev"
+          :scale              = "iconSize"
+          @scaling            = "ev => iconSize = ev"
           @togglePreviewPanel = "rightPanelVisible = !rightPanelVisible"
           :previewPanelVisible="rightPanelVisible"
           :showMenuBar        = "showMenuBar"
@@ -141,10 +143,7 @@
         v-show="rightPanelVisible"
         :path   = "previewPath"
         :width  = "rightPanelWidth"
-        :view   = "view"
-        :scale  = "iconSize"
         @resize = "w => rightPanelWidth = w"
-        @scaling = "ev => iconSize = ev"
       />
     </div>
     <transition name="toast-fade">

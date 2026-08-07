@@ -47,16 +47,6 @@
       <div v-if="!type" class="unknown">
         <div>The preview is unavailable</div>
       </div>
-      <div class="scale-bar" v-if="view === 'icons'">
-        <input
-          type="range"
-          min="40"
-          max="128"
-          :value="scale"
-          @input="onScale"
-          class="slider"
-        />
-      </div>
     </div>
   </side-bar>
 </template>
@@ -149,12 +139,10 @@
   }
 
   export default {
-    emits: ['resize', 'scaling'],
+    emits: ['resize'],
     props: {
       path: String,
-      width: Number,
-      view: String,
-      scale: Number
+      width: Number
     },
     components: { SideBar },
     data(){			
@@ -163,11 +151,6 @@
         text:null,
         type: null,
         imageStyle: null
-      }
-    },
-    methods:{
-      onScale(ev){
-        this.$emit('scaling', Number(ev.target.value))
       }
     },
     watch:{
@@ -243,25 +226,9 @@
     display:flex;
     flex-direction:column;
   }
-  .preview-wrap > :not(.scale-bar){
+  .preview-wrap > *{
     flex:1;
     min-height:0;
-  }
-  .scale-bar{
-    padding:4px 10px;
-    text-align:center;
-    flex-shrink:0;
-    background:v-bind('theme.sidebarBg');
-    min-height:28px;
-    display:flex;
-    align-items:center;
-  }
-  .slider{
-    width:100%;
-    vertical-align:middle;
-    cursor:pointer;
-    accent-color:v-bind('theme.accentColor');
-    outline:0;
   }
   .unknown{
     height:100%;

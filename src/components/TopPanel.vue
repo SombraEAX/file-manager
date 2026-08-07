@@ -30,6 +30,12 @@
       @search="e => $emit('search', e)"
       @toggle-bookmark="$emit('toggleBookmark')"
     />
+    <ZoomButton
+      v-if="view === 'icons'"
+      ref="zoomButton"
+      :scale="scale"
+      @scaling="v => $emit('scaling', v)"
+    />
     <button
       class="icon icon-list"
       :class="{ active: view === 'list' }"
@@ -64,12 +70,14 @@
   import theme from '../../theme.json'
   import AddressBar from "./AddressBar.vue"
   import TasksWidget from "./TasksWidget.vue"
+  import ZoomButton from "./ZoomButton.vue"
   
   export default {
-    emits: ['back', 'forward', 'up', 'jump', 'changeHistoryIndex', 'search', 'changeView', 'togglePreviewPanel', 'openRootMenu', 'toggleBookmark'],
+    emits: ['back', 'forward', 'up', 'jump', 'changeHistoryIndex', 'search', 'changeView', 'togglePreviewPanel', 'openRootMenu', 'toggleBookmark', 'scaling'],
     components:{
       AddressBar,
-      TasksWidget
+      TasksWidget,
+      ZoomButton
     },
     props: {
       address: String,
@@ -80,6 +88,7 @@
       historyIndex: Number,
       searchVersion: Number,
       view: String,
+      scale: Number,
       previewPanelVisible: Boolean,
       showMenuBar: Boolean,
       bookmarks: {
@@ -129,6 +138,7 @@
           ab.closeDropdown()
           ab.finishEditing()
         }
+        if(this.$refs.zoomButton) this.$refs.zoomButton.closePopup()
         if(this.$attrs.autohideTopPanel && this.$refs.tasksWidget) this.$refs.tasksWidget.closePopup()
       }
     },
