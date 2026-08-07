@@ -13,7 +13,9 @@
             <directory-list
               :dirs="section.dirs"
               :selected="selected"
+              menuable
               @select="(ev) => $emit('select', ev)"
+              @dir-context="onDirContextMenu"
             />
           </div>
           <div class="section" v-if="bookmarks.length">
@@ -22,8 +24,10 @@
               :dirs="bookmarkDirs"
               :selected="selected"
               closable
+              menuable
               @select="(ev) => $emit('select', ev)"
               @close="$emit('remove-bookmark', $event)"
+              @dir-context="onDirContextMenu"
             />
           </div>
           <div class="section" v-if="tabsInSidePanel && tabs.length > 1">
@@ -55,7 +59,7 @@
   const username = window.electron.getUserName()
 
   export default {
-    emits: ['select', 'resize', 'select-tab', 'close-tab', 'remove-bookmark'],
+    emits: ['select', 'resize', 'select-tab', 'close-tab', 'remove-bookmark', 'open-in-new-tab'],
     props: {
       width: Number,
       selected: String,
@@ -125,6 +129,14 @@
       onTabSelect(pathname){
         const m = String(pathname).match(/^#tab-(\d+)$/)
         if (m) this.$emit('select-tab', parseInt(m[1], 10))
+      },
+      onDirContextMenu({ pathname, x, y }){
+        const items = [{ label: 'Open' }, { label: 'Open in new tab' }]
+        window.electron.ipcRenderer.send('show-menu', { items, x, y })
+        window.electron.ipcRenderer.once('show-menu-reply', (_, index) => {
+          if(index === 0) this.$emit('select', pathname)
+          else if(index === 1) this.$emit('open-in-new-tab', pathname)
+        })
       },
       onTabClose(pathname){
         const m = String(pathname).match(/^#tab-(\d+)$/)

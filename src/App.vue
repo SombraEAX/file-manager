@@ -97,6 +97,7 @@
           @select-tab = "switchTab"
           @close-tab  = "closeTab"
           @remove-bookmark = "removeBookmark"
+          @open-in-new-tab = "openInNewTab"
           @mouseenter = "showLeftPanel"
           @mouseleave = "scheduleHideLeftPanel"
         />
@@ -427,7 +428,7 @@
       },
 
       async openInNewTab(pathname){
-        if(!pathname.startsWith('/'))
+        if(!pathname.startsWith('/') && pathname !== 'trash://')
           pathname = window.electron.join(this.currentDir, pathname);
         try {
           if(!(await window.electron.isDir(pathname))) throw new Error();

@@ -1,6 +1,6 @@
 <template>
   <div class="dirs">
-    <div v-for="dir in dirs" class="dir" :class="{selected:dir.pathname === selected}">
+    <div v-for="dir in dirs" class="dir" :class="{selected:dir.pathname === selected}" @contextmenu="onRowContextMenu(dir, $event)">
       <div class="dir-label" @mouseenter="hoveredDir = dir.pathname" @mouseleave="hoveredDir = null">
         <div class="dir-icon" @click="iconClick(dir)">
           <EntryIcon v-show="hoveredDir !== dir.pathname" :size="16" is-dir :type="folderType(dir)" />
@@ -41,7 +41,7 @@
   }
 
   export default {
-    emits: ['select', 'close'],
+    emits: ['select', 'close', 'dir-context'],
     components: { EntryIcon },
     props: {
       dirs: {
@@ -49,7 +49,8 @@
         default: () => []
       },
       selected: String,
-      closable: Boolean
+      closable: Boolean,
+      menuable: Boolean
     },
     name:'DirectoryList',
     data(){			
@@ -59,6 +60,11 @@
       }
     },
     methods:{
+      onRowContextMenu(dir, ev){
+        if(!this.menuable) return
+        ev.preventDefault()
+        this.$emit('dir-context', { pathname: dir.pathname, x: ev.clientX, y: ev.clientY })
+      },
       folderType(dir) {
         if (dir.name === '/') return 'root'
         const nameMap = {
