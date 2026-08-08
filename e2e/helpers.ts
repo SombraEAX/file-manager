@@ -1,13 +1,12 @@
-const { _electron: electron } = require('playwright')
-const path = require('path')
-const fs = require('fs')
-const fsp = require('fs/promises')
-const os = require('os')
+import { _electron } from 'playwright'
+import * as path from 'path'
+import * as fsp from 'fs/promises'
+import * as os from 'os'
 
-const APP_PATH = path.join(__dirname, '..')
+export const APP_PATH = path.join(__dirname, '..')
 
-async function launchApp() {
-  const app = await electron.launch({
+export async function launchApp() {
+  const app = await _electron.launch({
     args: [APP_PATH],
     env: { ...process.env, NODE_ENV: 'production', SLOW_FS: '1' },
   })
@@ -20,29 +19,29 @@ async function launchApp() {
   return { app, window }
 }
 
-function createTempDir(prefix) {
+export function createTempDir(prefix: string): Promise<string> {
   return fsp.mkdtemp(path.join(os.tmpdir(), prefix + '-e2e-'))
 }
 
-async function createTempFiles(dir, names) {
+export async function createTempFiles(dir: string, names: string[]): Promise<void> {
   await fsp.mkdir(dir, { recursive: true })
   for (const name of names) {
     await fsp.writeFile(path.join(dir, name), `content of ${name}`)
   }
 }
 
-async function createTempDirWithFiles(dir, subFiles) {
+export async function createTempDirWithFiles(dir: string, subFiles: Record<string, string>): Promise<void> {
   await fsp.mkdir(dir, { recursive: true })
   for (const [name, content] of Object.entries(subFiles)) {
     await fsp.writeFile(path.join(dir, name), content || `data-${name}`)
   }
 }
 
-function fileExists(p) {
+export function fileExists(p: string): Promise<boolean> {
   return fsp.access(p).then(() => true).catch(() => false)
 }
 
-async function readTrashInfo(trashName) {
+export async function readTrashInfo(trashName: string): Promise<string | null> {
   const infoPath = path.join(os.homedir(), '.local', 'share', 'Trash', 'info', trashName + '.trashinfo')
   try {
     const content = await fsp.readFile(infoPath, 'utf-8')
@@ -52,5 +51,3 @@ async function readTrashInfo(trashName) {
     return null
   }
 }
-
-module.exports = { launchApp, createTempDir, createTempFiles, createTempDirWithFiles, fileExists, readTrashInfo, APP_PATH }

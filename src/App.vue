@@ -284,7 +284,8 @@
   </div>
 </template>
 
-<script>
+<script lang="ts">
+  import { defineComponent } from 'vue'
   import DirectoryTree from './components/DirectoryTree.vue'
   import theme from '../theme.json'
   import TopPanel from './components/TopPanel.vue'
@@ -292,11 +293,13 @@
   import PreviewPanel from './components/PreviewPanel.vue'
   import MenuBar from './components/MenuBar.vue'
   import TabBar from './components/TabBar.vue'
-  import EntryIcon from './components/EntryIcon.vue'
   import aboutHeader from './assets/about-header.png'
   import pkg from '../package.json'
   import prettyBytes from 'pretty-bytes'
   import { tasks, createTask, updateTask, cancelTask, removeTask, pauseTask, resumeTask, createThrottledRunner } from './stores/tasks'
+  import type { Task } from './stores/tasks'
+  import type { MenuItemSpec, EntryStats, TaskResult, TrashItem } from './types/ipc'
+  import type { Tab, Group, PropsInfo, SelectEvent, ContextMenuEvent, BackgroundContextMenuEvent, DirItem, SearchResultsEvent } from './types/domains'
   import { on, off } from './stores/events'
 
   const username = window.electron.getUserName()
@@ -306,7 +309,15 @@
   const MB = 1024 * 1024
   const GB = 1024 * 1024 * 1024
 
-  export default {
+  function errorMessage(e: unknown): string {
+    return e instanceof Error ? e.message : String(e)
+  }
+
+  type MenuBarRef = { openRootMenu: (x: number, y: number) => void }
+  type TopPanelRef = { closeDropdowns: () => void }
+  type WorkZoneRef = { $el: HTMLElement; scrollToPath: (path: string) => void; itemsPerRow: number }
+
+  export default defineComponent({
     name: 'App',
     
     components: {
@@ -315,68 +326,70 @@
       DirectoryTree,
       TopPanel,
       PreviewPanel,
-      TabBar,
-      EntryIcon
+      TabBar
     },
     
     data(){      
       return {
-        previewPath: null,
+        previewPath: null as string | null,
         aboutHeader,
         leftPanelWidth: 200,
         rightPanelWidth: 300,
         theme,
         dirs: [
-          { name: username, pathname: homedir, caption:username },
+          { name: username, pathname: homedir, caption: username },
           { name: '/', pathname: '/', caption: 'System root' }
-        ],
-        tabs: [],
+        ] as DirItem[],
+        tabs: [] as Tab[],
         activeTabIndex: -1,
         tabIdCounter: 0,
         iconSize: 120,
         view: 'table',
-        entries: [],
+        entries: [] as EntryStats[],
         files: 0,
         folders: 0,
         sortColumn: 'name',
         sortOrder: 'asc',
-        groupBy: null,
+        groupBy: null as string | null,
         isDev: location.href.includes('localhost'),
         version: pkg.version,
         toastText: '',
         toastVisible: false,
-        toastTimer: null,
-        searchResults: null,
+        toastTimer: null as ReturnType<typeof setTimeout> | null,
+        searchResults: null as EntryStats[] | null,
         searchQuery: '',
         isSearchMode: false,
         searchVersion: 0,
         _restoreScrollPending: false,
         autohideLeftPanel: localStorage.getItem('autohideLeftPanel') === 'true',
         leftPanelVisible: false,
-        _leftPanelTimer: null,
+        _leftPanelTimer: null as ReturnType<typeof setTimeout> | null,
         autohideTopPanel: localStorage.getItem('autohideTopPanel') === 'true',
         topPanelVisible: false,
-        _topPanelTimer: null,
+        _topPanelTimer: null as ReturnType<typeof setTimeout> | null,
         rightPanelVisible: localStorage.getItem('rightPanelVisible') !== 'false',
         showHidden: localStorage.getItem('showHidden') === 'true',
         showMenuBar: localStorage.getItem('showMenuBar') !== 'false',
         tabsInSidePanel: localStorage.getItem('tabsInSidePanel') === 'true',
-        bookmarks: JSON.parse(localStorage.getItem('bookmarks') || '[]'),
-        selectedMap: {},
-        lastClickedPath: null,
-        renamingPath: null,
+        bookmarks: JSON.parse(localStorage.getItem('bookmarks') || '[]') as string[],
+        selectedMap: {} as Record<string, boolean>,
+        lastClickedPath: null as string | null,
+        renamingPath: null as string | null,
         renamingValue: '',
         trashPopupVisible: false,
-        trashPopupPaths: [],
+        trashPopupPaths: [] as string[],
         trashActionVisible: false,
         trashActionMode: '',
-        trashActionPaths: [],
+        trashActionPaths: [] as string[],
         propsPopupVisible: false,
-        propsInfo: {},
+        propsInfo: {} as PropsInfo,
         aboutPopupVisible: false,
         hotkeysPopupVisible: false,
-        clipboardPaths: [],
+        clipboardPaths: [] as string[],
         clipboardMode: '',
+        _undoThrottle: createThrottledRunner(),
+        _onKeydown: null as ((e: KeyboardEvent) => void) | null,
+        _allEntries: [] as EntryStats[],
       }
     },
 
@@ -386,7 +399,7 @@
     
     methods:{
     
-      async openDir(dirname){
+      async openDir(dirname: string){
         if(this.isTrash) return
         const absolute = dirname.startsWith('/')
         const target = absolute
@@ -407,17 +420,17 @@
         await this.jump(target);
       },
 
-      async openFile(pathname){
+      async openFile(pathname: string){
         if(this.isTrash || !pathname) return
         try {
           const { error } = await window.electron.openFile(pathname)
           if(error) this.showToast('Failed to open: ' + error)
         } catch(e) {
-          this.showToast('Failed to open: ' + (e.message || String(e)))
+          this.showToast('Failed to open: ' + (errorMessage(e)))
         }
       },
 
-      onSearchResults({ query, results }){
+      onSearchResults({ query, results }: SearchResultsEvent){
         if(results === null){
           this.isSearchMode = false;
           this.searchResults = null;
@@ -429,12 +442,13 @@
         this.isSearchMode = true;
       },
 
-      changeSort(col,sort){
+      changeSort(col: string, sort: string){
         this.sortColumn = col
         this.sortOrder  = sort
       },      
 
-      sortByProperty(array, property, order){
+      sortByProperty<T extends EntryStats>(array: T[], property: keyof T | undefined, order: string): T[] {
+        if(!property) return array
         return array.sort((a, b) => {
           const valA = a[property]
           const valB = b[property]
@@ -449,9 +463,9 @@
         })
       },
 
-      switchTab(index){
+      switchTab(index: number){
         if(index < 0 || index >= this.tabs.length || index === this.activeTabIndex) return;
-        let el = this.$refs.workzone?.$el.querySelector('.inner');
+        const el = (this.$refs.workzone as WorkZoneRef | undefined)?.$el.querySelector('.inner');
         if(el) this.tabs[this.activeTabIndex].scrollTop = el.scrollTop;
         this.activeTabIndex = index;
         this._restoreScrollPending = true;
@@ -468,7 +482,7 @@
         }
       },
 
-      removeBookmark(pathname){
+      removeBookmark(pathname: string){
         const i = this.bookmarks.indexOf(pathname)
         if(i === -1) return
         this.bookmarks.splice(i, 1)
@@ -479,9 +493,9 @@
         localStorage.setItem('bookmarks', JSON.stringify(this.bookmarks))
       },
 
-      closeTab(index){
+      closeTab(index: number){
         if(this.tabs.length <= 1) return;
-        let wasActive = index === this.activeTabIndex;
+        const wasActive = index === this.activeTabIndex;
         this.tabs.splice(index, 1);
         if(index < this.activeTabIndex){
           this.activeTabIndex--;
@@ -492,7 +506,7 @@
         this.searchVersion++;
       },
 
-      async openInNewTab(pathname){
+      async openInNewTab(pathname: string){
         if(!pathname.startsWith('/') && pathname !== 'trash://')
           pathname = window.electron.join(this.currentDir, pathname);
         try {
@@ -506,7 +520,7 @@
         this.searchVersion++;
       },
 
-      async jump(pathname){
+      async jump(pathname: string){
         if(!pathname || pathname === this.currentDir) return
         try {
           if(!(await window.electron.isDir(pathname))) throw new Error();
@@ -517,7 +531,8 @@
         this.isSearchMode = false;
         this.searchResults = null;
         this.searchVersion++;
-        let tab = this.tabs[this.activeTabIndex];
+        const tab = this.tabs[this.activeTabIndex];
+        if(!tab) return
         tab.history[++tab.historyIndex] = pathname
         if(tab.history.length > tab.historyIndex + 1){
           tab.history.splice(tab.historyIndex + 1)
@@ -530,12 +545,12 @@
         await this.jump(this.currentDir.replace(/\/[^/]+\/?$/,'') || '/')
       },
 
-      onContextMenu({ path, x, y }){
+      onContextMenu({ path, x, y }: ContextMenuEvent){
         if(this.isTrash){
-          let items = [{ label: 'Delete' }, { label: 'Restore' }]
+          const items = [{ label: 'Delete' }, { label: 'Restore' }]
           window.electron.ipcRenderer.send('show-menu', { items, x, y })
           window.electron.ipcRenderer.once('show-menu-reply', (_, index) => {
-            let paths = Object.keys(this.selectedMap)
+            const paths = Object.keys(this.selectedMap)
             if(!paths.includes(path)) paths.push(path)
             if(index === 0) this.beginTrashAction('delete', paths)
             else if(index === 1) this.beginTrashAction('restore', paths)
@@ -543,15 +558,15 @@
           return
         }
         let isDir = false
-        let source = this.isSearchMode && this.searchResults ? this.searchResults : this.entries
-        for(let entry of source){
-          let entryPath = entry.path || window.electron.join(this.currentDir, entry.name)
+        const source = this.isSearchMode && this.searchResults ? this.searchResults : this.entries
+        for(const entry of source){
+          const entryPath = entry.path || window.electron.join(this.currentDir, entry.name)
           if(entryPath === path){
             isDir = entry.type === 'directory'
             break
           }
         }
-        let items = isDir
+        const items: MenuItemSpec[] = isDir
           ? [{ label: 'Open' }, { label: 'Open in new tab' }, { type: 'separator' }, { label: 'Rename' }, { label: 'Copy' }, { label: 'Cut' }, { type: 'separator' }, { label: 'Move to Trash' }, { type: 'separator' }, { label: 'Properties' }]
           : [{ label: 'Open' }, { type: 'separator' }, { label: 'Rename' }, { label: 'Copy' }, { label: 'Cut' }, { type: 'separator' }, { label: 'Move to Trash' }, { type: 'separator' }, { label: 'Properties' }]
         const pasteIndex = items.length
@@ -570,19 +585,19 @@
             else if(idx === 1) this.openInNewTab(path)
             else if(idx === 2) this.startRename(path)
             else if(idx === 3){
-              let paths = Object.keys(this.selectedMap)
+              const paths = Object.keys(this.selectedMap)
               if(!paths.includes(path)) paths.push(path)
               this.clipboardPaths = paths
               this.clipboardMode = 'copy'
             }
             else if(idx === 4){
-              let paths = Object.keys(this.selectedMap)
+              const paths = Object.keys(this.selectedMap)
               if(!paths.includes(path)) paths.push(path)
               this.clipboardPaths = paths
               this.clipboardMode = 'cut'
             }
             else if(idx === 5){
-              let paths = Object.keys(this.selectedMap)
+              const paths = Object.keys(this.selectedMap)
               if(!paths.includes(path)) paths.push(path)
               this.confirmMoveToTrash(paths)
             }
@@ -591,19 +606,19 @@
             if(idx === 0) this.openFile(path)
             else if(idx === 1) this.startRename(path)
             else if(idx === 2){
-              let paths = Object.keys(this.selectedMap)
+              const paths = Object.keys(this.selectedMap)
               if(!paths.includes(path)) paths.push(path)
               this.clipboardPaths = paths
               this.clipboardMode = 'copy'
             }
             else if(idx === 3){
-              let paths = Object.keys(this.selectedMap)
+              const paths = Object.keys(this.selectedMap)
               if(!paths.includes(path)) paths.push(path)
               this.clipboardPaths = paths
               this.clipboardMode = 'cut'
             }
             else if(idx === 4){
-              let paths = Object.keys(this.selectedMap)
+              const paths = Object.keys(this.selectedMap)
               if(!paths.includes(path)) paths.push(path)
               this.confirmMoveToTrash(paths)
             }
@@ -611,9 +626,9 @@
           }
         })
       },
-      onBackgroundContextMenu({ x, y }){
+      onBackgroundContextMenu({ x, y }: BackgroundContextMenuEvent){
         if(this.isTrash){
-          let items = [{ label: 'Restore all' }, { label: 'Empty trash' }]
+          const items = [{ label: 'Restore all' }, { label: 'Empty trash' }]
           window.electron.ipcRenderer.send('show-menu', { items, x, y })
           window.electron.ipcRenderer.once('show-menu-reply', (_, index) => {
             if(index === 0) this.confirmRestoreAll()
@@ -621,7 +636,7 @@
           })
           return
         }
-        let items = [
+        const items = [
           { label: 'New folder' },
           { label: 'New file' }
         ]
@@ -656,32 +671,32 @@
         if(this._topPanelTimer) clearTimeout(this._topPanelTimer)
         this._topPanelTimer = setTimeout(() => {
           this.topPanelVisible = false
-          if(this.$refs.topPanel) this.$refs.topPanel.closeDropdowns()
+          if(this.$refs.topPanel) (this.$refs.topPanel as TopPanelRef).closeDropdowns()
         }, 300)
       },
 
-      selectEntry(ev){
+      selectEntry(ev: SelectEvent){
         if (!ev) { this.clearSelection(); return }
-        let { path, ctrl, shift } = ev
+        const { path, ctrl, shift } = ev
         this.previewPath = path
         if (ctrl) {
           if (this.selectedMap[path]) {
-            let next = { ...this.selectedMap }; delete next[path]; this.selectedMap = next
+            const next = { ...this.selectedMap }; delete next[path]; this.selectedMap = next
           } else {
             this.selectedMap = { ...this.selectedMap, [path]: true }
           }
         } else if (shift && this.lastClickedPath) {
-          let allPaths = []
-          for (let group of this.groups) {
-            for (let entry of group.entries) {
+          const allPaths = []
+          for (const group of this.groups) {
+            for (const entry of group.entries) {
               allPaths.push(entry.path || window.electron.join(this.currentDir, entry.name))
             }
           }
-          let lastIdx = allPaths.indexOf(this.lastClickedPath)
-          let currIdx = allPaths.indexOf(path)
+          const lastIdx = allPaths.indexOf(this.lastClickedPath)
+          const currIdx = allPaths.indexOf(path)
           if (~lastIdx && ~currIdx) {
-            let [start, end] = lastIdx < currIdx ? [lastIdx, currIdx] : [currIdx, lastIdx]
-            let next = {}
+            const [start, end] = lastIdx < currIdx ? [lastIdx, currIdx] : [currIdx, lastIdx]
+            const next: Record<string, boolean> = {}
             for (let i = start; i <= end; i++) next[allPaths[i]] = true
             this.selectedMap = next
           } else {
@@ -692,8 +707,8 @@
         }
         this.lastClickedPath = path
       },
-      selectRange(paths, additive){
-        let next
+      selectRange(paths: string[], additive: boolean){
+        let next: Record<string, boolean>
         if (additive) {
           next = { ...this.selectedMap }
           for (const p of paths) next[p] = true
@@ -711,53 +726,53 @@
         this.lastClickedPath = null
       },
       selectAllEntries(){
-        let source = this.isSearchMode && this.searchResults ? this.searchResults : this.entries
-        let next = {}
-        for(let entry of source){
-          let path = entry.path || window.electron.join(this.currentDir, entry.name)
+        const source = this.isSearchMode && this.searchResults ? this.searchResults : this.entries
+        const next: Record<string, boolean> = {}
+        for(const entry of source){
+          const path = entry.path || window.electron.join(this.currentDir, entry.name)
           next[path] = true
         }
         this.selectedMap = next
-        let paths = Object.keys(next)
+        const paths = Object.keys(next)
         this.previewPath = paths.length ? paths[paths.length - 1] : null
         this.lastClickedPath = paths.length ? paths[paths.length - 1] : null
       },
       invertSelection(){
-        let source = this.isSearchMode && this.searchResults ? this.searchResults : this.entries
-        let next = {}
-        for(let entry of source){
-          let path = entry.path || window.electron.join(this.currentDir, entry.name)
+        const source = this.isSearchMode && this.searchResults ? this.searchResults : this.entries
+        const next: Record<string, boolean> = {}
+        for(const entry of source){
+          const path = entry.path || window.electron.join(this.currentDir, entry.name)
           if(!this.selectedMap[path]) next[path] = true
         }
         this.selectedMap = next
-        let paths = Object.keys(next)
+        const paths = Object.keys(next)
         this.previewPath = paths.length ? paths[paths.length - 1] : null
         this.lastClickedPath = paths.length ? paths[paths.length - 1] : null
       },
-      startRename(path){
+      startRename(path: string){
         this.renamingPath = path
-        let name = path.split('/').pop()
-        this.renamingValue = name
+        const name = path.split('/').pop()
+        this.renamingValue = name || ''
       },
-      async confirmRename(newName){
+      async confirmRename(newName: string){
         if(this.isTrash) return
         if(!this.renamingPath) return
-        let oldPath = this.renamingPath
+        const oldPath = this.renamingPath
         this.renamingPath = null
         newName = (newName || '').trim()
         if(!newName){
           this.showToast('Name cannot be empty')
           return
         }
-        if(/[\/\0]/.test(newName)){
+        if(/[/\0]/.test(newName)){
           this.showToast('Invalid characters in name')
           return
         }
-        let dir = oldPath.replace(/\/[^/]+\/?$/, '') || '/'
-        let newPath = window.electron.join(dir, newName)
+        const dir = oldPath.replace(/\/[^/]+\/?$/, '') || '/'
+        const newPath = window.electron.join(dir, newName)
         if(oldPath === newPath) return
         try{
-          let entries = await window.electron.readdir(dir)
+          const entries = await window.electron.readdir(dir)
           if(entries.some(e => e.name === newName)){
             this.showToast('A file or folder with that name already exists')
             return
@@ -768,7 +783,7 @@
         try{
           await window.electron.rename(oldPath, newPath)
           if(this.selectedMap[oldPath]){
-            let next = { ...this.selectedMap }
+            const next = { ...this.selectedMap }
             delete next[oldPath]
             next[newPath] = true
             this.selectedMap = next
@@ -784,11 +799,11 @@
       cancelRename(){
         this.renamingPath = null
       },
-      async _uniqueName(dir, base){
+      async _uniqueName(dir: string, base: string): Promise<string>{
         let name = base
         let counter = 1
-        let entries = await window.electron.readdir(dir)
-        let names = new Set(entries.map(e => e.name))
+        const entries = await window.electron.readdir(dir)
+        const names = new Set(entries.map(e => e.name))
         while(names.has(name)){
           counter++
           name = base + ' (' + counter + ')'
@@ -801,9 +816,9 @@
           return
         }
         try{
-          let dir = this.currentDir
-          let name = await this._uniqueName(dir, 'New folder')
-          let newPath = window.electron.join(dir, name)
+          const dir = this.currentDir
+          const name = await this._uniqueName(dir, 'New folder')
+          const newPath = window.electron.join(dir, name)
           await window.electron.mkdir(newPath)
           this.selectedMap = { [newPath]: true }
           this.lastClickedPath = newPath
@@ -821,9 +836,9 @@
           return
         }
         try{
-          let dir = this.currentDir
-          let name = await this._uniqueName(dir, 'New file')
-          let newPath = window.electron.join(dir, name)
+          const dir = this.currentDir
+          const name = await this._uniqueName(dir, 'New file')
+          const newPath = window.electron.join(dir, name)
           await window.electron.writeFile(newPath, '')
           this.selectedMap = { [newPath]: true }
           this.lastClickedPath = newPath
@@ -837,25 +852,25 @@
       },
       renameSelected(){
         if(this.isTrash) return
-        let paths = Object.keys(this.selectedMap)
+        const paths = Object.keys(this.selectedMap)
         if(paths.length === 1){
           this.startRename(paths[0])
         }
       },
-      _entryType(path){
+      _entryType(path: string){
         if(path === 'trash://') return 'directory'
         const source = this.isSearchMode && this.searchResults ? this.searchResults : this.entries
-        for(let entry of source){
-          let entryPath = entry.path || window.electron.join(this.currentDir, entry.name)
+        for(const entry of source){
+          const entryPath = entry.path || window.electron.join(this.currentDir, entry.name)
           if(entryPath === path) return entry.type
         }
         return null
       },
-      focusedPath(){
+      focusedPath(): string | undefined{
         return this.lastClickedPath || Object.keys(this.selectedMap)[0]
       },
       async menuOpen(){
-        let path = this.focusedPath()
+        const path = this.focusedPath()
         if(!path){
           if(this.currentDir) await this.jump(this.currentDir)
           return
@@ -864,7 +879,7 @@
         else await this.openFile(path)
       },
       async menuOpenInNewTab(){
-        let path = this.focusedPath()
+        const path = this.focusedPath()
         if(!path){
           if(this.currentDir) await this.openInNewTab(this.currentDir)
           return
@@ -873,28 +888,28 @@
         else await this.openFile(path)
       },
       menuProperties(){
-        let path = this.focusedPath() || this.currentDir
+        const path = this.focusedPath() || this.currentDir
         if(path) this.showProperties(path)
       },
       moveToTrashFromMenu(){
         if(this.isTrash) return
-        let paths = Object.keys(this.selectedMap)
+        const paths = Object.keys(this.selectedMap)
         if(!paths.length) return
         this.confirmMoveToTrash(paths)
       },
       onCopy(){
         if(this.isTrash) return
-        let paths = Object.keys(this.selectedMap)
+        const paths = Object.keys(this.selectedMap)
         if(!paths.length) return
         this.clipboardPaths = [...paths]
         this.clipboardMode = 'copy'
       },
-      onOpenRootMenu(x, y){
-        this.$refs.menuBar.openRootMenu(x, y)
+      onOpenRootMenu(x: number, y: number){
+        (this.$refs.menuBar as MenuBarRef).openRootMenu(x, y)
       },
       onCut(){
         if(this.isTrash) return
-        let paths = Object.keys(this.selectedMap)
+        const paths = Object.keys(this.selectedMap)
         if(!paths.length) return
         this.clipboardPaths = [...paths]
         this.clipboardMode = 'cut'
@@ -909,7 +924,7 @@
         const destDir = this.currentDir
         if(this.clipboardMode === 'cut'){
           let totalBytes = 0
-          const fileSizes = []
+          const fileSizes: number[] = []
           for (const p of paths) {
             try {
               const s = await window.electron.stat(p)
@@ -931,7 +946,6 @@
           const total = paths.length
           let done = 0
           let errors = 0
-          let copiedBytes = 0
           window.electron.ipcRenderer.on('move-progress', (_, { taskId, copiedBytes: bytes }) => {
             if(task.id !== taskId) return
             if(task.status === 'cancelled' || task.status === 'done' || task.status === 'undone') return
@@ -954,8 +968,8 @@
               updateTask(task.id, { progress: Math.max(cur, fileProgress) })
             } catch(e){
               errors++
-              if(task.data && task.data.errorLog) task.data.errorLog.push(e.message || String(e))
-              this.showToast('Failed to move: ' + e.message)
+              if(task.data && task.data.errorLog) task.data.errorLog.push(errorMessage(e))
+              this.showToast('Failed to move: ' + errorMessage(e))
             }
           }
           window.electron.ipcRenderer.removeAllListeners('move-progress')
@@ -984,7 +998,7 @@
         })
         task.from = paths.length === 1 ? paths[0] : paths[0] + ' (+' + (paths.length - 1) + ')'
         task.to = destDir
-          window.electron.ipcRenderer.on('file-copy-progress', (_, { done, total, errors, copiedBytes, totalBytes, currentFile }) => {
+          window.electron.ipcRenderer.on('file-copy-progress', (_, { done, total, errors, copiedBytes, totalBytes }) => {
           if(task.status === 'cancelled' || task.status === 'paused') return
           const progress = totalBytes > 0 && copiedBytes != null
             ? Math.round((copiedBytes / totalBytes) * 100)
@@ -998,7 +1012,7 @@
           })
         })
         try {
-          let result = await window.electron.ipcRenderer.invoke('file-copy', JSON.parse(JSON.stringify(paths)), destDir, task.id)
+          const result = await window.electron.ipcRenderer.invoke('file-copy', JSON.parse(JSON.stringify(paths)), destDir, task.id)
           window.electron.ipcRenderer.removeAllListeners('file-copy-progress')
           if(task.status === 'cancelled'){
             await this.refreshDir()
@@ -1012,7 +1026,7 @@
             timeRemaining: 0
           })
           if(result.copiedPaths) task.data.copiedPaths = result.copiedPaths
-          if(result.errors && result.lastError) task.data.errorLog.push(result.lastError)
+          if(result.errors && result.lastError && task.data.errorLog) task.data.errorLog.push(result.lastError)
           await this.refreshDir()
         } catch(e) {
           window.electron.ipcRenderer.removeAllListeners('file-copy-progress')
@@ -1020,29 +1034,29 @@
             await this.refreshDir()
             return
           }
-          if(task.data && task.data.errorLog) task.data.errorLog.push(e.message || String(e))
+          if(task.data && task.data.errorLog) task.data.errorLog.push(errorMessage(e))
           updateTask(task.id, { status: 'error', name: this.taskName(paths, 'Copy'), progress: 100 })
           this.showToast('Failed to copy files')
         }
       },
-      taskFileLabel(paths){
+      taskFileLabel(paths: string[]){
         return paths.length === 1 ? paths[0].split('/').pop() : paths.length + ' files'
       },
-      taskName(paths, action){
+      taskName(paths: string[], action: string){
         return action + ' ' + this.taskFileLabel(paths)
       },
-      prepareTrashPaths(paths){
-        let sorted = [...paths].sort((a, b) => b.length - a.length)
-        let result = []
-        for(let p of sorted){
+      prepareTrashPaths(paths: string[]): string[] {
+        const sorted = [...paths].sort((a, b) => b.length - a.length)
+        const result: string[] = []
+        for(const p of sorted){
           if(!result.some(q => q.startsWith(p + '/'))){
             result.push(p)
           }
         }
         return result
       },
-      confirmMoveToTrash(paths){
-        let cleaned = this.prepareTrashPaths(paths)
+      confirmMoveToTrash(paths: string[]){
+        const cleaned = this.prepareTrashPaths(paths)
         console.log('[trash] cleaned:', cleaned)
         if(!cleaned.length) return
         this.trashPopupPaths = cleaned
@@ -1053,7 +1067,7 @@
         this.trashPopupPaths = []
       },
       async executeMoveToTrash(){
-        let paths = this.trashPopupPaths
+        const paths = this.trashPopupPaths
         this.trashPopupVisible = false
         this.trashPopupPaths = []
         if(!paths.length) return
@@ -1067,12 +1081,11 @@
         })
         task.from = paths.length === 1 ? paths[0] : paths[0] + ' (+' + (paths.length - 1) + ')'
 
-        window.electron.ipcRenderer.on('trash-progress', (_, { done, total, errors, copiedBytes, totalBytes, currentFile }) => {
+        window.electron.ipcRenderer.on('trash-progress', (_, { done, total, errors, copiedBytes, totalBytes }) => {
           if(task.status === 'cancelled' || task.status === 'paused') return
           const progress = totalBytes > 0 && copiedBytes != null
             ? Math.round((copiedBytes / totalBytes) * 100)
             : Math.round((done / total) * 100)
-          const fileLabel = currentFile || paths[0].split('/').pop()
           const successCount = done - errors
           updateTask(task.id, {
             progress,
@@ -1083,7 +1096,7 @@
         })
 
         try {
-          let result = await window.electron.ipcRenderer.invoke('trash-items', JSON.parse(JSON.stringify(paths)), task.id)
+          const result = await window.electron.ipcRenderer.invoke('trash-items', JSON.parse(JSON.stringify(paths)), task.id)
           window.electron.ipcRenderer.removeAllListeners('trash-progress')
           if(task.status === 'cancelled'){
             removeTask(task.id)
@@ -1097,7 +1110,7 @@
             name: 'Move ' + this.taskFileLabel(paths) + ' to trash',
             timeRemaining: 0
           })
-          if(result.errors && result.lastError) task.data.errorLog.push(result.lastError)
+          if(result.errors && result.lastError && task.data.errorLog) task.data.errorLog.push(result.lastError)
           if(result.errors){
             this.showToast('Failed to move to trash: ' + result.lastError)
           }else{
@@ -1110,7 +1123,7 @@
             removeTask(task.id)
             return
           }
-          if(task.data && task.data.errorLog) task.data.errorLog.push(e.message || String(e))
+          if(task.data && task.data.errorLog) task.data.errorLog.push(errorMessage(e))
           updateTask(task.id, { status: 'error', name: 'Move ' + this.taskFileLabel(paths) + ' to trash', progress: 100 })
           this.showToast('Failed to move to trash')
         }
@@ -1130,7 +1143,7 @@
         this.beginTrashAction('restore', paths)
       },
       confirmEmptyTrash(){
-        let paths = this.entries.map(e => e.path || window.electron.join(this.currentDir, e.name))
+        const paths = this.entries.map(e => e.path || window.electron.join(this.currentDir, e.name))
         if(!paths.length){
           this.showToast('Trash is empty')
           return
@@ -1138,24 +1151,24 @@
         this.beginTrashAction('empty', paths)
       },
       confirmRestoreAll(){
-        let paths = this.entries.map(e => e.path || window.electron.join(this.currentDir, e.name))
+        const paths = this.entries.map(e => e.path || window.electron.join(this.currentDir, e.name))
         if(!paths.length){
           this.showToast('Trash is empty')
           return
         }
         this.beginTrashAction('restore-all', paths)
       },
-      beginTrashAction(mode, paths){
+      beginTrashAction(mode: string, paths: string[]){
         paths = this.prepareTrashPaths(paths)
         if(!paths.length) return
         this.trashActionMode = mode
         this.trashActionPaths = paths
         this.trashActionVisible = true
       },
-      trashNameOf(path){
+      trashNameOf(path: string){
         return path.replace(/^trash:\/\//, '')
       },
-      toTrashRealPath(path){
+      toTrashRealPath(path: string){
         return window.electron.trashDirs().files + '/' + this.trashNameOf(path)
       },
       cancelTrashAction(){
@@ -1163,16 +1176,15 @@
         this.trashActionMode = ''
         this.trashActionPaths = []
       },
-      async _runTrashDelete(paths, parentDir){
+      async _runTrashDelete(paths: string[], parentDir: string | undefined): Promise<{ cancelled?: boolean; task?: Task; result?: TaskResult }> {
         const task = createTask('Delete ' + this.taskFileLabel(paths) + ' from trash', {
           originalPaths: [...paths],
           parentDir,
           operation: 'trash-delete',
           errorLog: []
         })
-        window.electron.ipcRenderer.on('trash-permanent-delete-progress', (_, { done, total, errors, currentFile }) => {
+        window.electron.ipcRenderer.on('trash-permanent-delete-progress', (_, { done, total, errors }) => {
           if(task.status === 'cancelled' || task.status === 'paused') return
-          const fileLabel = currentFile || ''
           const successCount = done - errors
           updateTask(task.id, {
             progress: Math.round((done / total) * 100),
@@ -1181,7 +1193,7 @@
           })
         })
         try {
-          let result = await window.electron.ipcRenderer.invoke('trash-permanent-delete', JSON.parse(JSON.stringify(paths)), task.id)
+          const result = await window.electron.ipcRenderer.invoke('trash-permanent-delete', JSON.parse(JSON.stringify(paths)), task.id)
           window.electron.ipcRenderer.removeAllListeners('trash-permanent-delete-progress')
           if(task.status === 'cancelled'){
             removeTask(task.id)
@@ -1194,7 +1206,7 @@
             name: 'Delete ' + this.taskFileLabel(paths) + ' from trash',
             timeRemaining: 0
           })
-          if(result.errors && result.lastError) task.data.errorLog.push(result.lastError)
+          if(result.errors && result.lastError && task.data.errorLog) task.data.errorLog.push(result.lastError)
           return { task, result }
         } catch(e) {
           window.electron.ipcRenderer.removeAllListeners('trash-permanent-delete-progress')
@@ -1202,12 +1214,12 @@
             removeTask(task.id)
             return { cancelled: true }
           }
-          if(task.data && task.data.errorLog) task.data.errorLog.push(e.message || String(e))
+          if(task.data && task.data.errorLog) task.data.errorLog.push(errorMessage(e))
           updateTask(task.id, { status: 'error', name: 'Delete ' + this.taskFileLabel(paths) + ' from trash', progress: 100 })
-          return { task, result: { errors: 1 } }
+          return { task, result: { errors: 1, lastError: errorMessage(e) } as TaskResult }
         }
       },
-      async _runTrashRestore(restoreItems, parentDir, originalPaths){
+      async _runTrashRestore(restoreItems: TrashItem[], parentDir: string | undefined, originalPaths: string[]): Promise<{ cancelled?: boolean; task?: Task; result?: TaskResult }> {
         const task = createTask('Restore ' + this.taskFileLabel(originalPaths) + ' from trash', {
           originalPaths: [...originalPaths],
           trashNames: restoreItems.map(i => i.trashName),
@@ -1216,12 +1228,11 @@
           errorLog: []
         })
         task.to = parentDir
-        window.electron.ipcRenderer.on('trash-restore-progress', (_, { done, total, errors, copiedBytes, totalBytes, currentFile }) => {
+        window.electron.ipcRenderer.on('trash-restore-progress', (_, { done, total, errors, copiedBytes, totalBytes }) => {
           if(task.status === 'cancelled' || task.status === 'paused') return
           const progress = totalBytes > 0 && copiedBytes != null
             ? Math.round((copiedBytes / totalBytes) * 100)
             : Math.round((done / total) * 100)
-          const fileLabel = currentFile || ''
           const successCount = done - errors
           updateTask(task.id, {
             progress,
@@ -1231,7 +1242,7 @@
           })
         })
         try {
-          let result = await window.electron.ipcRenderer.invoke('trash-restore-items', JSON.parse(JSON.stringify(restoreItems)), task.id)
+          const result = await window.electron.ipcRenderer.invoke('trash-restore-items', JSON.parse(JSON.stringify(restoreItems)), task.id)
           window.electron.ipcRenderer.removeAllListeners('trash-restore-progress')
           if(task.status === 'cancelled'){
             removeTask(task.id)
@@ -1245,7 +1256,7 @@
             name: 'Restore ' + this.taskFileLabel(originalPaths) + ' from trash',
             timeRemaining: 0
           })
-          if(result.errors && result.lastError) task.data.errorLog.push(result.lastError)
+          if(result.errors && result.lastError && task.data.errorLog) task.data.errorLog.push(result.lastError)
           return { task, result }
         } catch(e) {
           window.electron.ipcRenderer.removeAllListeners('trash-restore-progress')
@@ -1253,9 +1264,9 @@
             removeTask(task.id)
             return { cancelled: true }
           }
-          if(task.data && task.data.errorLog) task.data.errorLog.push(e.message || String(e))
+          if(task.data && task.data.errorLog) task.data.errorLog.push(errorMessage(e))
           updateTask(task.id, { status: 'error', name: 'Restore ' + this.taskFileLabel(originalPaths) + ' from trash', progress: 100 })
-          return { task, result: { errors: 1 } }
+          return { task, result: { errors: 1, lastError: errorMessage(e) } as TaskResult }
         }
       },
       async executeTrashAction(){
@@ -1270,7 +1281,7 @@
           const realPaths = paths.map(p => this.toTrashRealPath(p))
           const { cancelled, result } = await this._runTrashDelete(realPaths, this.currentDir)
           if(cancelled) return
-          if(result.errors){
+          if(result && result.errors){
             this.showToast('Failed to delete: ' + result.lastError)
           }else{
             this.clearSelection()
@@ -1293,7 +1304,7 @@
 
           const { cancelled, result } = await this._runTrashRestore(restoreItems, parentDir, restoreItems.map(i => i.originalPath))
           if(cancelled) return
-          if(result.errors){
+          if(result && result.errors){
             this.showToast('Failed to restore: ' + result.lastError)
           }else{
             this.clearSelection()
@@ -1301,12 +1312,12 @@
               await this.refreshDir()
               return
             }
-            const names = restoreItems.map(i => i.originalPath.split('/').pop())
+            const names = restoreItems.map(i => i.originalPath.split('/').pop() || '')
             await this._openLocationAndReveal(parentDir, names)
           }
         }
       },
-      onTaskCancel(taskId){
+      onTaskCancel(taskId: number){
         const task = tasks.find(t => t.id === taskId)
         if(task){
           const op = task.data && task.data.operation
@@ -1317,14 +1328,15 @@
           else if(op === 'move'){
             window.electron.ipcRenderer.send('move-cancel', taskId)
             const task_ = tasks.find(t => t.id === taskId)
-            const label = task_ && task_.data && task_.data.originalPaths ? this.taskName(task_.data.originalPaths, 'Move') : ''
+            const original = task_ && task_.data ? task_.data.originalPaths : undefined
+            const label = original ? this.taskName(original, 'Move') : ''
             updateTask(taskId, { status: 'cancelling', name: label })
             return
           }
         }
         cancelTask(taskId)
       },
-      onTaskPause(taskId){
+      onTaskPause(taskId: number){
         const task = tasks.find(t => t.id === taskId)
         if(task){
           const op = task.data && task.data.operation
@@ -1335,7 +1347,7 @@
           updateTask(taskId, { status: 'paused' })
         }
       },
-      onTaskResume(taskId){
+      onTaskResume(taskId: number){
         const task = tasks.find(t => t.id === taskId)
         if(task){
           const op = task.data && task.data.operation
@@ -1346,7 +1358,7 @@
           updateTask(taskId, { status: 'active' })
         }
       },
-      async onTaskRetry(task){
+      async onTaskRetry(task: Task){
         const oldId = task.id
         const op = task.data && task.data.operation
         if(op === 'trash' && task.data.originalPaths){
@@ -1360,11 +1372,10 @@
             errorLog: []
           })
           newTask.from = paths.length === 1 ? paths[0] : paths[0] + ' (+' + (paths.length - 1) + ')'
-          window.electron.ipcRenderer.on('trash-progress', (_, { done, total, errors, copiedBytes, totalBytes, currentFile }) => {
+          window.electron.ipcRenderer.on('trash-progress', (_, { done, total, errors, copiedBytes, totalBytes }) => {
             const progress = totalBytes > 0 && copiedBytes != null
               ? Math.round((copiedBytes / totalBytes) * 100)
               : Math.round((done / total) * 100)
-            const fileLabel = currentFile || paths[0].split('/').pop()
             const successCount = done - errors
             updateTask(newTask.id, {
               progress,
@@ -1387,7 +1398,7 @@
               name: 'Move ' + this.taskFileLabel(paths) + ' to trash',
               timeRemaining: 0
             })
-            if(result.errors && result.lastError) newTask.data.errorLog.push(result.lastError)
+            if(result.errors && result.lastError && newTask.data.errorLog) newTask.data.errorLog.push(result.lastError)
             if(result.errors){
               this.showToast('Failed to move to trash: ' + result.lastError)
             }else{
@@ -1405,23 +1416,24 @@
           removeTask(oldId)
           const { cancelled, result } = await this._runTrashDelete(task.data.originalPaths, task.data.parentDir)
           if(cancelled) return
-          if(result.errors){
+          if(result && result.errors){
             this.showToast('Failed to delete: ' + result.lastError)
           }else{
             this.clearSelection()
             await this.refreshDir()
           }
         }
-        if(op === 'trash-restore' && task.data.trashNames){
+        if(op === 'trash-restore' && task.data.trashNames && task.data.originalPaths){
+          const originalPaths = task.data.originalPaths
           const items = task.data.trashNames.map((name, i) => ({
             trashName: name,
-            originalPath: task.data.originalPaths[i]
+            originalPath: originalPaths[i]
           }))
           const parentDir = task.data.parentDir
           removeTask(oldId)
-          const { cancelled, result } = await this._runTrashRestore(items, parentDir, task.data.originalPaths)
+          const { cancelled, result } = await this._runTrashRestore(items, parentDir, originalPaths)
           if(cancelled) return
-          if(result.errors){
+          if(result && result.errors){
             this.showToast('Failed to restore: ' + result.lastError)
           }else{
             this.clearSelection()
@@ -1430,7 +1442,7 @@
         }
         if(op === 'copy' && task.data.originalPaths){
           const paths = task.data.originalPaths
-          const destDir = task.data.destDir
+          const destDir = task.data.destDir || ''
           removeTask(oldId)
           const newTask = createTask(this.taskName(paths, 'Copy'), {
             originalPaths: [...paths],
@@ -1440,13 +1452,12 @@
           })
           newTask.from = paths.length === 1 ? paths[0] : paths[0] + ' (+' + (paths.length - 1) + ')'
           newTask.to = destDir
-          window.electron.ipcRenderer.on('file-copy-progress', (_, { done, total, errors, copiedBytes, totalBytes, currentFile }) => {
+          window.electron.ipcRenderer.on('file-copy-progress', (_, { done, total, errors, copiedBytes, totalBytes }) => {
             if(newTask.status === 'cancelled' || newTask.status === 'paused') return
             const progress = totalBytes > 0 && copiedBytes != null
               ? Math.round((copiedBytes / totalBytes) * 100)
               : Math.round((done / total) * 100)
-            const fileLabel = currentFile || paths[0].split('/').pop()
-            const errorCount = newTask.data.errorLog.length
+            const errorCount = (newTask.data.errorLog || []).length
             updateTask(newTask.id, {
               progress,
               totalSize: totalBytes || newTask.totalSize,
@@ -1455,14 +1466,14 @@
             })
           })
           try {
-            let result = await window.electron.ipcRenderer.invoke('file-copy', JSON.parse(JSON.stringify(paths)), destDir, newTask.id)
+            const result = await window.electron.ipcRenderer.invoke('file-copy', JSON.parse(JSON.stringify(paths)), destDir, newTask.id)
             window.electron.ipcRenderer.removeAllListeners('file-copy-progress')
             if(newTask.status === 'cancelled'){
               removeTask(newTask.id)
               await this.refreshDir()
               return
             }
-            const errorCount = newTask.data.errorLog.length
+            const errorCount = (newTask.data.errorLog || []).length
             updateTask(newTask.id, {
               progress: 100,
               status: result.errors ? (errorCount >= paths.length ? 'error' : 'partial') : 'done',
@@ -1477,18 +1488,18 @@
               await this.refreshDir()
               return
             }
-            if(newTask.data && newTask.data.errorLog) newTask.data.errorLog.push(e.message || String(e))
+            if(newTask.data && newTask.data.errorLog) newTask.data.errorLog.push(errorMessage(e))
             updateTask(newTask.id, { status: 'error', name: this.taskName(paths, 'Copy'), progress: 100 })
             this.showToast('Failed to copy files')
           }
         }
       },
-      async onTaskRetryFailed(task){
+      async onTaskRetryFailed(task: Task){
         const oldId = task.id
         const op = task.data && task.data.operation
         if(op === 'copy' && task.data.originalPaths && task.data.failedPaths){
           const paths = task.data.failedPaths
-          const destDir = task.data.destDir
+          const destDir = task.data.destDir || ''
           removeTask(oldId)
           const newTask = createTask(this.taskName(paths, 'Copy'), {
             originalPaths: [...paths],
@@ -1498,13 +1509,12 @@
           })
           newTask.from = paths.length === 1 ? paths[0] : paths[0] + ' (+' + (paths.length - 1) + ')'
           newTask.to = destDir
-          window.electron.ipcRenderer.on('file-copy-progress', (_, { done, total, errors, copiedBytes, totalBytes, currentFile }) => {
+          window.electron.ipcRenderer.on('file-copy-progress', (_, { done, total, errors, copiedBytes, totalBytes }) => {
             if(newTask.status === 'cancelled' || newTask.status === 'paused') return
             const progress = totalBytes > 0 && copiedBytes != null
               ? Math.round((copiedBytes / totalBytes) * 100)
               : Math.round((done / total) * 100)
-            const fileLabel = currentFile || paths[0].split('/').pop()
-            const errorCount = newTask.data.errorLog.length
+            const errorCount = (newTask.data.errorLog || []).length
             updateTask(newTask.id, {
               progress,
               totalSize: totalBytes || newTask.totalSize,
@@ -1513,14 +1523,14 @@
             })
           })
           try {
-            let result = await window.electron.ipcRenderer.invoke('file-copy', JSON.parse(JSON.stringify(paths)), destDir, newTask.id)
+            const result = await window.electron.ipcRenderer.invoke('file-copy', JSON.parse(JSON.stringify(paths)), destDir, newTask.id)
             window.electron.ipcRenderer.removeAllListeners('file-copy-progress')
             if(newTask.status === 'cancelled'){
               removeTask(newTask.id)
               await this.refreshDir()
               return
             }
-            const errorCount = newTask.data.errorLog.length
+            const errorCount = (newTask.data.errorLog || []).length
             updateTask(newTask.id, {
               progress: 100,
               status: result.errors ? (errorCount >= paths.length ? 'error' : 'partial') : 'done',
@@ -1535,30 +1545,30 @@
               await this.refreshDir()
               return
             }
-            if(newTask.data && newTask.data.errorLog) newTask.data.errorLog.push(e.message || String(e))
+            if(newTask.data && newTask.data.errorLog) newTask.data.errorLog.push(errorMessage(e))
             updateTask(newTask.id, { status: 'error', name: this.taskName(paths, 'Copy'), progress: 100 })
             this.showToast('Failed to copy files')
           }
         }
       },
-      onTaskUndo(task){
+      onTaskUndo(task: Task){
         if(!task.data || !task.data.originalPaths) return
         if(task.data.operation === 'trash-delete') return
         this._undoThrottle(task.id, () => this._performUndo(task))
       },
-      async _performUndo(task){
+      async _performUndo(task: Task){
         const op = task.data.operation
 
         if(op === 'move'){
-          const destDir = task.data.destDir
-          const paths = task.data.originalPaths
+          const destDir = task.data.destDir || ''
+          const paths = task.data.originalPaths || []
           const items = paths.map(p => ({
             original: p,
             dest: destDir + '/' + p.split('/').pop()
           }))
           const label = this.taskName(paths, 'Move back')
           updateTask(task.id, { status: 'active', name: label, progress: 0, from: destDir, to: '' })
-          window.electron.ipcRenderer.on('trash-restore-progress', (_, { done, total, errors, copiedBytes, totalBytes, currentFile }) => {
+          window.electron.ipcRenderer.on('trash-restore-progress', (_, { done, total, errors, copiedBytes, totalBytes }) => {
             if(task.status === 'cancelled' || task.status === 'paused') return
             const progress = totalBytes > 0 && copiedBytes != null
               ? Math.round((copiedBytes / totalBytes) * 100)
@@ -1571,7 +1581,7 @@
             })
           })
           try {
-            let result = await window.electron.ipcRenderer.invoke('move-undo', items, task.id)
+            const result = await window.electron.ipcRenderer.invoke('move-undo', items, task.id)
             window.electron.ipcRenderer.removeAllListeners('trash-restore-progress')
             if(task.status === 'cancelled'){
               removeTask(task.id)
@@ -1598,12 +1608,12 @@
         }
 
         if(op === 'copy'){
-          const destDir = task.data.destDir
-          const paths = task.data.originalPaths
+          const destDir = task.data.destDir || ''
+          const paths = task.data.originalPaths || []
           const copiedPaths = task.data.copiedPaths || paths.map(p => destDir + '/' + p.split('/').pop())
           const label = this.taskName(paths, 'Remove')
           updateTask(task.id, { status: 'active', name: label, progress: 0, from: destDir, to: '' })
-          window.electron.ipcRenderer.on('trash-restore-progress', (_, { done, total, errors, currentFile }) => {
+          window.electron.ipcRenderer.on('trash-restore-progress', (_, { done, total, errors }) => {
             if(task.status === 'cancelled' || task.status === 'paused') return
             const progress = total > 0 ? Math.round((done / total) * 100) : 0
             const successCount = done - errors
@@ -1614,7 +1624,7 @@
             })
           })
           try {
-            let result = await window.electron.ipcRenderer.invoke('copy-undo', JSON.parse(JSON.stringify(copiedPaths)), task.id)
+            const result = await window.electron.ipcRenderer.invoke('copy-undo', JSON.parse(JSON.stringify(copiedPaths)), task.id)
             window.electron.ipcRenderer.removeAllListeners('trash-restore-progress')
             if(task.status === 'cancelled'){
               removeTask(task.id)
@@ -1645,7 +1655,7 @@
           const paths = task.data.originalPaths || (task.data.trashNames || []).map(name => parentDir + '/' + name)
           const label = 'Move ' + this.taskFileLabel(paths) + ' back to trash'
           updateTask(task.id, { status: 'active', name: label, progress: 0, from: parentDir, to: '' })
-          window.electron.ipcRenderer.on('trash-progress', (_, { done, total, errors, copiedBytes, totalBytes, currentFile }) => {
+          window.electron.ipcRenderer.on('trash-progress', (_, { done, total, errors, copiedBytes, totalBytes }) => {
             if(task.status === 'cancelled' || task.status === 'paused') return
             const progress = totalBytes > 0 && copiedBytes != null
               ? Math.round((copiedBytes / totalBytes) * 100)
@@ -1659,7 +1669,7 @@
             })
           })
           try {
-            let result = await window.electron.ipcRenderer.invoke('trash-items', JSON.parse(JSON.stringify(paths)), task.id)
+            const result = await window.electron.ipcRenderer.invoke('trash-items', JSON.parse(JSON.stringify(paths)), task.id)
             window.electron.ipcRenderer.removeAllListeners('trash-progress')
             if(task.status === 'cancelled'){
               removeTask(task.id)
@@ -1681,23 +1691,22 @@
           return
         }
 
-        const paths = task.data.originalPaths
+        const paths = task.data.originalPaths || []
         const infoDir = window.electron.join(homedir, '.local', 'share', 'Trash', 'info')
         const allTrashInfo = await window.electron.readAllTrashInfo(infoDir)
         const items = paths
           .map(p => {
             const found = allTrashInfo.find(i => i.originalPath === p)
-            return { trashName: found ? found.trashName : p.split('/').pop(), originalPath: p }
+            return { trashName: found ? found.trashName : p.split('/').pop() || '', originalPath: p }
           })
           .filter(i => i.trashName)
         const label = 'Move ' + this.taskFileLabel(paths) + ' to trash'
         updateTask(task.id, { status: 'active', name: label, progress: 0, from: '~/.local/share/Trash/files', to: task.data.parentDir || '' })
-        window.electron.ipcRenderer.on('trash-restore-progress', (_, { done, total, errors, copiedBytes, totalBytes, currentFile }) => {
+        window.electron.ipcRenderer.on('trash-restore-progress', (_, { done, total, errors, copiedBytes, totalBytes }) => {
           if(task.status === 'cancelled' || task.status === 'paused') return
           const progress = totalBytes > 0 && copiedBytes != null
             ? Math.round((copiedBytes / totalBytes) * 100)
             : Math.round((done / total) * 100)
-          const fileLabel = currentFile || ''
           const successCount = done - errors
           updateTask(task.id, {
             progress,
@@ -1707,7 +1716,7 @@
           })
         })
         try {
-          let result = await window.electron.ipcRenderer.invoke('trash-restore-items', items, task.id)
+          const result = await window.electron.ipcRenderer.invoke('trash-restore-items', items, task.id)
           window.electron.ipcRenderer.removeAllListeners('trash-restore-progress')
           if(task.status === 'cancelled'){
             removeTask(task.id)
@@ -1719,8 +1728,8 @@
             this.showToast('Failed to restore from trash: ' + result.lastError)
           }else{
             updateTask(task.id, { status: 'undone', name: label, progress: 100 })
-            const parentDir = task.data.parentDir
-            const names = task.data.originalPaths.map(p => p.split('/').pop())
+            const parentDir = task.data.parentDir || ''
+            const names = (task.data.originalPaths || []).map(p => p.split('/').pop() || '')
             await this._openLocationAndReveal(parentDir, names)
           }
         } catch(e) {
@@ -1729,7 +1738,7 @@
           this.showToast('Failed to restore from trash')
         }
       },
-      async onTaskOpenFolder(task){
+      async onTaskOpenFolder(task: Task){
         if(!task.data || !task.data.originalPaths) return
         const op = task.data.operation
         const trashDir = TRASH_PATH
@@ -1780,9 +1789,9 @@
           return
         }
 
-        await this._openLocationAndReveal(targetDir, names)
+        await this._openLocationAndReveal(targetDir || '', names)
       },
-      async _openLocationAndReveal(targetDir, names){
+      async _openLocationAndReveal(targetDir: string, names: (string | null | undefined)[] | undefined){
         if(this.currentDir === targetDir){
           await this.refreshDir()
         }else{
@@ -1790,26 +1799,26 @@
           await this.refreshDir()
         }
         if(names && names.length){
-          const next = {}
-          for(let entry of this.entries){
+          const next: Record<string, boolean> = {}
+          for(const entry of this.entries){
             const entryPath = entry.path || window.electron.join(this.currentDir, entry.name)
             if(names.includes(entry.name)) next[entryPath] = true
           }
           await this._revealFirstSelected(next)
         }
       },
-      async _revealFirstSelected(selectedMap){
+      async _revealFirstSelected(selectedMap: Record<string, boolean>){
         const paths = Object.keys(selectedMap)
         this.selectedMap = selectedMap
         this.previewPath = paths[paths.length - 1] || null
         this.lastClickedPath = this.previewPath
         if(!paths.length) return
         await this.$nextTick()
-        const wz = this.$refs.workzone
+        const wz = this.$refs.workzone as WorkZoneRef | undefined
         if(wz && wz.scrollToPath) wz.scrollToPath(paths[0])
       },
-      flatPathList(){
-        const list = []
+      flatPathList(): string[] {
+        const list: string[] = []
         for(const group of this.groups){
           for(const entry of group.entries){
             list.push(entry.path || window.electron.join(this.currentDir, entry.name))
@@ -1817,19 +1826,19 @@
         }
         return list
       },
-      _scrollToKeyPath(path){
+      _scrollToKeyPath(path: string){
         this.$nextTick(() => {
-          const wz = this.$refs.workzone
+          const wz = this.$refs.workzone as WorkZoneRef | undefined
           if(wz && wz.scrollToPath) wz.scrollToPath(path)
         })
       },
-      keyMoveSelection(e, jumpToEnd){
+      keyMoveSelection(e: KeyboardEvent, jumpToEnd: boolean){
         const list = this.flatPathList()
         if(!list.length) return
         const anchor = this.lastClickedPath && list.includes(this.lastClickedPath) ? this.lastClickedPath : null
         const cursor = this.previewPath && list.includes(this.previewPath) ? this.previewPath : null
         const curIdx = cursor ? list.indexOf(cursor) : (anchor ? list.indexOf(anchor) : 0)
-        const wz = this.$refs.workzone
+        const wz = this.$refs.workzone as WorkZoneRef | undefined
         const perRow = wz && wz.itemsPerRow ? wz.itemsPerRow : 1
         let delta
         if(jumpToEnd){
@@ -1847,7 +1856,7 @@
           const anchorIdx = list.indexOf(anchor)
           const start = Math.min(anchorIdx, nextIdx)
           const end = Math.max(anchorIdx, nextIdx)
-          const next = {}
+          const next: Record<string, boolean> = {}
           for(let i = start; i <= end; i++) next[list[i]] = true
           this.selectedMap = next
           this.previewPath = target
@@ -1891,9 +1900,9 @@
         this.searchVersion++
         tab.historyIndex--
       },
-      async showProperties(path){
+      async showProperties(path: string){
         if(!path) return
-        let info = { name: path.split('/').pop(), location: path }
+        const info: PropsInfo = { name: path.split('/').pop(), location: path }
         let stat = null
         try { stat = await window.electron.stat(path) } catch(e) {}
         const source = this.isSearchMode && this.searchResults ? this.searchResults : this.entries
@@ -1903,7 +1912,7 @@
           ? (isDir ? 'Folder' : (entry.filetype || 'File'))
           : (isDir ? 'Folder' : 'File')
         info.typeText = typeText
-        const fmtDate = (ms) => ms ? new Date(ms).toISOString().replace('T',' ').replace(/:[^:]+$/,'') : ''
+        const fmtDate = (ms: number) => ms ? new Date(ms).toISOString().replace('T',' ').replace(/:[^:]+$/,'') : ''
         if(stat){
           if(stat.birthtimeMs && stat.birthtimeMs > 0) info.createdText = fmtDate(stat.birthtimeMs)
           info.modifiedText = fmtDate(stat.mtimeMs)
@@ -1943,7 +1952,7 @@
       openWebsite(){
         window.electron.openExternal('https://sombraeax.github.io/')
       },
-      showToast(text){
+      showToast(text: string){
         if(this.toastTimer) clearTimeout(this.toastTimer);
         this.toastText = text;
         this.toastVisible = true;
@@ -1952,12 +1961,12 @@
           this.toastTimer = null;
         }, 5000);
       },
-      getGroup(entry){
+      getGroup(entry: EntryStats){
         switch(this.groupBy){
           case 'name': return entry.name[Number(entry.name[0] === '.')].toUpperCase()
-          case 'modified': return new Date(entry.modified).toISOString().split('T')[0]
+          case 'modified': return new Date(entry.modified || 0).toISOString().split('T')[0]
           case 'size': {
-            let {size} = entry
+            const size = entry.size || 0
             if(size < 10 * KB)  return '< 10 KB'
             if(size < 100 * KB) return '10 — 100 KB'
             if(size < MB)       return '100 KB — 1 MB'
@@ -1967,14 +1976,14 @@
             return Math.floor(size/GB) + ' GB'
           }
           case 'type': return entry.filetype
-          default: null
+          default: return null
         }
       },
       restoreScroll(){
         if(!this._restoreScrollPending) return;
         this._restoreScrollPending = false;
-        let el = this.$refs.workzone?.$el.querySelector('.inner');
-        let tab = this.tabs[this.activeTabIndex];
+        const el = (this.$refs.workzone as WorkZoneRef | undefined)?.$el.querySelector('.inner');
+        const tab = this.tabs[this.activeTabIndex];
         if(el && tab && tab.scrollTop){
           el.scrollTop = tab.scrollTop;
         }
@@ -1988,8 +1997,8 @@
           const allEntries = await window.electron.readdir(target)
           if(this.currentDir !== target) return
           this._allEntries = allEntries
-          let filtered = this.showHidden ? allEntries : allEntries.filter(e => e.name[0] !== '.')
-          for(let entry of filtered){
+          const filtered = this.showHidden ? allEntries : allEntries.filter(e => e.name[0] !== '.')
+          for(const entry of filtered){
             if(entry.type === 'directory') folders++
             if(entry.type === 'file')      files++
           }
@@ -2017,7 +2026,7 @@
           this.showProperties(this.lastClickedPath || Object.keys(this.selectedMap)[0])
         }
         if(e.key === 'Delete' && !this.renamingPath && !this.trashPopupVisible && !this.trashActionVisible && document.activeElement?.tagName !== 'INPUT'){
-          let paths = Object.keys(this.selectedMap)
+          const paths = Object.keys(this.selectedMap)
           if(paths.length){
             if(this.isTrash) this.beginTrashAction('delete', paths)
             else this.confirmMoveToTrash(paths)
@@ -2069,7 +2078,7 @@
           }
         }
       }
-      document.addEventListener('keydown', this._onKeydown)
+      document.addEventListener('keydown', this._onKeydown as (e: KeyboardEvent) => void)
       on('task-cancel', this.onTaskCancel)
       on('task-retry', this.onTaskRetry)
       on('task-undo', this.onTaskUndo)
@@ -2079,7 +2088,7 @@
       on('task-retry-failed', this.onTaskRetryFailed)
     },
     beforeUnmount(){
-      document.removeEventListener('keydown', this._onKeydown)
+      document.removeEventListener('keydown', this._onKeydown as (e: KeyboardEvent) => void)
       off('task-cancel', this.onTaskCancel)
       off('task-retry', this.onTaskRetry)
       off('task-undo', this.onTaskUndo)
@@ -2091,26 +2100,26 @@
     
     computed:{
       groups(){
-        let source = this.isSearchMode && this.searchResults ? this.searchResults : this.entries;
+        const source = this.isSearchMode && this.searchResults ? this.searchResults : this.entries;
 
-        let groups = []
-        let prop = {
+        const groups: Group[] = []
+        const prop: keyof EntryStats | undefined = ({
           name: 'name',
           size: 'size',
           type: 'filetype',
           modified: 'mtimeMs'
-        }[this.sortColumn]
+        } as Record<string, keyof EntryStats>)[this.sortColumn]
 
-        for(let entry of source){
-          let groupName = this.getGroup(entry)
+        for(const entry of source){
+          const groupName = this.getGroup(entry)
           let group = groups.find(g => g.name === groupName)
-          if(!group) groups.push(group = {name:groupName, entries:[]})
-          let path = entry.path || window.electron.join(this.currentDir, entry.name)
+          if(!group) groups.push(group = {name: groupName, entries: []})
+          const path = entry.path || window.electron.join(this.currentDir, entry.name)
           entry.selected = !!this.selectedMap[path]
           group.entries.push(entry)
         }
         
-        for(let group of groups)
+        for(const group of groups)
           group.entries = this.sortByProperty(
            group.entries,
            prop,
@@ -2119,13 +2128,13 @@
         return groups
       },
           
-          currentDir(){
-        let tab = this.tabs[this.activeTabIndex];
-        return tab ? tab.history[tab.historyIndex] : undefined;
+          currentDir(): string {
+        const tab = this.tabs[this.activeTabIndex];
+        return tab ? (tab.history[tab.historyIndex] || '') : '';
       },
 
       isBookmarked(){
-        return this.currentDir && this.bookmarks.includes(this.currentDir)
+        return !!(this.currentDir && this.bookmarks.includes(this.currentDir))
       },
 
       propsRows(){
@@ -2163,13 +2172,13 @@
       },
 
       trashDeleteLabel(){
-        let n = this.trashSelectedCount
+        const n = this.trashSelectedCount
         if(!n) return 'Delete all files'
         return n === 1 ? 'Delete selected file' : 'Delete selected files'
       },
 
       trashRestoreLabel(){
-        let n = this.trashSelectedCount
+        const n = this.trashSelectedCount
         if(!n) return 'Restore all files'
         return n === 1 ? 'Restore selected file' : 'Restore selected files'
       },
@@ -2210,8 +2219,8 @@
         localStorage.setItem('showHidden', val)
         if(this._allEntries){
           let folders = 0, files = 0
-          let filtered = val ? this._allEntries : this._allEntries.filter(e => e.name[0] !== '.')
-          for(let entry of filtered){
+          const filtered = val ? this._allEntries : this._allEntries.filter(e => e.name[0] !== '.')
+          for(const entry of filtered){
             if(entry.type === 'directory') folders++
             if(entry.type === 'file')      files++
           }
@@ -2243,9 +2252,9 @@
           const allEntries = await window.electron.readdir(target)
           if(this.currentDir !== target) return
           this._allEntries = allEntries
-          let filtered = this.showHidden ? allEntries : allEntries.filter(e => e.name[0] !== '.')
+          const filtered = this.showHidden ? allEntries : allEntries.filter(e => e.name[0] !== '.')
           
-          for(let entry of filtered){
+          for(const entry of filtered){
             if(entry.type === 'directory') folders++
             if(entry.type === 'file')      files++
           }
@@ -2260,7 +2269,7 @@
         }
       }
     }
-  }
+  })
 </script>
 <style>
   html,body,#app{

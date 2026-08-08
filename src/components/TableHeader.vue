@@ -10,9 +10,9 @@
         v-for="[index,column] in visibleColumns"
         :ref="'button' + index"
         :key="index"
-        :redLine="index == this.insert - 1 ? 'right' : index == visibleColumns[0][0] && insert == 0 && 'left'"
+        :redLine="insert !== null ? (Number(index) == insert - 1 ? 'right' : (Number(index) == Number(visibleColumns[0][0]) && insert == 0) ? 'left' : '') : ''"
         :status="status"
-        :sort="column.colname == sortColumn && sortOrder"
+        :sort="column.colname == sortColumn ? (sortOrder || '') : ''"
         :caption="column.caption"
         :width="column.width"
         @changeSort="sort => changeSort(column.colname, sort)"
@@ -21,17 +21,19 @@
         @resizeend="resizeend"
         @move="move"
         @movestart="moveStart"
-        @moveend="moveEnd(index)"
+        @moveend="moveEnd(Number(index))"
       />
       <div class="end"></div>
     </div>
   </div>
 </template>
-<script>
+<script lang="ts">
+  import { defineComponent, PropType } from 'vue'
+  import type { Column } from '../types/domains'
   import theme from '../../theme.json'
   import TableHeaderButton from './TableHeaderButton.vue'
   
-  export default {
+  export default defineComponent({
     emits: ['toggleColumnVisible', 'moveColumn', 'changeSort', 'changeWidth'],
     components:{
       TableHeaderButton
@@ -40,13 +42,13 @@
       sortColumn: String,
       sortOrder: String,
       columns:{
-        type: Array,
+        type: Array as PropType<Column[]>,
         default: () => []
       }
     },
     data(){
       return {
-        insert:null,
+        insert: null as number | null,
         theme,
         x:0,
         left:0,
@@ -55,7 +57,7 @@
       }
     },
     computed:{
-      visibleColumns(){
+      visibleColumns(): [string, Column][] {
         return Object.entries(this.columns)
         .filter(entry => entry[1].visible)
       }
@@ -67,14 +69,14 @@
       resizeend(){
         this.status = "normal"
       },
-      move(x){
+      move(x: number){
         x = Math.abs(x - this.left)
         let pos = 0
         let i = 0
         let distance = x
-        for(let [index,{width}] of this.visibleColumns){
+        for(const [index,{width}] of this.visibleColumns){
           pos+=width
-          let dist = Math.abs(pos-x)
+          const dist = Math.abs(pos-x)
           if(dist < distance){
             distance = dist
             i = Number(index) + 1
@@ -82,8 +84,8 @@
         }
         this.insert = i
       },
-      menu({clientX,clientY}){
-        let { ipcRenderer } = window.electron
+      menu({clientX,clientY}: MouseEvent){
+        const { ipcRenderer } = window.electron
 
         ipcRenderer.send('show-menu', {
           x: clientX,
@@ -100,26 +102,26 @@
           (_, index) => this.$emit('toggleColumnVisible',index)
         )
       },
-      moveStart(x){
+      moveStart(x: number){
         this.status = "move"
-        let {left,width} = this.$refs.header.getBoundingClientRect()
+        const {left,width} = (this.$refs.header as HTMLElement).getBoundingClientRect()
         this.left = left
         this.width = width
         this.x = x
       },
-      moveEnd(index){
+      moveEnd(index: number){
         this.$emit('moveColumn',index,this.insert)
         this.status = "normal"
         this.insert = null
       },
-      changeSort(index, sort){
+      changeSort(index: string, sort: string){
         this.$emit("changeSort",index,sort)
       },
-      changeWidth(index,width){
+      changeWidth(index: string, width: number){
         this.$emit("changeWidth",index,width)
       }
     }
-  }
+  })
 </script>
 <style scoped>
   .placeholder{

@@ -20,10 +20,11 @@
     </div>
   </div>
 </template>
-<script>
+<script lang="ts">
+  import { defineComponent } from 'vue'
   import theme from '../../theme.json'
   
-  export default {
+  export default defineComponent({
     emits: ['resizeend', 'resize', 'resizestart', 'moveend', 'movestart', 'move', 'changeSort'],
     props: {
       redLine:     String,
@@ -40,28 +41,28 @@
       }
     },
     methods:{
-      delimiterMouseUp(event){
+      delimiterMouseUp(){
         this.$emit('resizeend')
         window.removeEventListener('mouseup',this.delimiterMouseUp)
         window.removeEventListener('mousemove',this.delimiterMouseMove)        
       },
-      delimiterMouseMove(event){
-        let delta = this.x - event.clientX
-        this.$emit('resize',this.width - delta)
+      delimiterMouseMove(event: MouseEvent){
+        const delta = this.x - event.clientX
+        this.$emit('resize',(this.width || 0) - delta)
         this.x = event.clientX
       },
-      delimiterMouseDown(event){
+      delimiterMouseDown(event: MouseEvent){
         this.$emit('resizestart')
         this.x = event.clientX
         window.addEventListener('mousemove',this.delimiterMouseMove)
         window.addEventListener('mouseup',this.delimiterMouseUp)
       },
-      buttonMouseDown(event){
+      buttonMouseDown(event: MouseEvent){
         this.x = event.clientX
         window.addEventListener('mousemove',this.buttonMouseMove)
         window.addEventListener('mouseup',this.buttonMouseUp)
       },
-      buttonMouseUp(event){
+      buttonMouseUp(){
         window.removeEventListener('mouseup',this.buttonMouseUp)
         window.removeEventListener('mousemove',this.buttonMouseMove)        
 
@@ -76,7 +77,7 @@
         
         this.mousemove = false
       },
-      buttonMouseMove(event){
+      buttonMouseMove(event: MouseEvent){
         if(!this.mousemove) this.$emit('movestart', event.clientX)
         this.mousemove = true
         this.$emit('move', event.clientX)
@@ -89,7 +90,7 @@
         return ''
       }
     }
-  }
+  })
 </script>
 <style scoped>
   .wrapper{

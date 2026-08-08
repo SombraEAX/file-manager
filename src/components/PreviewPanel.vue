@@ -50,7 +50,8 @@
     </div>
   </side-bar>
 </template>
-<script>
+<script lang="ts">
+  import { defineComponent } from 'vue'
   import theme from '../../theme.json'
   import SideBar from './SideBar.vue'
   import hljs from 'highlight.js'
@@ -58,7 +59,7 @@
   import DOMPurify from 'dompurify';
   import {marked} from 'marked';
   
-  function getFileType(filename) {
+  function getFileType(filename: string): { type: string | null; language: string | null } {
     const filenameLower = filename.toLowerCase();
     const dotIndex = filenameLower.lastIndexOf('.');
 
@@ -138,30 +139,30 @@
     return { type: type, language: language };
   }
 
-  export default {
+  export default defineComponent({
     emits: ['resize'],
     props: {
-      path: String,
+      path: { type: [String, null], default: null },
       width: Number
     },
     components: { SideBar },
     data(){			
       return {
         theme,
-        text:null,
-        type: null,
-        imageStyle: null
+        text: null as string | null,
+        type: null as string | null,
+        imageStyle: null as { backgroundImage: string } | null
       }
     },
     watch:{
       async path(path){
         if(!path){ this.text = null; this.type = null; this.imageStyle = null; return }
         if(path.startsWith('trash://')){ this.text = null; this.type = null; this.imageStyle = null; return }
-        let {type,language} = getFileType(path)
+        const {type,language} = getFileType(path)
 
         switch(this.type = type){
           case 'image':{
-            let dataUri = await window.electron.getImageDataUri(this.path)
+            const dataUri = await window.electron.getImageDataUri(path)
             this.imageStyle = {
               backgroundImage: `url("${dataUri}")`
             }
@@ -172,21 +173,21 @@
             break
           }
           case 'markdown':{
-            let source = await window.electron.readFile(path,'utf-8')            
-          	this.text = DOMPurify.sanitize(marked(source))
+            const source = await window.electron.readFile(path,'utf-8')            
+          	this.text = DOMPurify.sanitize(marked(source) as string)
           	break
           }
           case 'source':{
             console.log({language})
-            let source = await window.electron.readFile(path,'utf-8')            
-            this.text = hljs.highlight(source,{language}).value
+            const source = await window.electron.readFile(path,'utf-8')            
+            this.text = language ? hljs.highlight(source, { language }).value : hljs.highlightAuto(source).value
             break            
           }
         }
         
       }
     }
-  }
+  })
 </script>
 <style scoped>
   .image-preview-outer{

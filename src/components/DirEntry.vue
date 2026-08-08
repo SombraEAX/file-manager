@@ -11,7 +11,8 @@
   >
     <EntryIcon :size="entryIconSize" :is-dir="params.type === 'directory'" :type="entryType" />
     <div class="label"
-      v-for="(col,index) in columns" 
+      v-for="(col,index) in columns"
+      :key="col.colname"
       :style="columnStyle(col,index)"
       :data-colname="col.colname"
     >
@@ -31,20 +32,22 @@
     <div v-if="view==='table'" class="label" style="width:5px"></div>
   </div>
 </template>
-<script>
+<script lang="ts">
+  import { defineComponent, PropType } from 'vue'
+  import type { Column } from '../types/domains'
   import theme from '../../theme.json'
   import prettyBytes from 'pretty-bytes'
   import EntryIcon from './EntryIcon.vue'
 
   const homedir = `/home/${window.electron.getUserName()}`
 
-  let xdgCache = null
-  function getXdgDirs() {
+  let xdgCache: Record<string, string> | null = null
+  function getXdgDirs(): Record<string, string> {
     if (xdgCache) return xdgCache
     xdgCache = {}
     try {
       const content = window.electron.readFileSync(window.electron.join(homedir, '.config/user-dirs.dirs'), 'utf8')
-      const map = { XDG_DOWNLOAD_DIR:'downloads', XDG_DOCUMENTS_DIR:'documents', XDG_MUSIC_DIR:'music', XDG_PICTURES_DIR:'pictures', XDG_VIDEOS_DIR:'videos', XDG_DESKTOP_DIR:'desktop', XDG_PUBLICSHARE_DIR:'public' }
+      const map: Record<string, string> = { XDG_DOWNLOAD_DIR:'downloads', XDG_DOCUMENTS_DIR:'documents', XDG_MUSIC_DIR:'music', XDG_PICTURES_DIR:'pictures', XDG_VIDEOS_DIR:'videos', XDG_DESKTOP_DIR:'desktop', XDG_PUBLICSHARE_DIR:'public' }
       for (const line of content.split('\n')) {
         const m = line.match(/^(\w+)="?\$HOME\/(.+?)"?$/)
         if (m && map[m[1]]) xdgCache[m[2]] = map[m[1]]
@@ -53,19 +56,19 @@
     return xdgCache
   }
 
-  export default {
+  export default defineComponent({
     emits: ['openDir', 'openFile', 'contextMenu', 'click', 'confirmRename', 'cancelRename', 'update:renamingValue'],
     components: { EntryIcon },
     props: {
       view:String,
       address:String,
       columns:{
-        type: Array,
+        type: Array as PropType<Column[]>,
         default: () => []
       },
       params:{
         type: Object,
-        default: () => []
+        default: () => ({})
       },
       selected:Boolean,
       focused:Boolean,
@@ -74,7 +77,7 @@
       renamingValue:String,
       clipboardMode:String,
       clipboardPaths:{
-        type: Array,
+        type: Array as PropType<string[]>,
         default: () => []
       }
     },
@@ -84,12 +87,12 @@
       }
     },
     watch:{
-      renaming(val){
+      renaming(val: boolean){
         if(val){
           this.$nextTick(()=>{
-            let input = this.$refs.renameInput
+            const raw = this.$refs.renameInput as HTMLInputElement | HTMLInputElement[] | undefined
+            const input = Array.isArray(raw) ? raw[0] : raw
             if(input){
-              input = Array.isArray(input) ? input[0] : input
               input.focus()
               input.select()
             }
@@ -98,27 +101,27 @@
       }
     },
     computed:{
-      entryIconSize(){
-        return this.view === 'icons' ? Math.max(this.iconSize, 40) : 16
+      entryIconSize(): number {
+        return this.view === 'icons' ? Math.max(this.iconSize || 0, 40) : 16
       },
-      iconSizePx(){
+      iconSizePx(): string {
         return this.entryIconSize + 'px'
       },
-      entryType(){
+      entryType(): string {
         if (this.params.type === 'directory') return this.folderType(this.params.name)
         return this.params.ext || ''
       },
-      isCut(){
+      isCut(): boolean {
         if (this.clipboardMode !== 'cut' || !this.clipboardPaths.length) return false
-        const entryPath = this.params.path || window.electron.join(this.address, this.params.name)
+        const entryPath = this.params.path || window.electron.join(this.address || '', this.params.name)
         return this.clipboardPaths.includes(entryPath)
       }
     },
     methods: {
-      folderType(name) {
+      folderType(name: string): string {
         if (name.toLowerCase() === 'node_modules') return 'npm'
         if (this.address !== homedir) return ''
-        const nameMap = {
+        const nameMap: Record<string, string> = {
           'home': 'home', 'desktop': 'desktop', 'documents': 'documents',
           'downloads': 'downloads', 'music': 'music', 'pictures': 'pictures',
           'videos': 'videos', 'trash': 'trash', 'public': 'public',
@@ -133,29 +136,29 @@
         if(this.params.type === 'directory')
           this.$emit('openDir', this.params.path || this.params.name)
         else
-          this.$emit('openFile', this.params.path || window.electron.join(this.address, this.params.name))
+          this.$emit('openFile', this.params.path || window.electron.join(this.address || '', this.params.name))
       },
-      onContextMenu(e){
-        this.$emit('contextMenu', { path: this.params.path || window.electron.join(this.address, this.params.name), x: e.clientX, y: e.clientY });
+      onContextMenu(e: MouseEvent){
+        this.$emit('contextMenu', { path: this.params.path || window.electron.join(this.address || '', this.params.name), x: e.clientX, y: e.clientY });
       },
-      onClick($event){
+      onClick($event: MouseEvent){
         this.$emit('click', $event)
       },
-      columnStyle(col,index){
+      columnStyle(col: Column, index: number): { width: string; minWidth?: string } {
         if(this.view !== 'table') return {width:'auto'}
-        let w = (index ? col.width : col.width - 26) + 'px'
+        const w = (index ? col.width : col.width - 26) + 'px'
         return {width: w, minWidth: w}
       },
-      stringify(val,colname){
+      stringify(val: unknown, colname: string): string {
         if(val === undefined) return ''
         switch(colname){
-          case 'modified': return val.toISOString().replace('T',' ').replace(/:[^:]+$/,'')
-          case 'size':     return prettyBytes(val)
-          default: return val
+          case 'modified': return (val as Date).toISOString().replace('T',' ').replace(/:[^:]+$/,'')
+          case 'size':     return prettyBytes(val as number)
+          default: return String(val)
         }
       }
     }
-  }
+  })
 </script>
 <style scoped>
   .main{

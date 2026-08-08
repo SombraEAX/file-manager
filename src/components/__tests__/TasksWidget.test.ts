@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { mount } from '@vue/test-utils'
 import TasksWidget from '../TasksWidget.vue'
+import type { Task } from '../../stores/tasks'
 
 vi.mock('../../theme.json', () => ({
   default: {
@@ -16,17 +17,17 @@ vi.mock('../../theme.json', () => ({
 
 const mockEmit = vi.fn()
 vi.mock('../../stores/events', () => ({
-  emit: (...args) => mockEmit(...args),
+  emit: (...args: unknown[]) => mockEmit(...args),
 }))
 
-let mockTasks = []
+let mockTasks: Task[] = []
 vi.mock('../../stores/tasks', () => ({
   get tasks() { return mockTasks },
   removeTask: vi.fn(),
-  formatTime: (s) => s == null ? '' : s < 60 ? Math.ceil(s) + 's' : Math.ceil(s / 60) + 'm',
+  formatTime: (s: number | null) => s == null ? '' : s < 60 ? Math.ceil(s) + 's' : Math.ceil(s / 60) + 'm',
 }))
 
-function createMockTask(overrides) {
+function createMockTask(overrides: Partial<Task> = {}): Task {
   return {
     id: 1,
     name: 'Test task',
@@ -39,10 +40,10 @@ function createMockTask(overrides) {
     to: '/dest',
     data: { operation: 'copy' },
     ...overrides,
-  }
+  } as Task
 }
 
-async function mountWidgetOpen(tasks, options = {}) {
+async function mountWidgetOpen(tasks: Task[], options: { props?: Record<string, unknown> } = {}) {
   mockTasks = tasks
   const wrapper = mount(TasksWidget, {
     props: options.props || {},
@@ -51,8 +52,8 @@ async function mountWidgetOpen(tasks, options = {}) {
       stubs: { Teleport: true },
     },
   })
-  wrapper.vm.useMock = false
-  wrapper.vm.open = true
+  const vm = wrapper.vm as unknown as { open: boolean }
+  vm.open = true
   await wrapper.vm.$nextTick()
   return wrapper
 }

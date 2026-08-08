@@ -1,31 +1,54 @@
 {
   "name": "file-manager",
   "version": "0.1.0",
-  "main": "src/electron-main.js",
+  "main": "dist-electron/electron-main.js",
   "private": true,
   "scripts": {
-    "start": "vue-cli-service build && npx cross-env NODE_ENV=production electron .",
-    "serve": "concurrently \"vue-cli-service serve\" \"npx wait-on http://localhost:8081 && npx cross-env NODE_ENV=development electron .\"",
-    "build": "vue-cli-service build",
-    "lint": "vue-cli-service lint",
+    "build:electron": "tsc -p tsconfig.electron.json",
+    "typecheck": "vue-tsc --noEmit && tsc -p tsconfig.electron.json --noEmit",
+    "start": "npm run build:electron && vue-cli-service build && npx cross-env NODE_ENV=production electron .",
+    "serve": "npm run build:electron && concurrently \"vue-cli-service serve\" \"npx wait-on http://localhost:8081 && npx cross-env NODE_ENV=development electron .\"",
+    "build": "npm run build:electron && vue-cli-service build",
+    "lint": "eslint --ext .js,.ts,.vue src e2e",
     "test": "vitest run",
     "test:watch": "vitest",
-    "test:e2e": "npx playwright test --config=playwright.config.js",
-    "test:e2e:headed": "npx playwright test --config=playwright.config.js --headed"
+    "test:e2e": "npx playwright test --config=playwright.config.ts",
+    "test:e2e:headed": "npx playwright test --config=playwright.config.ts --headed"
   },
   "eslintConfig": {
     "root": true,
     "env": {
-      "node": true
+      "node": true,
+      "browser": true,
+      "es2020": true
     },
     "extends": [
       "plugin:vue/vue3-essential",
-      "eslint:recommended"
+      "eslint:recommended",
+      "@vue/typescript/recommended"
     ],
     "parserOptions": {
-      "parser": "@babel/eslint-parser"
+      "ecmaVersion": 2020
     },
-    "rules": {}
+    "rules": {
+      "no-mixed-spaces-and-tabs": "off",
+      "no-constant-condition": [
+        "error",
+        {
+          "checkLoops": false
+        }
+      ],
+      "no-empty": [
+        "error",
+        {
+          "allowEmptyCatch": true
+        }
+      ],
+      "@typescript-eslint/no-empty-function": "off",
+      "@typescript-eslint/no-var-requires": "off",
+      "@typescript-eslint/ban-types": "off",
+      "vue/no-reserved-keys": "off"
+    }
   },
   "browserslist": [
     "> 1%",
@@ -57,11 +80,21 @@
   },
   "devDependencies": {
     "@playwright/test": "^1.62.0",
+    "@types/node": "^20.19.43",
+    "@types/pretty-bytes": "^5.1.0",
+    "@typescript-eslint/eslint-plugin": "^5.62.0",
+    "@typescript-eslint/parser": "^5.62.0",
     "@vitejs/plugin-vue": "^6.0.8",
+    "@vue/cli-plugin-typescript": "^5.0.9",
+    "@vue/eslint-config-typescript": "^12.0.0",
     "@vue/test-utils": "^2.4.11",
     "concurrently": "^9.1.2",
+    "eslint": "^8.57.1",
+    "eslint-plugin-vue": "^9.33.0",
     "jsdom": "^30.0.0",
+    "typescript": "~4.9.5",
     "vitest": "^4.1.10",
+    "vue-tsc": "^1.0.24",
     "wait-on": "^8.0.3"
   }
 }

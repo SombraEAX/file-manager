@@ -22,10 +22,11 @@
     </div>
   </div>
 </template>
-<script>
+<script lang="ts">
+  import { defineComponent } from 'vue'
   import theme from '../../theme.json'
 
-  export default {
+  export default defineComponent({
     name: 'ZoomButton',
     emits: ['scaling'],
     props: {
@@ -43,14 +44,14 @@
       }
     },
     methods: {
-      onScale(ev){
-        this.$emit('scaling', Number(ev.target.value))
+      onScale(ev: Event){
+        this.$emit('scaling', Number((ev.target as HTMLInputElement).value))
       },
       closePopup(){
         this.open = false
       },
-      onClickOutside(e){
-        if(this.$el && !this.$el.contains(e.target)) this.open = false
+      onClickOutside(e: MouseEvent){
+        if(this.$el && !this.$el.contains(e.target as Node)) this.open = false
       }
     },
     mounted(){
@@ -59,7 +60,7 @@
     beforeUnmount(){
       document.removeEventListener('click', this.onClickOutside)
     }
-  }
+  })
 </script>
 <style scoped>
   .zoom-wrapper{

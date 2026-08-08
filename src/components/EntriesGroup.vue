@@ -9,10 +9,11 @@
     </div>
   </div>
 </template>
-<script>
-  import theme from '../../theme'
+<script lang="ts">
+  import { defineComponent } from 'vue'
+  import theme from '../../theme.json'
 
-  export default {
+  export default defineComponent({
     name:'EntriesGroup',
     props: {
       name:String,
@@ -48,7 +49,7 @@
     },
     methods: {
     }
-  }
+  })
 </script>
 <style scoped>
   .titlebar{

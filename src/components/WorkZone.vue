@@ -27,7 +27,7 @@
               <div class="group-header-icon" :data-expand="!isGroupCollapsed(item.group.name)"></div>
               <div class="group-header-title">{{ item.group.name }}</div>
             </div>
-            <template v-else-if="view === 'table'">
+            <template v-else-if="item.type === 'entry'">
               <DirEntry
                 :columns="visibleColumns"
                 :params="item.entry"
@@ -86,10 +86,13 @@
     </div>
   </div>
 </template>
-<script>
+<script lang="ts">
+  import { defineComponent } from 'vue'
   import theme from '../../theme.json'
   import TableHeader from './TableHeader.vue'
   import DirEntry from './DirEntry.vue'
+  import type { Group, Column, VirtualItem, VirtualEntry, VirtualRow, EntryRect, RubberBand, ContextMenuEvent } from '../types/domains'
+  import type { EntryStats } from '../types/ipc'
 
   const TABLE_ROW_H = 22
   const HEADER_H = 30
@@ -98,10 +101,9 @@
   const LIST_ROW_H = 22
   const LIST_GAP = 2
   const ICONS_GAP = 20
-  const ICONS_ROW_GAP = 4
   const ICONS_LABEL_H = 50
 
-  export default {
+  export default defineComponent({
     emits: ['openDir', 'openFile', 'changeSort', 'contextMenu', 'backgroundContextMenu', 'select', 'selectRange', 'confirmRename', 'cancelRename', 'update:renamingValue'],
     components:{
       TableHeader,
@@ -113,25 +115,25 @@
       address: String,
       view: String,
       groups: {
-        type: Array,
+        type: Array as () => Group[],
         default: () => []
       },
       isTrash: Boolean,
       iconSize: Number,
-      renamingPath: String,
+      renamingPath: { type: [String, null], default: null },
       renamingValue: String,
       clipboardMode: String,
       clipboardPaths: {
-        type: Array,
+        type: Array as () => string[],
         default: () => []
       },
-      focusedPath: String
+      focusedPath: { type: [String, null], default: null }
     },
     data(){
       return {
         width:100,
         theme,
-        files: [],
+        files: [] as string[],
         columns: [
           {
             caption:'Name',
@@ -161,10 +163,10 @@
             field: 'filetype',
             colname:'type'
           }
-        ],
+        ] as Column[],
         scrollTop: 0,
         viewportHeight: 600,
-        collapsedGroups: {},
+        collapsedGroups: {} as Record<string, boolean>,
         containerWidth: 300,
         dragSelecting: false,
         _justDragged: false,
@@ -174,7 +176,8 @@
         _lastClientX: 0,
         _lastClientY: 0,
         _autoScrollDir: 0,
-        rubberBand: null
+        rubberBand: null as RubberBand | null,
+        _ro: null as ResizeObserver | null
       }
     },
     computed:{
@@ -183,30 +186,31 @@
         return this.columns.filter(col => col.visible)
       },
       flatItems(){
-        const items = []
+        const items: VirtualItem[] = []
         const cols = this.itemsPerRow
         for (const group of this.groups) {
           if (group.name) {
-            items.push({ type: 'header', group, height: HEADER_H, key: 'h-' + group.name })
+            items.push({ type: 'header', group, height: HEADER_H, key: 'h-' + group.name, offset: 0 })
           }
           if (group.name && this.collapsedGroups[group.name]) continue
           if (this.view === 'table') {
             for (const entry of group.entries) {
-              const p = entry.path || window.electron.join(this.address, entry.name)
-              items.push({ type: 'entry', entry, group, height: TABLE_ROW_H, key: 't-' + group.name + '-' + (entry.path || entry.name), path: p })
+              const p = entry.path || window.electron.join(this.address || '', entry.name)
+              items.push({ type: 'entry', entry, group, height: TABLE_ROW_H, key: 't-' + (group.name || '') + '-' + (entry.path || entry.name), path: p, offset: 0 })
             }
           } else {
             const rowH = this.view === 'list' ? LIST_ROW_H : (Math.max(this.iconSize || 120, 40) + ICONS_LABEL_H + 21)
             for (let i = 0; i < group.entries.length; i += cols) {
               const chunk = group.entries.slice(i, i + cols)
-              const paths = chunk.map(e => e.path || window.electron.join(this.address, e.name))
+              const paths = chunk.map(e => e.path || window.electron.join(this.address || '', e.name))
               items.push({
                 type: 'row',
                 entries: chunk,
                 paths,
                 group,
                 height: rowH,
-                key: 'r-' + group.name + '-' + i
+                key: 'r-' + (group.name || '') + '-' + i,
+                offset: 0
               })
             }
           }
@@ -266,17 +270,18 @@
         return { width: '150px', flexShrink: 0 }
       },
       entryRects(){
-        const rects = []
+        const rects: EntryRect[] = []
         for (const item of this.flatItems) {
           if (item.type === 'header') continue
           if (this.view === 'table') {
-            rects.push({ path: item.path, y: item.offset, height: item.height, x: 0, width: this.containerWidth })
+            rects.push({ path: (item as VirtualEntry).path, y: item.offset, height: item.height, x: 0, width: this.containerWidth })
           } else if (item.type === 'row') {
+            const row = item as VirtualRow
             const entryW = this.view === 'icons' ? Math.max(this.iconSize || 120, 120) + 20 : 150
             const gap = this.view === 'icons' ? ICONS_GAP : LIST_GAP
             const padX = this.view === 'icons' ? 2 : 8
-            for (let i = 0; i < item.entries.length; i++) {
-              rects.push({ path: item.paths[i], y: item.offset, height: item.height, x: padX + i * (entryW + gap), width: entryW })
+            for (let i = 0; i < row.entries.length; i++) {
+              rects.push({ path: row.paths[i], y: item.offset, height: item.height, x: padX + i * (entryW + gap), width: entryW })
             }
           }
         }
@@ -298,13 +303,14 @@
       }
     },
     methods: {
-      isGroupCollapsed(name){
-        return !!this.collapsedGroups[name]
+      isGroupCollapsed(name: string | null): boolean {
+        return !!this.collapsedGroups[name || '']
       },
-      toggleGroup(name){
-        this.collapsedGroups = { ...this.collapsedGroups, [name]: !this.collapsedGroups[name] }
+      toggleGroup(name: string | null): void {
+        const key = name || ''
+        this.collapsedGroups = { ...this.collapsedGroups, [key]: !this.collapsedGroups[key] }
       },
-      lowerBound(arr, val){
+      lowerBound(arr: VirtualItem[], val: number): number {
         let lo = 0, hi = arr.length
         while (lo < hi) {
           const mid = (lo + hi) >> 1
@@ -313,9 +319,9 @@
         }
         return lo
       },
-      onMouseDown(event){
+      onMouseDown(event: MouseEvent): void {
         if (event.button !== 0) return
-        if (event.target.closest('[data-variant]')) return
+        if ((event.target as Element).closest('[data-variant]')) return
         this._justDragged = false
         this._dragAdditive = event.ctrlKey || event.metaKey
         this._dragStartClientX = event.clientX
@@ -326,15 +332,15 @@
         document.addEventListener('mousemove', this.onDragMove)
         document.addEventListener('mouseup', this.onDragEnd)
       },
-      onDragMove(event){
+      onDragMove(event: MouseEvent): void {
         if (!this.dragSelecting) return
         this._lastClientX = event.clientX
         this._lastClientY = event.clientY
         this._autoScroll()
         this._updateDragSelection()
       },
-      _autoScroll(){
-        const wrapRect = this.$refs.scrollWrap.getBoundingClientRect()
+      _autoScroll(): void {
+        const wrapRect = (this.$refs.scrollWrap as HTMLElement).getBoundingClientRect()
         const MARGIN = 50
         let dir = 0
         let dist = 0
@@ -354,19 +360,19 @@
         this._autoScrollDir = dir
         if (!dir) return
         const speed = Math.min(40, Math.max(5, dist / 3))
-        const inner = this.$refs.inner
+        const inner = this.$refs.inner as HTMLElement
         inner.scrollTop += dir * speed
         this.scrollTop = inner.scrollTop
       },
-      _updateDragSelection(){
-        const wrapRect = this.$refs.scrollWrap.getBoundingClientRect()
+      _updateDragSelection(): void {
+        const wrapRect = (this.$refs.scrollWrap as HTMLElement).getBoundingClientRect()
         const vx = Math.min(this._dragStartClientX, this._lastClientX) - wrapRect.left
         const vy = Math.min(this._dragStartClientY, this._lastClientY) - wrapRect.top
         const vw = Math.abs(this._lastClientX - this._dragStartClientX)
         const vh = Math.abs(this._lastClientY - this._dragStartClientY)
         this.rubberBand = { vx, vy, vw, vh }
 
-        const body = this.$refs.virtualBody
+        const body = this.$refs.virtualBody as HTMLElement
         const bodyRect = body.getBoundingClientRect()
         const x1 = Math.min(this._dragStartClientX, this._lastClientX) - bodyRect.left
         const x2 = Math.max(this._dragStartClientX, this._lastClientX) - bodyRect.left
@@ -380,7 +386,7 @@
           .map(r => r.path)
         this.$emit('selectRange', paths, this._dragAdditive)
       },
-      onDragEnd(){
+      onDragEnd(): void {
         this.dragSelecting = false
         this._justDragged = true
         this.rubberBand = null
@@ -388,74 +394,74 @@
         document.removeEventListener('mousemove', this.onDragMove)
         document.removeEventListener('mouseup', this.onDragEnd)
       },
-      select(entry, event){
-        let pathname = entry.path || window.electron.join(this.address, entry.name)
+      select(entry: EntryStats, event: MouseEvent): void {
+        const pathname = entry.path || window.electron.join(this.address || '', entry.name)
         this.$emit('select', { path: pathname, ctrl: event.ctrlKey || event.metaKey, shift: event.shiftKey })
       },
-      deselectAll(){
+      deselectAll(): void {
         if (this._justDragged) return
         this.$emit('select', null)
       },
-      openDir(dir){
+      openDir(dir: string): void {
         this.$emit('openDir',dir)
       },
-      openFile(path){
+      openFile(path: string): void {
         this.$emit('openFile', path)
       },
-      onContextMenu(e){
+      onContextMenu(e: ContextMenuEvent): void {
         this.$emit('contextMenu', e);
       },
-      onBackgroundContextMenu(event){
+      onBackgroundContextMenu(event: MouseEvent): void {
         this.$emit('backgroundContextMenu', { x: event.clientX, y: event.clientY })
       },
-      changeSort(col,sort){
+      changeSort(col: string, sort: string): void {
         this.$emit('changeSort',col,sort)
       },
-      changeWidth(index,width){
+      changeWidth(index: number, width: number): void {
         this.columns[index].width = width
       },
-      toggleColumnVisible(index){
+      toggleColumnVisible(index: number): void {
         this.columns[index].visible = !this.columns[index].visible
       },
-      moveColumn(fromIndex,toIndex){
+      moveColumn(fromIndex: number, toIndex: number): void {
         if(fromIndex>toIndex){
           const [element] = this.columns.splice(fromIndex, 1)
           this.columns.splice(toIndex, 0, element)
         }else{
-          let element = this.columns[fromIndex]
+          const element = this.columns[fromIndex]
           this.columns.splice(toIndex, 0, element)
           this.columns.splice(fromIndex, 1)
         }
       },
-      onScroll(){
-        this.scrollTop = this.$refs.inner.scrollTop
+      onScroll(): void {
+        this.scrollTop = (this.$refs.inner as HTMLElement).scrollTop
       },
-      updateViewport(){
-        const el = this.$refs.inner
+      updateViewport(): void {
+        const el = this.$refs.inner as HTMLElement | undefined
         if (!el) return
         this.viewportHeight = el.clientHeight
         this.containerWidth = el.clientWidth
       },
-      scrollToPath(path){
+      scrollToPath(path: string): void {
         if (!path) return
         for (const group of this.groups) {
           for (const entry of group.entries) {
-            const p = entry.path || window.electron.join(this.address, entry.name)
+            const p = entry.path || window.electron.join(this.address || '', entry.name)
             if (p !== path) continue
-            if (this.collapsedGroups[group.name]) {
-              this.collapsedGroups = { ...this.collapsedGroups, [group.name]: false }
+            if (this.collapsedGroups[group.name || '']) {
+              this.collapsedGroups = { ...this.collapsedGroups, [group.name || '']: false }
             }
             break
           }
         }
         const items = this.flatItems
-        let item = null
+        let item: VirtualEntry | VirtualRow | null = null
         for (const it of items) {
           if (it.type === 'entry' && it.path === path) { item = it; break }
           if (it.type === 'row' && it.paths && it.paths.includes(path)) { item = it; break }
         }
         if (!item) return
-        const el = this.$refs.inner
+        const el = this.$refs.inner as HTMLElement | undefined
         const viewport = this.viewportHeight || (el ? el.clientHeight : 600)
         const itemTop = item.offset
         const itemBottom = item.offset + item.height
@@ -470,12 +476,12 @@
     mounted(){
       this.updateViewport()
       this._ro = new ResizeObserver(() => requestAnimationFrame(() => this.updateViewport()))
-      this._ro.observe(this.$refs.inner)
+      this._ro.observe(this.$refs.inner as Element)
     },
     beforeUnmount(){
       this._ro?.disconnect()
     }
-  }
+  })
 </script>
 <style scoped>
   .outer{

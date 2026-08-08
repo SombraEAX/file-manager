@@ -4,16 +4,17 @@
   </div>
 </template>
 
-<script>
+<script lang="ts">
+import { defineComponent } from 'vue'
 import theme from '../../theme.json';
-export default {
+export default defineComponent({
   props: {
     modelValue: Boolean
   },
   data() {
     return { theme }
   }
-}
+})
 </script>
 
 <style scoped>

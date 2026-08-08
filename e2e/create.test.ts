@@ -1,7 +1,7 @@
-const { test, expect, afterEach } = require('@playwright/test')
-const path = require('path')
-const fsp = require('fs/promises')
-const { launchApp, createTempDir, fileExists } = require('./helpers')
+import { test, expect, afterEach } from '@playwright/test'
+import * as path from 'path'
+import * as fsp from 'fs/promises'
+import { launchApp, createTempDir, fileExists } from './helpers'
 
 let app, page
 let tempDirs = []
@@ -46,10 +46,6 @@ async function replyToContextMenu(index) {
       event.reply('show-menu-reply', idx)
     })
   }, index)
-}
-
-function folderRow(name) {
-  return page.locator('div[data-variant]').filter({ hasText: name }).first()
 }
 
 async function backgroundRightClick() {

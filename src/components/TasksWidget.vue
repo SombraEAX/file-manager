@@ -123,18 +123,20 @@
   </div>
 </template>
 
-<script>
+<script lang="ts">
+import { defineComponent } from 'vue'
+import type { Task } from '../stores/tasks'
 import theme from '../../theme.json'
-import { tasks, removeTask, formatTime } from '../stores/tasks'
+import { tasks, formatTime } from '../stores/tasks'
 import { emit } from '../stores/events'
 
-export default {
+export default defineComponent({
   data() {
     return {
       open: false,
       theme,
       hideInactive: false,
-      infoTask: null,
+      infoTask: null as Task | null,
     }
   },
   computed: {
@@ -161,8 +163,8 @@ export default {
       if (!inFlight.length) return 0
       return inFlight.reduce((s, t) => s + (t.progress || 0), 0) / inFlight.length
     },
-    eta() {
-      const times = this.activeTasks.filter(t => t.timeRemaining != null).map(t => t.timeRemaining)
+    eta(): string {
+      const times = this.activeTasks.map(t => t.timeRemaining).filter((t): t is number => t != null)
       if (!times.length) return ''
       return formatTime(Math.min(...times))
     },
@@ -180,7 +182,7 @@ export default {
   },
   methods: {
     formatTime,
-    formatSize(bytes) {
+    formatSize(bytes?: number): string {
       if (!bytes) return ''
       if (bytes < 1024) return '(' + bytes + ' B)'
       if (bytes < 1048576) return '(' + (bytes / 1024).toFixed(1) + ' KB)'
@@ -188,16 +190,16 @@ export default {
       return '(' + (bytes / 1073741824).toFixed(1) + ' GB)'
     },
     emit,
-    isFinished(task) {
+    isFinished(task: Task): boolean {
       return task.status === 'done' || task.status === 'error' || task.status === 'cancelled' || task.status === 'partial' || task.status === 'undone'
     },
-    canUndo(task) {
-      return task.data && task.data.operation && task.data.operation !== 'trash-delete'
+    canUndo(task: Task): boolean {
+      return !!(task.data && task.data.operation && task.data.operation !== 'trash-delete')
     },
-    isCancelling(task) {
+    isCancelling(task: Task): boolean {
       return task.status === 'cancelling'
     },
-    taskIcon(task) {
+    taskIcon(task: Task): string {
       const op = task.data && task.data.operation
       switch(op) {
         case 'copy': return '&#xf0c5;'
@@ -209,7 +211,7 @@ export default {
         default: return '&#xf019;'
       }
     },
-    taskSpeed(task) {
+    taskSpeed(task: Task): string {
       if (task.status === 'paused') return 'Paused'
       if (task.status === 'counting') return ''
       if (task.status === 'cancelling') return ''
@@ -226,7 +228,7 @@ export default {
       if (bytesPerSec < 1073741824) return (bytesPerSec / 1048576).toFixed(1) + ' MB/s'
       return (bytesPerSec / 1073741824).toFixed(1) + ' GB/s'
     },
-    statusLabel(task) {
+    statusLabel(task: Task): string {
       switch(task.status) {
         case 'active': return 'In progress'
         case 'paused': return 'Paused'
@@ -243,11 +245,11 @@ export default {
     closePopup() {
       this.open = false
     },
-    showInfo(task) {
+    showInfo(task: Task) {
       this.infoTask = task
     },
-    onClickOutside(e) {
-      if (this.$el && !this.$el.contains(e.target)) {
+    onClickOutside(e: MouseEvent) {
+      if (this.$el && !this.$el.contains(e.target as Node)) {
         this.open = false
       }
     }
@@ -258,7 +260,7 @@ export default {
   beforeUnmount() {
     document.removeEventListener('click', this.onClickOutside)
   }
-}
+})
 </script>
 
 <style scoped>

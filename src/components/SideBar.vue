@@ -11,14 +11,15 @@
     <div class="line" @mousedown="mousedown"></div>
   </div>
 </template>
-<script>
+<script lang="ts">
+  import { defineComponent } from 'vue'
   import theme from '../../theme.json'
-  export default {
+  export default defineComponent({
     props: {
       position: {
         type: String,
         default: 'left',
-        validator: (value) => ['left', 'right'].includes(value)
+        validator: (value: string) => ['left', 'right'].includes(value)
       },
       width: {
         type: Number,
@@ -33,14 +34,14 @@
       return {theme, isResizing: false, startX: 0, initialWidth: 0}
     },
     methods: {
-      mousedown(ev) {
+      mousedown(ev: MouseEvent) {
         this.isResizing = true;
         this.startX = ev.clientX;
         this.initialWidth = this.width;
         document.addEventListener('mousemove', this.mousemove);
         document.addEventListener('mouseup', this.mouseup);
       },
-      mousemove(ev) {
+      mousemove(ev: MouseEvent) {
         if (!this.isResizing) return;
 
         let delta = ev.clientX - this.startX;
@@ -62,7 +63,7 @@
         document.removeEventListener('mouseup', this.mouseup);
       },
     }
-  }
+  })
 </script>
 <style scoped>
   .sidebar{

@@ -10,23 +10,25 @@
     </div>
   </div>
 </template>
-<script>
+<script lang="ts">
+  import { defineComponent } from 'vue'
+  import type { MenuItemSpec } from '../types/ipc'
   import theme from '../../theme.json'
 
-  let clickHandler
+  let clickHandler: ((id: string) => void) | null = null
 
   const { ipcRenderer } = window.electron
 
-  ipcRenderer.on('show-menu-bar-submenu-reply', (_,id) => clickHandler && clickHandler(id))
+  ipcRenderer.on('show-menu-bar-submenu-reply', (_, id) => clickHandler && clickHandler(id))
 
-  export default {
+  export default defineComponent({
     name: 'MenuBar',
 
     props: {
       view:       String,
       sortColumn: String,
       sortOrder:  String,
-      groupBy:    String,
+      groupBy: { type: [String, null], default: null },
       isDev:      Boolean,
       autohideLeftPanel: Boolean,
       autohideTopPanel: Boolean,
@@ -72,16 +74,16 @@
     },
    
     methods: {
-      openMenu(menuItem, event){
-        let rect = event.currentTarget.getBoundingClientRect()
+      openMenu(menuItem: MenuItemSpec, event: MouseEvent){
+        const rect = (event.currentTarget as HTMLElement).getBoundingClientRect()
         ipcRenderer.send('show-menu-bar-submenu', {
-          items: menuItem.submenu,
+          items: menuItem.submenu || [],
           x: rect.x,
           y: rect.y + rect.height
         })
       },
 
-      openRootMenu(x, y){
+      openRootMenu(x: number, y: number){
         ipcRenderer.send('show-menu-bar-submenu', {
           items: this.items,
           x,
@@ -89,7 +91,7 @@
         })
       },
 
-      itemClick(id){
+      itemClick(id: string){
         switch(id){
           case 'icons':
           case 'table':
@@ -101,7 +103,7 @@
           case 'sort-by-type':
           case 'sort-by-modified':
           case 'sort-by-size': {
-            let field = id.split('-')[2]
+            const field = id.split('-')[2]
             this.$emit('changeSortColumn', field)
             break
           }
@@ -114,7 +116,7 @@
           case 'group-by-type':
           case 'group-by-modified':
           case 'group-by-size': {
-            let field = id.split('-')[2]
+            const field = id.split('-')[2]
             this.$emit('changeGroup', field)          
             break
           }
@@ -207,7 +209,7 @@
     },
 
     computed: {
-      items(){
+      items(): MenuItemSpec[] {
         return [
           {
             label: 'File',
@@ -434,7 +436,7 @@
         ]
       }
     }
-  }
+  })
 </script>
 <style scoped>
   .menu-bar{

@@ -1,8 +1,8 @@
-const { test, expect, afterEach } = require('@playwright/test')
-const path = require('path')
-const fsp = require('fs/promises')
-const os = require('os')
-const { launchApp, createTempDir, createTempFiles, fileExists } = require('./helpers')
+import { test, expect, afterEach } from '@playwright/test'
+import * as path from 'path'
+import * as fsp from 'fs/promises'
+import * as os from 'os'
+import { launchApp, createTempDir, createTempFiles, fileExists } from './helpers'
 
 let app, page
 let tempDirs = []

@@ -38,7 +38,8 @@
     </div>
   </span>
 </template>
-<script>
+<script lang="ts">
+  import { defineComponent, PropType } from 'vue'
   import filetypes from '../../filetypes.json'
   const imageTypes = new Set(filetypes.image)
   const audioTypes = new Set(filetypes.audio)
@@ -47,7 +48,7 @@
   const documentTypes = new Set(filetypes.document)
   const archiveTypes = new Set(['zip','rar','7z','tar','gz','bz2','xz','zst','tgz','lz','lzma','arj','cab','z'])
 
-  export default {
+  export default defineComponent({
     props: {
       size: {
         type: Number,
@@ -56,17 +57,17 @@
       isDir: Boolean,
       type: String,
       preview: {
-        type: Array,
+        type: Array as PropType<string[]>,
         default: () => [],
       },
     },
     computed: {
-      bgColor() {
+      bgColor(): string {
         if (this.isDir) {
           if (this.type === 'root') return '#a0a0a0'
           return '#ffc966'
         }
-        const map = {
+        const map: Record<string, string> = {
           txt: '#ccc',
           pdf: '#e74c3c',
           js: '#d4a017',
@@ -131,7 +132,7 @@
         return '#fff'
       },
       hasFold() {
-        return documentTypes.has(this.type) && !this.officeLetter && this.type !== 'pdf' && this.type !== 'xml'
+        return !!this.type && documentTypes.has(this.type) && !this.officeLetter && this.type !== 'pdf' && this.type !== 'xml'
       },
       hasIcon() {
         return !!this.iconChar
@@ -149,7 +150,8 @@
         if (this.hasIcon) return Math.round(this.size * 0.68)
         return Math.round(this.size * 0.3)
       },
-      officeLetter() {
+      officeLetter(): string {
+        if (!this.type) return ''
         const word = new Set(['doc','docx','dot','dotx','rtf','odt'])
         const xls = new Set(['xls','xlsx','xlsm','csv','ods'])
         const ppt = new Set(['ppt','pptx','pps','ppsx','odp'])
@@ -158,8 +160,8 @@
         if (ppt.has(this.type)) return 'P'
         return ''
       },
-      iconChar() {
-        const map = {
+      iconChar(): string {
+        const map: Record<string, string> = {
           desktop: '\u{f4a9}',
           documents: '\u{f018f}',
           downloads: '\u{f01da}',
@@ -214,7 +216,7 @@
         return ''
       },
     },
-  }
+  })
 </script>
 <style>
   @font-face{

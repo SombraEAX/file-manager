@@ -3,7 +3,7 @@
     <div class="text"><span class="icon-item"></span> {{ items }}</div>
     <div class="text"><span class="icon-file"></span> {{ files }}</div>
     <div class="text"><span class="icon-folder"></span> {{ dirs }}</div>
-    <div class="text" v-if="selected">{{ selected }} items selected {{ prettyBytes(size) }}</div>
+    <div class="text" v-if="selected">{{ selected }} items selected {{ prettyBytes(size || 0) }}</div>
     <div style="flex: 1"></div>
     <input
       type="range"
@@ -33,11 +33,12 @@
   </div>
 </template>
 
-<script>
+<script lang="ts">
+  import { defineComponent } from 'vue'
   import prettyBytes from 'pretty-bytes'
-  import theme from '../../theme'
+  import theme from '../../theme.json'
 
-  export default {
+  export default defineComponent({
     emits: ['changeView', 'scaling'],
     name: 'StatusBar',
     props: {
@@ -66,7 +67,7 @@
         this.$emit('scaling', this.localScale); 
       },
     },
-  };
+  });
 </script>
 <style scoped>
   .status-bar{

@@ -1,10 +1,40 @@
 import { reactive } from 'vue'
 
-export const tasks = reactive([])
+export interface TaskData {
+  operation?: string
+  errorLog?: string[]
+  originalPaths?: string[]
+  destDir?: string
+  status?: string
+  progress?: number
+  copiedPaths?: string[]
+  failedPaths?: string[]
+  trashNames?: string[]
+  parentDir?: string
+  batch?: string[]
+  done?: number
+  id?: number
+  type?: string
+}
+
+export interface Task {
+  id: number
+  name: string
+  progress: number
+  status: string
+  timeRemaining: number | null
+  startedAt: number
+  data: TaskData
+  totalSize?: number
+  from?: string
+  to?: string
+}
+
+export const tasks = reactive<Task[]>([])
 let nextId = 0
 
-export function createTask(name, data = {}) {
-  const task = reactive({
+export function createTask(name: string, data: TaskData = {}): Task {
+  const task = reactive<Task>({
     id: ++nextId,
     name,
     progress: 0,
@@ -17,7 +47,7 @@ export function createTask(name, data = {}) {
   return task
 }
 
-export function updateTask(id, updates) {
+export function updateTask(id: number, updates: Partial<Task>): void {
   const task = tasks.find(t => t.id === id)
   if (!task) return
   Object.assign(task, updates)
@@ -28,7 +58,7 @@ export function updateTask(id, updates) {
   }
 }
 
-export function cancelTask(id) {
+export function cancelTask(id: number): void {
   const task = tasks.find(t => t.id === id)
   if (task) {
     task.status = 'cancelled'
@@ -36,29 +66,29 @@ export function cancelTask(id) {
   }
 }
 
-export function pauseTask(id) {
+export function pauseTask(id: number): void {
   const task = tasks.find(t => t.id === id)
   if (task) {
     task.status = 'paused'
   }
 }
 
-export function resumeTask(id) {
+export function resumeTask(id: number): void {
   const task = tasks.find(t => t.id === id)
   if (task) {
     task.status = 'active'
   }
 }
 
-export function removeTask(id) {
+export function removeTask(id: number): void {
   const idx = tasks.findIndex(t => t.id === id)
   if (idx !== -1) tasks.splice(idx, 1)
 }
 
-export function createThrottledRunner() {
-  const busy = new Set()
-  let queue = Promise.resolve()
-  return function throttledRunner(key, run) {
+export function createThrottledRunner(): (key: string | number, run: () => Promise<void>) => boolean {
+  const busy = new Set<string | number>()
+  let queue: Promise<void> = Promise.resolve()
+  return function throttledRunner(key: string | number, run: () => Promise<void>): boolean {
     if (busy.has(key)) return false
     busy.add(key)
     queue = Promise.resolve(queue).then(async () => {
@@ -74,7 +104,7 @@ export function createThrottledRunner() {
   }
 }
 
-export function formatTime(seconds) {
+export function formatTime(seconds: number | null | undefined): string {
   if (seconds == null) return ''
   if (seconds < 60) return Math.ceil(seconds) + 's'
   if (seconds < 3600) return Math.ceil(seconds / 60) + 'm'

@@ -78,7 +78,7 @@
       <div class="items-outer editing-dropdown" v-if="isEditing && !isSearch">
       <div class="items-inner">
       <div class="items">
-        <div class="row item" v-for="dir in dirItems" @click.stop="dirItemClick(dir)">
+        <div class="row item" v-for="dir in dirItems" :key="dir" @click.stop="dirItemClick(dir)">
           <EntryIcon :size="16" is-dir :type="folderType(dir)" />
           <div class="label">{{dir}}</div>
         </div>
@@ -126,6 +126,7 @@
       <div class="items">
         <div
           v-for="dir in dropdownItems"
+          :key="dir"
           class="row item"
           @click.stop="dropdownNavigate(dir)"
         >
@@ -139,21 +140,22 @@
   </div>
 </template>
 
-<script>
+<script lang="ts">
+import { defineComponent } from 'vue'
+import type { EntryStats } from '../types/ipc'
 import theme from '../../theme.json';
 import DropDown from './DropDown.vue';
 import AppCheckbox from './AppCheckbox.vue';
 import EntryIcon from './EntryIcon.vue';
-const { ipcRenderer } = window.electron
 const homedir = `/home/${window.electron.getUserName()}`
 
-let xdgCache = null
-function getXdgDirs() {
+let xdgCache: Record<string, string> | null = null
+function getXdgDirs(): Record<string, string> {
   if (xdgCache) return xdgCache
   xdgCache = {}
   try {
     const content = window.electron.readFileSync(window.electron.join(homedir, '.config/user-dirs.dirs'), 'utf8')
-    const map = { XDG_DOWNLOAD_DIR:'downloads', XDG_DOCUMENTS_DIR:'documents', XDG_MUSIC_DIR:'music', XDG_PICTURES_DIR:'pictures', XDG_VIDEOS_DIR:'videos', XDG_DESKTOP_DIR:'desktop', XDG_PUBLICSHARE_DIR:'public' }
+    const map: Record<string, string> = { XDG_DOWNLOAD_DIR:'downloads', XDG_DOCUMENTS_DIR:'documents', XDG_MUSIC_DIR:'music', XDG_PICTURES_DIR:'pictures', XDG_VIDEOS_DIR:'videos', XDG_DESKTOP_DIR:'desktop', XDG_PUBLICSHARE_DIR:'public' }
     for (const line of content.split('\n')) {
       const m = line.match(/^(\w+)="?\$HOME\/(.+?)"?$/)
       if (m && map[m[1]]) xdgCache[m[2]] = map[m[1]]
@@ -162,7 +164,7 @@ function getXdgDirs() {
   return xdgCache
 }
 
-export default {
+export default defineComponent({
   components: { DropDown, AppCheckbox, EntryIcon },
   props: {
     address: String,
@@ -175,32 +177,32 @@ export default {
   },
   data() {
     return {
-      tmp: this.address,
+      tmp: this.address || '',
       focused:false,
       theme,
 
       searchOptions: ['Filenames', 'Content', 'Filenames and content'],
       filetypesOptions: ['Documents', 'Code', 'Images', 'Video', 'Audio'],
       isEditing: false,
-      openDropdownIdx: null,
-      dropdownItems: [],
+      openDropdownIdx: null as number | null,
+      dropdownItems: [] as string[],
       hasClipboardText: false,
     selectedSearchOption: 'Filenames',
     selectedLocation: this.address || homedir,
     browseInProgress: false,
-      selectedFiletypes: [],
+      selectedFiletypes: [] as string[],
       includeHidden: false,
       includeRegExp: false,
       searchQuery: '',
       isExecutingSearch: false,
       isSearchResults: false,
       searchHadResults: false,
-      searchTimer: null,
+      searchTimer: null as ReturnType<typeof setTimeout> | null,
       dropdownScrolled: false,
       wasSearchMode: false,
-      searchId: 0,
-      searchResultsAcc: [],
-      _dirItems: []
+      searchId: '',
+      searchResultsAcc: [] as EntryStats[],
+      _dirItems: [] as string[]
     };
   },
   computed: {
@@ -209,11 +211,11 @@ export default {
         { label: 'Current directory', value: this.address },
         { label: 'Root directory', value: '/' },
         { label: 'Home directory', value: homedir },
-        { label: 'Browse...', value: null }
+        { label: 'Browse...', value: '__browse__' }
       ];
     },
     isSearch(){
-      let text = this.tmp.trim()
+      const text = this.tmp.trim()
       if(!text) return false
       return text[0] !== '/' && !text.includes('://')
     },
@@ -222,7 +224,7 @@ export default {
     },
     breadcrumbParts() {
       if(this.isTrash) return []
-      let breadcrumbs = this.tmp ? this.tmp.split('/').filter(part => part) : [];
+      const breadcrumbs = this.tmp ? this.tmp.split('/').filter(part => part) : [];
       breadcrumbs.unshift()
       return breadcrumbs
     },
@@ -238,8 +240,8 @@ export default {
     }
   },
   methods: {
-    folderType(name) {
-      const nameMap = {
+    folderType(name: string): string {
+      const nameMap: Record<string, string> = {
         'home': 'home', 'desktop': 'desktop', 'documents': 'documents',
         'downloads': 'downloads', 'music': 'music', 'pictures': 'pictures',
         'videos': 'videos', 'trash': 'trash', 'public': 'public',
@@ -250,25 +252,25 @@ export default {
       const xdg = getXdgDirs()
       return xdg[name] || ''
     },
-    dirItemClick(dir) {
-      this.tmp = window.electron.join(this.address, dir);
+    dirItemClick(dir: string) {
+      this.tmp = window.electron.join(this.address || '', dir);
       this.gotopath();
     },
     copyPath(){
-      window.electron.ipcRenderer.send('copy-to-clipboard',this.address)
+      window.electron.ipcRenderer.send('copy-to-clipboard', this.address || '')
     },
     pasteAndGo(){
       this.tmp = window.electron.clipboard.readText();
       this.gotopath();
     },
-    onDropdownScroll(e) {
-      this.dropdownScrolled = e.target.scrollTop > 0;
+    onDropdownScroll(e: Event) {
+      this.dropdownScrolled = (e.target as HTMLElement).scrollTop > 0;
     },
     focus() {
-      this.$refs.addressInput.select();
+      (this.$refs.addressInput as HTMLInputElement | undefined)?.select();
     },
     blur() {
-      this.$refs.addressInput.blur();
+      (this.$refs.addressInput as HTMLInputElement | undefined)?.blur();
     },
     enableEdit() {
       this.dropdownScrolled = false;
@@ -299,7 +301,7 @@ export default {
         this.isExecutingSearch = true;
         this.isSearchResults = this.searchHadResults;
       }else{
-        this.tmp = this.address;
+        this.tmp = this.address || '';
       }
       this.isEditing = false;
     },
@@ -317,27 +319,27 @@ export default {
       this.tmp = "/";
       this.$emit("jump", "/");
     },
-    goToSegment(index) {
+    goToSegment(index: number) {
       this.closeDropdown();
       if(this.isTrash){
         this.tmp = "trash://";
         this.$emit("jump", "trash://");
         return;
       }
-      let newPath = '/' + this.breadcrumbParts.slice(0, index + 1).join('/');
+      const newPath = '/' + this.breadcrumbParts.slice(0, index + 1).join('/');
       this.tmp = newPath;
       this.$emit("jump", newPath); 
     },
-    async toggleDropdown(idx) {
+    async toggleDropdown(idx: number) {
       this.dropdownScrolled = false;
       if (this.openDropdownIdx === idx) {
         this.closeDropdown();
         return;
       }
-      let path = idx === -1 ? '/' : '/' + this.breadcrumbParts.slice(0, idx + 1).join('/');
+      const path = idx === -1 ? '/' : '/' + this.breadcrumbParts.slice(0, idx + 1).join('/');
       this.openDropdownIdx = idx;
       try {
-        let items = await window.electron.readdir(path)
+        const items = await window.electron.readdir(path)
         this.dropdownItems = items.filter(item => item.type === 'directory').map(item => item.name)
       } catch(e) {
         this.dropdownItems = []
@@ -347,12 +349,12 @@ export default {
     dropdownOutsideHandler() {
       this.closeDropdown();
     },
-    dropdownNavigate(dir) {
-      let path;
+    dropdownNavigate(dir: string) {
+      let path: string;
       if (this.openDropdownIdx === -1) {
         path = '/' + dir;
       } else {
-        path = '/' + this.breadcrumbParts.slice(0, this.openDropdownIdx + 1).join('/') + '/' + dir;
+        path = '/' + this.breadcrumbParts.slice(0, (this.openDropdownIdx as number) + 1).join('/') + '/' + dir;
       }
       this.closeDropdown();
       this.tmp = path;
@@ -364,10 +366,11 @@ export default {
       this.dropdownItems = [];
       this.dropdownScrolled = false;
     },
-    onSearchMessage(e){
-      if(e.data.type === '__search_batch' && e.data.id === this.searchId){
-        this.searchResultsAcc = this.searchResultsAcc.concat(e.data.batch);
-        if(e.data.done) this.isSearchResults = true;
+    onSearchMessage(e: MessageEvent){
+      const data = e.data as { type: string; id: string; batch?: EntryStats[]; done?: boolean }
+      if(data.type === '__search_batch' && data.id === this.searchId){
+        this.searchResultsAcc = this.searchResultsAcc.concat(data.batch || []);
+        if(data.done) this.isSearchResults = true;
         this.$emit('search', {
           query: this.searchQuery,
           results: [...this.searchResultsAcc],
@@ -376,17 +379,17 @@ export default {
         });
       }
     },
-    onSearchEsc(e){
+    onSearchEsc(e: KeyboardEvent){
       if(e.key === 'Escape' && this.isExecutingSearch){
         if(this.searchId) window.electron.cancelSearch(this.searchId);
-        this.searchId = 0;
+        this.searchId = '';
         this.isSearchResults = true;
         this.$emit('search', { query: this.searchQuery, results: [...this.searchResultsAcc] });
       }
     },
     cancelSearch(){
       if(this.searchId) window.electron.cancelSearch(this.searchId);
-      this.searchId = 0;
+      this.searchId = '';
       this.isExecutingSearch = false;
       this.isSearchResults = false;
       this.wasSearchMode = false;
@@ -399,7 +402,7 @@ export default {
         this.isSearchResults = false;
         this.finishEditing();
         this.searchResultsAcc = [];
-        let ft = this.selectedFiletypes;
+        const ft = this.selectedFiletypes;
         this.searchId = window.electron.startSearch({
           query: '' + this.searchQuery,
           location: '' + this.selectedLocation,
@@ -425,9 +428,9 @@ export default {
       document.removeEventListener('keydown', this.onSearchEsc);
     },
     watch: {
-    async address(newAddress) {
-      this.tmp = newAddress;
-      this.selectedLocation = newAddress;
+    async address(newAddress: string | undefined) {
+      this.tmp = newAddress || '';
+      this.selectedLocation = newAddress || '';
       if(this.isExecutingSearch){
         this.cancelSearch();
       }
@@ -436,7 +439,7 @@ export default {
         return
       }
       try {
-        let items = await window.electron.readdir(newAddress)
+        const items = await window.electron.readdir(newAddress || '')
         this._dirItems = items.filter(item => item.type === 'directory').map(item => item.name)
       } catch(e) {
         this._dirItems = []
@@ -447,19 +450,19 @@ export default {
         this.cancelSearch();
       }
     },
-    async selectedLocation(val){
-      if(val !== null || this.browseInProgress) return;
+    async selectedLocation(val: string | null) {
+      if(val !== '__browse__' || this.browseInProgress) return;
       this.browseInProgress = true;
-      let dir = await window.electron.ipcRenderer.invoke('open-directory-dialog');
+      const dir = await window.electron.ipcRenderer.invoke('open-directory-dialog');
       if(dir){
         this.selectedLocation = dir;
       }else{
-        this.selectedLocation = this.address;
+        this.selectedLocation = this.address || '';
       }
       this.browseInProgress = false;
     }
   }
-};
+});
 </script>
 
 <style scoped>
@@ -653,9 +656,9 @@ export default {
   
   .button{
     border:0px;
-    background: v-bind('theme.addressBar.inlineButton.background');
+    background: v-bind('theme.addressBar.inlineButton.normal.background');
     border-radius: v-bind('theme.addressBar.inlineButton.borderRadius');
-    color: v-bind('theme.addressBar.inlineButton.textColor');
+    color: v-bind('theme.addressBar.inlineButton.normal.textColor');
     margin:auto;
     margin-right:5px;
     height:20px;

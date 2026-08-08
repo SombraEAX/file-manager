@@ -50,7 +50,10 @@
     </div>
   </side-bar>
 </template>
-<script>
+<script lang="ts">
+  import { defineComponent, PropType } from 'vue'
+  import type { Tab, Section, DirItem, DirContextMenuEvent } from '../types/domains'
+  import type { MenuItemSpec } from '../types/ipc'
   import theme from '../../theme.json'
   import DirectoryList from './DirectoryList.vue'
   import SideBar from './SideBar.vue'
@@ -58,7 +61,7 @@
   const homedir = `/home/${window.electron.getUserName()}`
   const username = window.electron.getUserName()
 
-  export default {
+  export default defineComponent({
     emits: ['select', 'resize', 'select-tab', 'close-tab', 'remove-bookmark', 'open-in-new-tab'],
     props: {
       width: Number,
@@ -66,45 +69,44 @@
       items: Number,
       files: Number,
       dirsCount: Number,
-      tabs: Array,
+      tabs: { type: Array as PropType<Tab[]>, default: () => [] },
       activeTabIndex: Number,
       tabsInSidePanel: Boolean,
       bookmarks: {
-        type: Array,
+        type: Array as PropType<string[]>,
         default: () => []
       }
     },
     components: { DirectoryList, SideBar },
     data(){
+      const places: DirItem[] = [
+        { name: 'home', pathname: homedir, caption: username },
+        { name: 'Desktop', pathname: window.electron.join(homedir, 'Desktop') },
+        { name: 'Documents', pathname: window.electron.join(homedir, 'Documents') },
+        { name: 'Downloads', pathname: window.electron.join(homedir, 'Downloads') },
+        { name: 'Music', pathname: window.electron.join(homedir, 'Music') },
+        { name: 'Pictures', pathname: window.electron.join(homedir, 'Pictures') },
+        { name: 'Public', pathname: window.electron.join(homedir, 'Public') },
+        { name: 'Videos', pathname: window.electron.join(homedir, 'Videos') },
+        { name: 'Trash', pathname: 'trash://', caption: 'Trash' },
+        { name: '/', pathname: '/', caption: 'System root' }
+      ]
+      const sections: Section[] = [
+        { title: 'PLACES', dirs: places }
+      ]
       return {
         theme,
-        sections: [
-          {
-            title: 'PLACES',
-            dirs: [
-              { name: 'home', pathname: homedir, caption: username },
-              { name: 'Desktop', pathname: window.electron.join(homedir, 'Desktop') },
-              { name: 'Documents', pathname: window.electron.join(homedir, 'Documents') },
-              { name: 'Downloads', pathname: window.electron.join(homedir, 'Downloads') },
-              { name: 'Music', pathname: window.electron.join(homedir, 'Music') },
-              { name: 'Pictures', pathname: window.electron.join(homedir, 'Pictures') },
-              { name: 'Public', pathname: window.electron.join(homedir, 'Public') },
-              { name: 'Videos', pathname: window.electron.join(homedir, 'Videos') },
-              { name: 'Trash', pathname: 'trash://', caption: 'Trash' },
-              { name: '/', pathname: '/', caption: 'System root' }
-            ]
-          }
-        ]
+        sections
       }
     },
     computed: {
-      bookmarkDirs(){
+      bookmarkDirs(): DirItem[] {
         return this.bookmarks.map(pathname => ({
           name: this.pathName(pathname),
           pathname
         }))
       },
-      tabsDirs(){
+      tabsDirs(): DirItem[] {
         return this.tabs.map((tab, i) => ({
           name: this.tabTitle(tab),
           pathname: '#tab-' + i
@@ -115,35 +117,35 @@
       }
     },
     methods: {
-      pathName(pathname){
+      pathName(pathname: string): string {
         if(pathname === 'trash://') return 'Trash'
         if(!pathname) return ''
         if(pathname === '/') return '/'
         return pathname.replace(/\/$/, '').split('/').filter(Boolean).pop() || '/'
       },
-      tabTitle(tab){
-        let path = tab.history[tab.historyIndex]
+      tabTitle(tab: Tab): string {
+        const path = tab.history[tab.historyIndex]
         if (!path || path === '/') return '/'
-        return path.split('/').filter(Boolean).pop()
+        return path.split('/').filter(Boolean).pop() || '/'
       },
-      onTabSelect(pathname){
+      onTabSelect(pathname: string){
         const m = String(pathname).match(/^#tab-(\d+)$/)
         if (m) this.$emit('select-tab', parseInt(m[1], 10))
       },
-      onDirContextMenu({ pathname, x, y }){
-        const items = [{ label: 'Open' }, { label: 'Open in new tab' }]
+      onDirContextMenu({ pathname, x, y }: DirContextMenuEvent){
+        const items: MenuItemSpec[] = [{ label: 'Open' }, { label: 'Open in new tab' }]
         window.electron.ipcRenderer.send('show-menu', { items, x, y })
         window.electron.ipcRenderer.once('show-menu-reply', (_, index) => {
           if(index === 0) this.$emit('select', pathname)
           else if(index === 1) this.$emit('open-in-new-tab', pathname)
         })
       },
-      onTabClose(pathname){
+      onTabClose(pathname: string){
         const m = String(pathname).match(/^#tab-(\d+)$/)
         if (m) this.$emit('close-tab', parseInt(m[1], 10))
       }
     }
-  }
+  })
 </script>
 <style scoped>
   .inner{

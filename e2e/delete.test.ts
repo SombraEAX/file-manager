@@ -1,8 +1,8 @@
-const { test, expect, afterEach } = require('@playwright/test')
-const path = require('path')
-const fsp = require('fs/promises')
-const os = require('os')
-const { launchApp, createTempDir, createTempFiles, fileExists } = require('./helpers')
+import { test, expect, afterEach } from '@playwright/test'
+import * as path from 'path'
+import * as fsp from 'fs/promises'
+import * as os from 'os'
+import { launchApp, createTempDir, createTempFiles, fileExists } from './helpers'
 
 let app, window
 let tempDirs = []
@@ -16,16 +16,6 @@ afterEach(async () => {
   app = null
   window = null
 })
-
-async function moveToTrash(srcDir, filename) {
-  const launched = await launchApp()
-  app = launched.app
-  window = launched.window
-
-  await window.evaluate(async ({ srcDir, filename }) => {
-    return await window.electron.ipcRenderer.invoke('trash-items', [srcDir + '/' + filename], 'setup-trash-' + Date.now())
-  }, { srcDir, filename })
-}
 
 test.describe('Permanent delete from trash', () => {
   test('deletes file from trash permanently', async () => {

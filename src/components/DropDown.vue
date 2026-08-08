@@ -20,14 +20,16 @@
     </div>
   </div>
 </template>
-<script>
+<script lang="ts">
+  import { defineComponent, PropType } from 'vue'
+  import type { DropDownOption } from '../types/domains'
   import theme from '../../theme.json';
   import AppCheckbox from './AppCheckbox.vue';
-  export default {
+  export default defineComponent({
     components: { AppCheckbox },
     props: {
-      options: Array,
-      modelValue: [String, Array],
+      options: { type: Array as PropType<DropDownOption[]>, default: () => [] },
+      modelValue: { type: [String, Array] as PropType<string | string[]>, default: '' },
       editable: Boolean,
       multipleSelect: Boolean
     },
@@ -54,31 +56,32 @@
       options: { handler(){ this.syncInput(); this.syncText(); }, deep: true }
     },
     computed:{
-      displayText(){
+      displayText(): string {
         if(this.multipleSelect){
-          let selected = this.modelValue || [];
+          const selected = Array.isArray(this.modelValue) ? this.modelValue : [];
           return selected.length ? selected.join(', ') : 'Select...';
         }
-        return this.modelValue || 'Select...';
+        return typeof this.modelValue === 'string' ? (this.modelValue || 'Select...') : 'Select...';
       }
     },
     methods:{
-      optValue(option){
-        return option && option.value !== undefined ? option.value : option;
+      optValue(option: DropDownOption): string {
+        return option && typeof option === 'object' && option.value !== undefined ? option.value : String(option);
       },
-      optLabel(option){
-        return option && option.label !== undefined ? option.label : option;
+      optLabel(option: DropDownOption): string {
+        return option && typeof option === 'object' && option.label !== undefined ? option.label : String(option);
       },
       syncInput(){
-        let idx = this.options.findIndex(o => this.optValue(o) === this.modelValue);
+        const idx = this.options.findIndex(o => this.optValue(o) === this.modelValue);
         this.selectedIndex = idx;
       },
       syncText(){
         if(!this.editable) return;
         if(this.selectedIndex >= 0 && this.inputText !== this.modelValue){
-          this.inputText = this.optLabel(this.options[this.selectedIndex]);
+          const opt = this.options[this.selectedIndex];
+          this.inputText = opt ? this.optLabel(opt) : '';
         }else{
-          this.inputText = this.modelValue || '';
+          this.inputText = typeof this.modelValue === 'string' ? this.modelValue : '';
         }
       },
       toggle(){
@@ -93,12 +96,13 @@
           document.addEventListener('click', this.clickOutside, true);
           this.$nextTick(() => {
             this.scrollToHighlighted();
-            if(this.editable) this.$refs.input?.select();
+            if(this.editable) (this.$refs.input as HTMLInputElement | undefined)?.select();
           });
         }
       },
-      clickOutside(e){
-        if(!this.$refs.root || !this.$refs.root.contains(e.target)){
+      clickOutside(e: MouseEvent){
+        const root = this.$refs.root as HTMLElement | undefined;
+        if(!root || !root.contains(e.target as Node)){
           if(this.editable && this.selectedIndex >= 0 && this.inputText === ''){
             this.syncText();
           }
@@ -109,8 +113,9 @@
         document.removeEventListener('click', this.clickOutside, true);
         this.isOpen = false;
         this.$nextTick(() => {
-          this.$refs.input?.setSelectionRange(0, 0);
-          this.$refs.input?.blur();
+          const input = this.$refs.input as HTMLInputElement | undefined;
+          input?.setSelectionRange(0, 0);
+          input?.blur();
         });
       },
       onFocus(){
@@ -118,13 +123,13 @@
           this.inputText = '';
         }
       },
-      onInput(e){
-        this.inputText = e.target.value;
+      onInput(e: Event){
+        this.inputText = (e.target as HTMLInputElement).value;
         this.selectedIndex = -1;
         this.highlightedIndex = -1;
-        this.$emit('update:modelValue', e.target.value);
+        this.$emit('update:modelValue', (e.target as HTMLInputElement).value);
       },
-      handleKeydown(e){
+      handleKeydown(e: KeyboardEvent){
         switch(e.key){
           case 'ArrowDown':
             e.preventDefault();
@@ -160,16 +165,17 @@
         }
       },
       scrollToHighlighted(){
-        let items = this.$refs.root.querySelector('.items');
+        const root = this.$refs.root as HTMLElement;
+        const items = root.querySelector('.items');
         if(!items) return;
-        let el = items.querySelector('.highlighted') || items.querySelector('.selected');
+        const el = items.querySelector('.highlighted') || items.querySelector('.selected');
         if(el) el.scrollIntoView({ block: 'nearest' });
       },
-      select(option, index){
-        let val = this.optValue(option);
+      select(option: DropDownOption, index: number){
+        const val = this.optValue(option);
         if(this.multipleSelect){
-          let selected = Array.isArray(this.modelValue) ? [...this.modelValue] : [];
-          let idx = selected.indexOf(val);
+          const selected = Array.isArray(this.modelValue) ? [...this.modelValue] : [];
+          const idx = selected.indexOf(val);
           if(idx === -1){
             selected.push(val);
           }else{
@@ -185,12 +191,12 @@
           this.close();
         }
       },
-      isSelected(option){
-        let val = this.optValue(option);
+      isSelected(option: DropDownOption): boolean {
+        const val = this.optValue(option);
         return this.multipleSelect && Array.isArray(this.modelValue) && this.modelValue.includes(val);
       }
     }
-  }
+  })
 </script>
 <style scoped>
   .dropdown-button{

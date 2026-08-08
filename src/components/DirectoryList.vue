@@ -1,6 +1,6 @@
 <template>
   <div class="dirs">
-    <div v-for="dir in dirs" class="dir" :class="{selected:dir.pathname === selected}" @contextmenu="onRowContextMenu(dir, $event)">
+    <div v-for="dir in dirs" :key="dir.pathname" class="dir" :class="{selected:dir.pathname === selected}" @contextmenu="onRowContextMenu(dir, $event)">
       <div class="dir-label" @mouseenter="hoveredDir = dir.pathname" @mouseleave="hoveredDir = null">
         <div class="dir-icon" @click="iconClick(dir)">
           <EntryIcon v-show="hoveredDir !== dir.pathname" :size="16" is-dir :type="folderType(dir)" />
@@ -13,25 +13,27 @@
         <directory-list
           :dirs="dir.dirs" 
           :selected="selected" 
-          @select="(ev) => $emit('select',ev)"
+          @select="(ev: string) => $emit('select',ev)"
         />
       </div>
     </div>
   </div>
 </template>
-<script>
+<script lang="ts">
+  import { defineComponent, PropType } from 'vue'
+  import type { DirItem } from '../types/domains'
   import theme from '../../theme.json'
   import EntryIcon from './EntryIcon.vue'
 
   const homedir = `/home/${window.electron.getUserName()}`
 
-  let xdgCache = null
-  function getXdgDirs() {
+  let xdgCache: Record<string, string> | null = null
+  function getXdgDirs(): Record<string, string> {
     if (xdgCache) return xdgCache
     xdgCache = {}
     try {
       const content = window.electron.readFileSync(window.electron.join(homedir, '.config/user-dirs.dirs'), 'utf8')
-      const map = { XDG_DOWNLOAD_DIR:'downloads', XDG_DOCUMENTS_DIR:'documents', XDG_MUSIC_DIR:'music', XDG_PICTURES_DIR:'pictures', XDG_VIDEOS_DIR:'videos', XDG_DESKTOP_DIR:'desktop', XDG_PUBLICSHARE_DIR:'public' }
+      const map: Record<string, string> = { XDG_DOWNLOAD_DIR:'downloads', XDG_DOCUMENTS_DIR:'documents', XDG_MUSIC_DIR:'music', XDG_PICTURES_DIR:'pictures', XDG_VIDEOS_DIR:'videos', XDG_DESKTOP_DIR:'desktop', XDG_PUBLICSHARE_DIR:'public' }
       for (const line of content.split('\n')) {
         const m = line.match(/^(\w+)="?\$HOME\/(.+?)"?$/)
         if (m && map[m[1]]) xdgCache[m[2]] = map[m[1]]
@@ -40,12 +42,12 @@
     return xdgCache
   }
 
-  export default {
+  export default defineComponent({
     emits: ['select', 'close', 'dir-context'],
     components: { EntryIcon },
     props: {
       dirs: {
-        type: Array,
+        type: Array as PropType<DirItem[]>,
         default: () => []
       },
       selected: String,
@@ -56,18 +58,18 @@
     data(){			
       return {
         theme,
-        hoveredDir: null
+        hoveredDir: null as string | null
       }
     },
     methods:{
-      onRowContextMenu(dir, ev){
+      onRowContextMenu(dir: DirItem, ev: MouseEvent){
         if(!this.menuable) return
         ev.preventDefault()
         this.$emit('dir-context', { pathname: dir.pathname, x: ev.clientX, y: ev.clientY })
       },
-      folderType(dir) {
+      folderType(dir: DirItem): string {
         if (dir.name === '/') return 'root'
-        const nameMap = {
+        const nameMap: Record<string, string> = {
           'home': 'home', 'desktop': 'desktop', 'documents': 'documents',
           'downloads': 'downloads', 'music': 'music', 'pictures': 'pictures',
           'videos': 'videos', 'trash': 'trash', 'public': 'public',
@@ -78,12 +80,12 @@
         const xdg = getXdgDirs()
         return xdg[dir.name] || ''
       },
-      async iconClick(dir){
+      async iconClick(dir: DirItem){
         dir.open = !dir.open
 
         if(dir.open){
           try {
-            let items = await window.electron.readdir(dir.pathname)
+            const items = await window.electron.readdir(dir.pathname)
             dir.dirs = items
               .filter(item => item.type === 'directory')
               .map(item => ({
@@ -98,7 +100,7 @@
         }
       }
     }
-  }
+  })
 </script>
 <style scoped>
   .subtree{

@@ -48,11 +48,14 @@
   </div>
 </template>
 
-<script>
+<script lang="ts">
+import { defineComponent, PropType } from 'vue'
+import type { MenuItemSpec } from '../types/ipc'
+import type { Tab } from '../types/domains'
 import theme from '../../theme.json';
-export default {
+export default defineComponent({
   props: {
-    tabs: Array,
+    tabs: { type: Array as PropType<Tab[]>, default: () => [] },
     activeIndex: Number
   },
   emits: ['select', 'close'],
@@ -62,11 +65,11 @@ export default {
       overflows: false,
       canScrollLeft: false,
       canScrollRight: false,
-      holdTimer: null,
+      holdTimer: null as ReturnType<typeof setTimeout> | null,
       scrollDir: 0,
-      scrollRAF: null,
+      scrollRAF: null as number | null,
       scrollSpeed: 400,
-      lastTime: null,
+      lastTime: null as number | null,
       longPress: false
     }
   },
@@ -93,13 +96,13 @@ export default {
     this.stopScroll();
   },
   methods: {
-    tabTitle(tab) {
-      let path = tab.history[tab.historyIndex];
+    tabTitle(tab: Tab) {
+      const path = tab.history[tab.historyIndex];
       if (!path || path === '/') return '/';
       return path.split('/').filter(Boolean).pop();
     },
     updateScroll() {
-      const el = this.$refs.scroll;
+      const el = this.$refs.scroll as HTMLElement | undefined;
       if (!el) {
         this.overflows = false;
         this.canScrollLeft = false;
@@ -111,23 +114,23 @@ export default {
       this.canScrollRight = el.scrollLeft + el.clientWidth < el.scrollWidth - 1;
     },
     scrollStep() {
-      const el = this.$refs.scroll;
+      const el = this.$refs.scroll as HTMLElement | undefined;
       if (!el) return 200;
       return Math.min(el.clientWidth * 0.8, 220);
     },
-    scrollBy(dir) {
-      const el = this.$refs.scroll;
+    scrollBy(dir: number) {
+      const el = this.$refs.scroll as HTMLElement | undefined;
       if (!el) return;
       el.scrollBy({ left: dir * this.scrollStep(), behavior: 'smooth' });
     },
-    onClick(dir) {
+    onClick(dir: number) {
       if (this.longPress) {
         this.longPress = false;
         return;
       }
       this.scrollBy(dir);
     },
-    startScroll(dir) {
+    startScroll(dir: number) {
       this.stopScroll();
       this.longPress = false;
       this.holdTimer = setTimeout(() => {
@@ -139,8 +142,8 @@ export default {
       window.addEventListener('mouseup', this.stopScroll);
       window.addEventListener('blur', this.stopScroll);
     },
-    tickScroll(timestamp) {
-      const el = this.$refs.scroll;
+    tickScroll(timestamp: number) {
+      const el = this.$refs.scroll as HTMLElement | undefined;
       if (!el) {
         this.stopScroll();
         return;
@@ -156,8 +159,8 @@ export default {
       this.scrollRAF = requestAnimationFrame((t) => this.tickScroll(t));
     },
     stopScroll() {
-      clearTimeout(this.holdTimer);
-      cancelAnimationFrame(this.scrollRAF);
+      if (this.holdTimer !== null) clearTimeout(this.holdTimer);
+      if (this.scrollRAF !== null) cancelAnimationFrame(this.scrollRAF);
       this.holdTimer = null;
       this.scrollDir = 0;
       this.scrollRAF = null;
@@ -166,9 +169,9 @@ export default {
       window.removeEventListener('blur', this.stopScroll);
     },
     scrollToActive() {
-      const el = this.$refs.scroll;
+      const el = this.$refs.scroll as HTMLElement | undefined;
       if (!el) return;
-      const active = el.querySelector('.tab.active');
+      const active = el.querySelector('.tab.active') as HTMLElement | null;
       if (!active) return;
       const left = active.offsetLeft;
       const right = left + active.offsetWidth;
@@ -178,9 +181,9 @@ export default {
         el.scrollLeft = right - el.clientWidth;
       }
     },
-    openTabMenu(event) {
-      const rect = event.currentTarget.getBoundingClientRect();
-      const items = this.tabs.map((tab, i) => ({
+    openTabMenu(event: MouseEvent) {
+      const rect = (event.currentTarget as HTMLElement).getBoundingClientRect();
+      const items: MenuItemSpec[] = this.tabs.map((tab, i) => ({
         label: this.tabTitle(tab) || '/',
         type: 'radio',
         checked: i === this.activeIndex
@@ -195,7 +198,7 @@ export default {
       });
     }
   }
-}
+})
 </script>
 
 <style scoped>

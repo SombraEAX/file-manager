@@ -66,13 +66,18 @@
     ></button>
   </div>
 </template>
-<script>
+<script lang="ts">
+  import { defineComponent, PropType } from 'vue'
   import theme from '../../theme.json'
   import AddressBar from "./AddressBar.vue"
   import TasksWidget from "./TasksWidget.vue"
   import ZoomButton from "./ZoomButton.vue"
-  
-  export default {
+
+  type AddressBarRef = InstanceType<typeof AddressBar>
+  type ZoomButtonRef = InstanceType<typeof ZoomButton>
+  type TasksWidgetRef = InstanceType<typeof TasksWidget>
+
+  export default defineComponent({
     emits: ['back', 'forward', 'up', 'jump', 'changeHistoryIndex', 'search', 'changeView', 'togglePreviewPanel', 'openRootMenu', 'toggleBookmark', 'scaling'],
     components:{
       AddressBar,
@@ -82,7 +87,7 @@
     props: {
       address: String,
       history: {
-        type: Array,
+        type: Array as PropType<string[]>,
         default: () => []
       },
       historyIndex: Number,
@@ -92,7 +97,7 @@
       previewPanelVisible: Boolean,
       showMenuBar: Boolean,
       bookmarks: {
-        type: Array,
+        type: Array as PropType<string[]>,
         default: () => []
       },
       isBookmarked: Boolean
@@ -100,25 +105,21 @@
     data(){
       return {
         theme,
-        tmp: '',
-        focus: false
+        tmp: ''
       }
     },
     methods: {
-      focus(){
-        this.$refs.addressInput.select()
-      },
-      gotopath(pathname){
+      gotopath(pathname: string){
         if(pathname !== '/' && pathname !== 'trash://') pathname = pathname.replace(/\/$/,'')
         this.$emit('jump', pathname)
       },
       showHistory(){
-        let { ipcRenderer } = window.electron
-        let rect = this.$refs.historyButton.getBoundingClientRect()
+        const { ipcRenderer } = window.electron
+        const rect = (this.$refs.historyButton as HTMLElement).getBoundingClientRect()
 
         ipcRenderer.send('show-history-menu', {
           history: [...this.history], 
-          current: this.historyIndex, 
+          current: this.historyIndex || 0, 
           x:       rect.x, 
           y:       rect.y + rect.height
         })
@@ -129,25 +130,27 @@
         )
       },
       openMenu(){
-        let rect = this.$refs.menuButton.getBoundingClientRect()
+        const rect = (this.$refs.menuButton as HTMLElement).getBoundingClientRect()
         this.$emit('openRootMenu', rect.x, rect.y + rect.height)
       },
       closeDropdowns(){
-        let ab = this.$refs.addressBar
+        const ab = this.$refs.addressBar as AddressBarRef | undefined
         if(ab){
           ab.closeDropdown()
           ab.finishEditing()
         }
-        if(this.$refs.zoomButton) this.$refs.zoomButton.closePopup()
-        if(this.$attrs.autohideTopPanel && this.$refs.tasksWidget) this.$refs.tasksWidget.closePopup()
+        const zoom = this.$refs.zoomButton as ZoomButtonRef | undefined
+        if(zoom) zoom.closePopup()
+        const tw = this.$refs.tasksWidget as TasksWidgetRef | undefined
+        if(this.$attrs.autohideTopPanel && tw) tw.closePopup()
       }
     },
     watch: {
       address(){
-        this.tmp = this.address
+        this.tmp = this.address || ''
       }
     }
-  }
+  })
 </script>
 <style scoped>
   .top-panel{

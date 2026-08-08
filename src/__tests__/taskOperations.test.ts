@@ -1,12 +1,12 @@
 import { describe, it, expect, beforeEach } from 'vitest'
-import { tasks, createTask, updateTask, cancelTask, pauseTask, resumeTask, removeTask, createThrottledRunner } from '../stores/tasks'
+import { tasks, createTask, updateTask, cancelTask, pauseTask, resumeTask, removeTask, createThrottledRunner, type Task } from '../stores/tasks'
 
 describe('task state transitions', () => {
   beforeEach(() => {
     tasks.splice(0, tasks.length)
   })
 
-  function simulateProgress(task, done, total, errors = 0) {
+  function simulateProgress(task: Task, done: number, total: number, errors = 0) {
     const successCount = done - errors
     updateTask(task.id, {
       progress: Math.round((done / total) * 100),
@@ -18,7 +18,7 @@ describe('task state transitions', () => {
     })
   }
 
-  function simulateFinalResult(task, totalPaths, resultErrors = 0) {
+  function simulateFinalResult(task: Task, totalPaths: number, resultErrors = 0) {
     const successCount = totalPaths - resultErrors
     updateTask(task.id, {
       progress: 100,
@@ -182,13 +182,14 @@ describe('task state transitions', () => {
   describe('error logging', () => {
     it('errorLog accumulates errors', () => {
       const task = createTask('Copying files…', { operation: 'copy', errorLog: [] })
+      const errorLog = task.data.errorLog || []
 
-      task.data.errorLog.push('File A: permission denied')
-      task.data.errorLog.push('File B: not found')
+      errorLog.push('File A: permission denied')
+      errorLog.push('File B: not found')
 
-      expect(task.data.errorLog.length).toBe(2)
-      expect(task.data.errorLog[0]).toBe('File A: permission denied')
-      expect(task.data.errorLog[1]).toBe('File B: not found')
+      expect(errorLog.length).toBe(2)
+      expect(errorLog[0]).toBe('File A: permission denied')
+      expect(errorLog[1]).toBe('File B: not found')
     })
   })
 
@@ -244,12 +245,12 @@ describe('task state transitions', () => {
   })
 
   describe('undo throttling', () => {
-    const sleep = (ms) => new Promise(r => setTimeout(r, ms))
+    const sleep = (ms: number) => new Promise(r => setTimeout(r, ms))
 
     it('blocks a second undo for the same task while the first is running', async () => {
       const throttle = createThrottledRunner()
       let runs = 0
-      const run = () => new Promise(res => setTimeout(() => { runs++; res() }, 20))
+      const run = () => new Promise<void>(res => setTimeout(() => { runs++; res() }, 20))
 
       const first = throttle('task-1', run)
       expect(first).toBe(true)
@@ -264,7 +265,7 @@ describe('task state transitions', () => {
     it('allows undo again for the same task after it finished', async () => {
       const throttle = createThrottledRunner()
       let runs = 0
-      const run = () => new Promise(res => setTimeout(() => { runs++; res() }, 10))
+      const run = () => new Promise<void>(res => setTimeout(() => { runs++; res() }, 10))
 
       throttle('task-1', run)
       await sleep(30)
@@ -275,8 +276,8 @@ describe('task state transitions', () => {
 
     it('serializes undo of different tasks so they do not run concurrently', async () => {
       const throttle = createThrottledRunner()
-      const order = []
-      const makeRun = (name) => () => new Promise(res => setTimeout(() => { order.push(name); res() }, 10))
+      const order: string[] = []
+      const makeRun = (name: string) => () => new Promise<void>(res => setTimeout(() => { order.push(name); res() }, 10))
 
       throttle('task-a', makeRun('a'))
       throttle('task-b', makeRun('b'))
@@ -299,7 +300,7 @@ describe('task state transitions', () => {
 
   describe('widget display logic', () => {
     it('isFinished returns true for done, error, cancelled, partial, undone', () => {
-      function isFinished(status) {
+      function isFinished(status: string) {
         return status === 'done' || status === 'error' || status === 'cancelled' || status === 'partial' || status === 'undone'
       }
 
@@ -315,7 +316,7 @@ describe('task state transitions', () => {
     })
 
     it('allFinished returns true only when all tasks are finished', () => {
-      function allFinished(taskList) {
+      function allFinished(taskList: { status: string }[]) {
         return taskList.length > 0 && taskList.every(t =>
           t.status === 'done' || t.status === 'error' || t.status === 'cancelled' || t.status === 'partial'
         )
