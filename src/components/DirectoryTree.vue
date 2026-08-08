@@ -54,6 +54,7 @@
   import { defineComponent, PropType } from 'vue'
   import type { Tab, Section, DirItem, DirContextMenuEvent } from '../types/domains'
   import type { MenuItemSpec } from '../types/ipc'
+  import { openMenu } from '../stores/menus'
   import theme from '../../theme.json'
   import DirectoryList from './DirectoryList.vue'
   import SideBar from './SideBar.vue'
@@ -134,8 +135,7 @@
       },
       onDirContextMenu({ pathname, x, y }: DirContextMenuEvent){
         const items: MenuItemSpec[] = [{ label: 'Open' }, { label: 'Open in new tab' }]
-        window.electron.ipcRenderer.send('show-menu', { items, x, y })
-        window.electron.ipcRenderer.once('show-menu-reply', (_, index) => {
+        openMenu(items, x, y).then(index => {
           if(index === 0) this.$emit('select', pathname)
           else if(index === 1) this.$emit('open-in-new-tab', pathname)
         })

@@ -24,6 +24,7 @@
           :showMenuBar       = "showMenuBar"
           :tabsInSidePanel   = "tabsInSidePanel"
           :hasSelection      = "hasSelection"
+          :useHtmlMenus      = "menuState.useHtmlMenus"
           @changeView       = "ev => view = ev"
           @changeSortColumn = "ev => sortColumn = ev"
           @changeSortOrder  = "ev => sortOrder = ev"
@@ -33,6 +34,7 @@
           @toggleShowHidden = "showHidden = !showHidden"
           @toggleShowMenuBar = "showMenuBar = !showMenuBar"
           @toggleTabsInSidePanel = "tabsInSidePanel = !tabsInSidePanel"
+          @toggleHtmlMenus = "toggleHtmlMenus"
           @selectAll       = "selectAllEntries"
           @invertSelection = "invertSelection"
           @rename          = "renameSelected"
@@ -230,6 +232,8 @@
       </div>
     </transition>
 
+    <menu-host />
+
     <transition name="trash-popup-fade">
       <div class="trash-confirm-overlay" v-if="aboutPopupVisible" @click.self="closeAbout">
         <div class="about-popup">
@@ -292,6 +296,7 @@
   import WorkZone from './components/WorkZone.vue'
   import PreviewPanel from './components/PreviewPanel.vue'
   import MenuBar from './components/MenuBar.vue'
+  import MenuHost from './components/MenuHost.vue'
   import TabBar from './components/TabBar.vue'
   import aboutHeader from './assets/about-header.png'
   import pkg from '../package.json'
@@ -301,6 +306,7 @@
   import type { MenuItemSpec, EntryStats, TaskResult, TrashItem } from './types/ipc'
   import type { Tab, Group, PropsInfo, SelectEvent, ContextMenuEvent, BackgroundContextMenuEvent, DirItem, SearchResultsEvent } from './types/domains'
   import { on, off } from './stores/events'
+  import { menuState, toggleHtmlMenus, openMenu } from './stores/menus'
 
   const username = window.electron.getUserName()
   const homedir  = `/home/${username}`
@@ -326,7 +332,8 @@
       DirectoryTree,
       TopPanel,
       PreviewPanel,
-      TabBar
+      TabBar,
+      MenuHost
     },
     
     data(){      
@@ -547,9 +554,8 @@
 
       onContextMenu({ path, x, y }: ContextMenuEvent){
         if(this.isTrash){
-          const items = [{ label: 'Delete' }, { label: 'Restore' }]
-          window.electron.ipcRenderer.send('show-menu', { items, x, y })
-          window.electron.ipcRenderer.once('show-menu-reply', (_, index) => {
+          const items: MenuItemSpec[] = [{ label: 'Delete' }, { label: 'Restore' }]
+          openMenu(items, x, y).then(index => {
             const paths = Object.keys(this.selectedMap)
             if(!paths.includes(path)) paths.push(path)
             if(index === 0) this.beginTrashAction('delete', paths)
@@ -573,8 +579,7 @@
         if(this.clipboardPaths.length){
           items.push({ label: 'Paste' })
         }
-        window.electron.ipcRenderer.send('show-menu', { items, x, y })
-        window.electron.ipcRenderer.once('show-menu-reply', (_, index) => {
+        openMenu(items, x, y).then(index => {
           if(index === pasteIndex && this.clipboardPaths.length){ this.onPaste(); return }
           let idx = index
           for(let i = 0; i <= index; i++){
@@ -628,20 +633,18 @@
       },
       onBackgroundContextMenu({ x, y }: BackgroundContextMenuEvent){
         if(this.isTrash){
-          const items = [{ label: 'Restore all' }, { label: 'Empty trash' }]
-          window.electron.ipcRenderer.send('show-menu', { items, x, y })
-          window.electron.ipcRenderer.once('show-menu-reply', (_, index) => {
+          const items: MenuItemSpec[] = [{ label: 'Restore all' }, { label: 'Empty trash' }]
+          openMenu(items, x, y).then(index => {
             if(index === 0) this.confirmRestoreAll()
             else if(index === 1) this.confirmEmptyTrash()
           })
           return
         }
-        const items = [
+        const items: MenuItemSpec[] = [
           { label: 'New folder' },
           { label: 'New file' }
         ]
-        window.electron.ipcRenderer.send('show-menu', { items, x, y })
-        window.electron.ipcRenderer.once('show-menu-reply', (_, index) => {
+        openMenu(items, x, y).then(index => {
           if(index === 0) this.createNewFolder()
           else if(index === 1) this.createNewFile()
         })
@@ -2007,6 +2010,10 @@
           this.files   = files
           this.searchVersion++
         } catch(e) {}
+      },
+
+      toggleHtmlMenus(){
+        toggleHtmlMenus()
       }
     },
     
@@ -2099,6 +2106,9 @@
     },
     
     computed:{
+      menuState(){
+        return menuState
+      },
       groups(){
         const source = this.isSearchMode && this.searchResults ? this.searchResults : this.entries;
 

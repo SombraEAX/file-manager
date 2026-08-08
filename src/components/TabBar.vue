@@ -52,6 +52,7 @@
 import { defineComponent, PropType } from 'vue'
 import type { MenuItemSpec } from '../types/ipc'
 import type { Tab } from '../types/domains'
+import { openMenu } from '../stores/menus'
 import theme from '../../theme.json';
 export default defineComponent({
   props: {
@@ -188,12 +189,7 @@ export default defineComponent({
         type: 'radio',
         checked: i === this.activeIndex
       }));
-      window.electron.ipcRenderer.send('show-menu', {
-        items,
-        x: Math.floor(rect.left),
-        y: Math.floor(rect.bottom)
-      });
-      window.electron.ipcRenderer.once('show-menu-reply', (_, index) => {
+      openMenu(items, Math.floor(rect.left), Math.floor(rect.bottom)).then(index => {
         if (index >= 0 && index < this.tabs.length) this.$emit('select', index);
       });
     }

@@ -13,13 +13,8 @@
 <script lang="ts">
   import { defineComponent } from 'vue'
   import type { MenuItemSpec } from '../types/ipc'
+  import { openMenuBarSubmenu } from '../stores/menus'
   import theme from '../../theme.json'
-
-  let clickHandler: ((id: string) => void) | null = null
-
-  const { ipcRenderer } = window.electron
-
-  ipcRenderer.on('show-menu-bar-submenu-reply', (_, id) => clickHandler && clickHandler(id))
 
   export default defineComponent({
     name: 'MenuBar',
@@ -35,7 +30,8 @@
       showHidden: Boolean,
       showMenuBar: Boolean,
       tabsInSidePanel: Boolean,
-      hasSelection: Boolean
+      hasSelection: Boolean,
+      useHtmlMenus: Boolean
     },
 
     emits: [
@@ -48,6 +44,7 @@
       'toggleShowHidden',
       'toggleShowMenuBar',
       'toggleTabsInSidePanel',
+      'toggleHtmlMenus',
       'selectAll',
       'invertSelection',
       'rename',
@@ -69,25 +66,18 @@
       return { theme }
     },
 
-    mounted() {
-      clickHandler = this.itemClick.bind(this)
-    },
-   
     methods: {
       openMenu(menuItem: MenuItemSpec, event: MouseEvent){
         const rect = (event.currentTarget as HTMLElement).getBoundingClientRect()
-        ipcRenderer.send('show-menu-bar-submenu', {
-          items: menuItem.submenu || [],
-          x: rect.x,
-          y: rect.y + rect.height
+        const items = menuItem.submenu || []
+        openMenuBarSubmenu(items, rect.x, rect.y + rect.height).then(id => {
+          if (id) this.itemClick(id)
         })
       },
 
       openRootMenu(x: number, y: number){
-        ipcRenderer.send('show-menu-bar-submenu', {
-          items: this.items,
-          x,
-          y
+        openMenuBarSubmenu(this.items, x, y).then(id => {
+          if (id) this.itemClick(id)
         })
       },
 
@@ -142,6 +132,10 @@
           }
           case 'tabs-in-side-panel': {
             this.$emit('toggleTabsInSidePanel')
+            break
+          }
+          case 'html-menus': {
+            this.$emit('toggleHtmlMenus')
             break
           }
           case 'select-all': {
@@ -398,6 +392,12 @@
                 id: 'tabs-in-side-panel',
                 type: 'checkbox',
                 checked: this.tabsInSidePanel
+              },
+              {
+                label: 'HTML menus',
+                id: 'html-menus',
+                type: 'checkbox',
+                checked: this.useHtmlMenus
               },
               { type: 'separator' },
               {

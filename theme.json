@@ -63,6 +63,18 @@
 		"itemSelectedBackground":"lightblue",
 		"itemSelectedTextColor":"#000"
 	},
+	"menu":{
+		"background":"#fff",
+		"textColor":"#000",
+		"borderColor":"#ccc",
+		"itemHoverBackground":"#e0e0e0",
+		"separatorColor":"#ccc",
+		"accentColor":"#0000aa",
+		"disabledTextColor":"#999",
+		"shadowColor":"rgba(0,0,0,0.15)",
+		"borderRadius":"4px",
+		"font":"sans-serif"
+	},
 	"searchMode":{
 		"background":"#d4d4d4",
 		"textColor":"#333",

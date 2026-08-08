@@ -30,6 +30,8 @@
 <script lang="ts">
   import { defineComponent, PropType } from 'vue'
   import type { Column } from '../types/domains'
+  import type { MenuItemSpec } from '../types/ipc'
+  import { openMenu } from '../stores/menus'
   import theme from '../../theme.json'
   import TableHeaderButton from './TableHeaderButton.vue'
   
@@ -85,21 +87,14 @@
         this.insert = i
       },
       menu({clientX,clientY}: MouseEvent){
-        const { ipcRenderer } = window.electron
+        const items: MenuItemSpec[] = this.columns.map(col => ({
+          label:   col.caption,
+          type:    'checkbox',
+          checked: col.visible
+        }))
 
-        ipcRenderer.send('show-menu', {
-          x: clientX,
-          y: clientY,
-          items:this.columns.map(col => ({
-            label:   col.caption,
-            type:    'checkbox',
-            checked: col.visible
-          }))
-        })
-
-        ipcRenderer.once(
-          'show-menu-reply',
-          (_, index) => this.$emit('toggleColumnVisible',index)
+        openMenu(items, clientX, clientY).then(index =>
+          this.$emit('toggleColumnVisible', index)
         )
       },
       moveStart(x: number){

@@ -69,6 +69,7 @@
 <script lang="ts">
   import { defineComponent, PropType } from 'vue'
   import theme from '../../theme.json'
+  import { openHistoryMenu } from '../stores/menus'
   import AddressBar from "./AddressBar.vue"
   import TasksWidget from "./TasksWidget.vue"
   import ZoomButton from "./ZoomButton.vue"
@@ -114,19 +115,10 @@
         this.$emit('jump', pathname)
       },
       showHistory(){
-        const { ipcRenderer } = window.electron
         const rect = (this.$refs.historyButton as HTMLElement).getBoundingClientRect()
 
-        ipcRenderer.send('show-history-menu', {
-          history: [...this.history], 
-          current: this.historyIndex || 0, 
-          x:       rect.x, 
-          y:       rect.y + rect.height
-        })
-
-        ipcRenderer.once(
-          'show-history-menu-reply',
-          (_, index) => this.$emit('changeHistoryIndex', index)
+        openHistoryMenu([...this.history], this.historyIndex || 0, rect.x, rect.y + rect.height).then(index =>
+          this.$emit('changeHistoryIndex', index)
         )
       },
       openMenu(){
