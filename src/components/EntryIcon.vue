@@ -36,6 +36,7 @@
         </template>
       </template>
     </div>
+    <div v-if="hasFold" class="icon-fold" :style="{ '--fold-bg': bgColor }"></div>
   </span>
 </template>
 <script lang="ts">
@@ -233,6 +234,7 @@
     justify-content:center;
   }
   .entry-icon-wrap{
+    position:relative;
     display:inline-flex;
     align-items:center;
   }
@@ -242,15 +244,16 @@
   .entry-icon--txt{
     mask-image:linear-gradient(to bottom left, transparent 0%, transparent 12.5%, #000 12.51%);
   }
-  .entry-icon--txt::before{
-    content:'';
+  .icon-fold{
     position:absolute;
     top:0;
     right:0;
     width:25%;
     height:25%;
-    clip-path:polygon(0 0, 100% 100%, 0 100%);
-    background:linear-gradient(225deg, rgba(0,0,0,0) 0%, rgba(0,0,0,0.22) 50%, rgba(0,0,0,0) 100%);
+    clip-path:polygon(0 0, 100% 100%, 50% 100%, 30.9% 96.2%, 14.6% 85.4%, 3.8% 69.1%, 0 50%);
+    background:
+      linear-gradient(225deg, rgba(0,0,0,0) 0%, rgba(0,0,0,0.22) 50%, rgba(0,0,0,0) 100%),
+      var(--fold-bg, #ccc);
     z-index:1;
   }
   .folder-back{
