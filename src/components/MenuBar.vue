@@ -15,6 +15,7 @@
   import type { MenuItemSpec } from '../types/ipc'
   import { openMenuBarSubmenu } from '../stores/menus'
   import theme from '../../theme.json'
+  import { IS_WEB } from '../web'
 
   export default defineComponent({
     name: 'MenuBar',
@@ -393,12 +394,12 @@
                 type: 'checkbox',
                 checked: this.tabsInSidePanel
               },
-              {
+              ...(IS_WEB ? [] : [{
                 label: 'HTML menus',
                 id: 'html-menus',
-                type: 'checkbox',
+                type: 'checkbox' as const,
                 checked: this.useHtmlMenus
-              },
+              }]),
               { type: 'separator' },
               {
                 label: 'Autohide left panel',

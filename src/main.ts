@@ -1,4 +1,8 @@
 import { createApp } from 'vue'
-import App from './App.vue'
+import { installWebPlatform } from './web'
 
-createApp(App).mount('#app')
+installWebPlatform()
+
+import('./App.vue').then(({ default: App }) => {
+  createApp(App).mount('#app')
+})

@@ -11,6 +11,8 @@
     "build": "npm run build:electron && vue-cli-service build",
     "lint": "eslint --ext .js,.ts,.vue src e2e",
     "test": "vitest run",
+    "test:web": "node web-smoke.mjs",
+    "preview:web": "npm run build && node scripts/preview-web.mjs",
     "test:watch": "vitest",
     "test:e2e": "npx playwright test --config=playwright.config.ts",
     "test:e2e:headed": "npx playwright test --config=playwright.config.ts --headed"

@@ -43,6 +43,24 @@ npm run lint
 npm run typecheck
 ```
 
+### Web live preview (no server, runs entirely in the browser)
+```
+npm run preview:web
+```
+Builds the renderer and opens `dist/index.html` in the default browser.
+No backend and no server are involved: the app boots into a browser-only mode
+that installs an in-memory mock of the Electron API and a virtual file system
+(`src/web/`) so the whole file manager works with nothing but static files.
+All changes made inside the preview live in memory and are lost on reload.
+
+### Web smoke test (headless, no server)
+```
+npm run test:web
+```
+Loads the built `dist/index.html` via the `file://` protocol in headless
+Chromium and exercises the UI (menus, creating a folder, moving a file to the
+trash) plus the in-memory backend (restore, copy, move, search, clipboard).
+
 ### Runs unit tests
 ```
 npm test

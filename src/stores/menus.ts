@@ -1,6 +1,7 @@
 import { reactive } from 'vue'
 import type { MenuItemSpec } from '../types/ipc'
 import { emit, on } from './events'
+import { IS_WEB } from '../web'
 
 export interface MenuState {
   useHtmlMenus: boolean
@@ -16,7 +17,7 @@ export interface MenuSelectPayload {
 }
 
 export const menuState = reactive<MenuState>({
-  useHtmlMenus: localStorage.getItem('useHtmlMenus') === 'true',
+  useHtmlMenus: IS_WEB ? true : localStorage.getItem('useHtmlMenus') === 'true',
   open: false,
   items: [],
   x: 0,
@@ -35,6 +36,7 @@ on('menu-popup-select', (payload: MenuSelectPayload) => {
 })
 
 export function toggleHtmlMenus(): void {
+  if (IS_WEB) return
   menuState.useHtmlMenus = !menuState.useHtmlMenus
   localStorage.setItem('useHtmlMenus', String(menuState.useHtmlMenus))
 }
