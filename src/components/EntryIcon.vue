@@ -239,15 +239,18 @@
   .entry-icon-clip{
     overflow:hidden;
   }
+  .entry-icon--txt{
+    mask-image:linear-gradient(to bottom left, transparent 0%, transparent 12.5%, #000 12.51%);
+  }
   .entry-icon--txt::before{
     content:'';
     position:absolute;
-    top:-3.66%;
-    right:-3.66%;
+    top:0;
+    right:0;
     width:25%;
     height:25%;
-    border-radius:50%;
-    background:linear-gradient(to top right, #b3b3b3 50%, #fff 50%);
+    clip-path:polygon(0 0, 100% 100%, 0 100%);
+    background:linear-gradient(225deg, rgba(0,0,0,0) 0%, rgba(0,0,0,0.22) 50%, rgba(0,0,0,0) 100%);
     z-index:1;
   }
   .folder-back{
