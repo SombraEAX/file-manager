@@ -188,6 +188,7 @@ export interface ElectronAPI {
   ipcRenderer: ElectronIpc
   readFile: (path: string, encoding?: string) => Promise<string>
   getImageDataUri: (path: string) => Promise<string>
+  getThumbnail: (path: string, size: number) => Promise<string | null>
   openExternal: (url: string) => void
   trashPath: string
   trashDirs: () => TrashDirs

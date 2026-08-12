@@ -170,6 +170,15 @@ describe('web backend api', () => {
     expect(uri.startsWith('data:image/png;base64,')).toBe(true)
   })
 
+  it('returns thumbnails for images and null for non-images and directories', async () => {
+    const api = freshApi()
+    const thumb = await api.getThumbnail('/home/demo/Pictures/landscape.png', 128)
+    expect(thumb).toMatch(/^data:image\/png;base64,/)
+    expect(await api.getThumbnail('/home/demo/Pictures', 128)).toBeNull()
+    expect(await api.getThumbnail('/home/demo/hello.js', 128)).toBeNull()
+    expect(await api.getThumbnail('/home/demo/missing.png', 128)).toBeNull()
+  })
+
   it('computes directory info', async () => {
     const api = freshApi()
     const info = await api.getDirInfo('/home/demo')

@@ -732,6 +732,15 @@ export function createWebElectronApi(): ElectronAPI {
       if (node.content != null) return 'data:' + mime + ';base64,' + textToBase64(node.content)
       throw new Error('Image not found')
     },
+    async getThumbnail(imagePath: string) {
+      const node = fs.get(imagePath)
+      if (!node || node.isDir) return null
+      const mime = mimeFor(imagePath)
+      if (!mime.startsWith('image/')) return null
+      if (node.imageBase64) return 'data:' + mime + ';base64,' + node.imageBase64
+      if (node.content != null) return 'data:' + mime + ';base64,' + textToBase64(node.content)
+      return null
+    },
     openExternal(url: string) {
       window.open(url, '_blank', 'noopener')
     },

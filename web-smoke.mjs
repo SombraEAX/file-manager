@@ -163,6 +163,9 @@ const deep = await page.evaluate(async () => {
   const imgUri = await electron.getImageDataUri('/home/demo/Pictures/landscape.png')
   check('getImageDataUri', imgUri.startsWith('data:image/png;base64,'))
 
+  const thumb = await electron.getThumbnail('/home/demo/Pictures/landscape.png', 128)
+  check('getThumbnail', thumb && thumb.startsWith('data:image/png;base64,'))
+
   const openFake = { fake: true }
   const origOpen = window.open
   let openUrl = null

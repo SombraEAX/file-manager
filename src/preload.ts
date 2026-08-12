@@ -270,6 +270,7 @@ const api: ElectronAPI = {
     return String(content)
   },
   getImageDataUri,
+  getThumbnail: (pathname: string, size: number) => ipcRenderer.invoke('get-thumbnail', pathname, size),
   openExternal(url: string) {
     ipcRenderer.send('open-external', url)
   },

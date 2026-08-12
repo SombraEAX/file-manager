@@ -13,9 +13,10 @@
       <div v-if="isDir" class="folder-back" :class="{ 'folder-back--root': type === 'root' }" :style="{ background: bgColor }"></div>
       <div v-if="isDir" class="folder-front" :style="{ background: bgColor }">
         <span v-if="type === 'root'" class="root-dot"></span>
-        <div v-if="preview && preview.length && size >= 32" class="preview-grid">
-          <div v-for="(src, i) in preview.slice(0, 4)" :key="i" class="preview-cell">
-            <img :src="src" class="preview-img" />
+        <div v-if="isDir && !iconChar && preview && preview.length && size >= 32" class="preview-grid" :style="gridStyle">
+          <div v-for="(cell, i) in preview.slice(0, gridCount * gridCount)" :key="i" class="preview-cell">
+            <img v-if="typeof cell === 'string'" :src="cell" class="preview-img" />
+            <EntryIcon v-else :size="cellSize" :type="cell.ext || ''" :preview="cell.uri ? [cell.uri] : []" />
           </div>
         </div>
         <span v-else-if="iconChar" class="nerd-icon" :style="{ fontSize: iconFontSize + 'px' }">{{ iconChar }}</span>
@@ -49,7 +50,14 @@
   const documentTypes = new Set(filetypes.document)
   const archiveTypes = new Set(['zip','rar','7z','tar','gz','bz2','xz','zst','tgz','lz','lzma','arj','cab','z'])
 
+  export interface PreviewCell {
+    name?: string
+    ext?: string
+    uri?: string
+  }
+
   export default defineComponent({
+    name: 'EntryIcon',
     props: {
       size: {
         type: Number,
@@ -58,11 +66,23 @@
       isDir: Boolean,
       type: String,
       preview: {
-        type: Array as PropType<string[]>,
+        type: Array as PropType<Array<string | PreviewCell>>,
         default: () => [],
       },
     },
     computed: {
+      gridCount(): number {
+        return this.size < 80 ? 2 : 3
+      },
+      gridStyle() {
+        return {
+          gridTemplateColumns: `repeat(${this.gridCount}, 1fr)`,
+          gridTemplateRows: `repeat(${this.gridCount}, 1fr)`,
+        }
+      },
+      cellSize(): number {
+        return Math.max(6, Math.round(this.size * 0.8 / this.gridCount))
+      },
       bgColor(): string {
         if (this.isDir) {
           if (this.type === 'root') return '#a0a0a0'
@@ -296,11 +316,11 @@
   }
   .preview-grid{
     display:grid;
-    grid-template-columns:1fr 1fr;
-    grid-template-rows:1fr 1fr;
-    gap:7.5%;
-    width:85%;
-    height:85%;
+    grid-template-columns:repeat(3, 1fr);
+    grid-template-rows:repeat(3, 1fr);
+    gap:8%;
+    width:86%;
+    height:86%;
   }
   .preview-grid.single{
     grid-template-columns:1fr;
@@ -308,8 +328,14 @@
     gap:0;
   }
   .preview-cell{
-    border-radius:20%;
+    border-radius:12.5%;
     overflow:hidden;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+  }
+  .preview-cell > .entry-icon-wrap{
+    transform:scale(0.95);
   }
   .preview-img{
     width:100%;

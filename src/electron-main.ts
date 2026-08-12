@@ -1,6 +1,7 @@
-import { app, BrowserWindow, ipcMain, Menu, MenuItem, clipboard, dialog, shell } from 'electron'
+import { app, BrowserWindow, ipcMain, Menu, MenuItem, clipboard, dialog, shell, nativeImage } from 'electron'
 import type { MenuItemConstructorOptions } from 'electron'
 import { spawn } from 'child_process'
+import { createHash } from 'crypto'
 import * as url from 'url'
 import * as path from 'path'
 import * as os from 'os'
@@ -341,6 +342,120 @@ async function getDirInfo(dirPath: string): Promise<{ size: number; count: numbe
   }
   return { size, count }
 }
+
+const THUMB_BASE = path.join(os.homedir(), '.cache', 'thumbnails')
+const THUMB_DIRS: Record<number, string> = { 128: 'normal', 256: 'large', 512: 'x-large' }
+
+function crc32(buf: Buffer): number {
+  let c: number
+  let crc = 0xffffffff
+  for (let n = 0; n < buf.length; n++) {
+    c = (crc ^ buf[n]) & 0xff
+    for (let k = 0; k < 8; k++) c = (c & 1) ? (0xedb88320 ^ (c >>> 1)) : (c >>> 1)
+    crc = (crc >>> 8) ^ c
+  }
+  return (crc ^ 0xffffffff) >>> 0
+}
+
+function insertTextChunks(png: Buffer, chunks: [string, string][]): Buffer {
+  let offset = 8
+  const ihdrLen = png.readUInt32BE(offset)
+  offset += 12 + ihdrLen
+  const parts: Buffer[] = []
+  for (const [key, value] of chunks) {
+    const data = Buffer.concat([Buffer.from(key, 'latin1'), Buffer.from([0]), Buffer.from(value, 'latin1')])
+    const length = Buffer.alloc(4)
+    length.writeUInt32BE(data.length, 0)
+    const type = Buffer.from('tEXt', 'latin1')
+    const crcBuf = Buffer.alloc(4)
+    crcBuf.writeUInt32BE(crc32(Buffer.concat([type, data])), 0)
+    parts.push(length, type, data, crcBuf)
+  }
+  return Buffer.concat([png.subarray(0, offset), ...parts, png.subarray(offset)])
+}
+
+function readTextChunks(png: Buffer): Record<string, string> {
+  const out: Record<string, string> = {}
+  let offset = 8
+  while (offset + 8 <= png.length) {
+    const len = png.readUInt32BE(offset)
+    const type = png.toString('latin1', offset + 4, offset + 8)
+    if (type === 'IEND') break
+    if (type === 'tEXt') {
+      const data = png.subarray(offset + 8, offset + 8 + len)
+      const sep = data.indexOf(0)
+      if (sep > 0) out[data.toString('latin1', 0, sep)] = data.toString('latin1', sep + 1)
+    }
+    offset += 12 + len
+  }
+  return out
+}
+
+async function generateThumbnail(imagePath: string, size: number): Promise<string | null> {
+  try {
+    let bucket = 128
+    for (const s of Object.keys(THUMB_DIRS).map(Number)) {
+      if (size <= s) { bucket = s; break }
+    }
+    const uri = url.pathToFileURL(imagePath).href
+    const file = path.join(THUMB_BASE, THUMB_DIRS[bucket], createHash('md5').update(uri).digest('hex') + '.png')
+
+    const st = await fsp.lstat(imagePath)
+    const cached = await fsp.readFile(file).catch(() => null)
+    if (cached) {
+      const meta = readTextChunks(cached)
+      const mtime = parseInt(meta['Thumb::MTime'] || '', 10)
+      const fsize = parseInt(meta['Thumb::Size'] || '', 10)
+      if (mtime === Math.floor(st.mtimeMs / 1000) && fsize === st.size) {
+        return 'data:image/png;base64,' + cached.toString('base64')
+      }
+    }
+
+    const img = nativeImage.createFromPath(imagePath)
+    if (img.isEmpty()) return null
+    const { width, height } = img.getSize()
+    const scale = Math.min(1, bucket / Math.max(width, height))
+    const resized = img.resize({
+      width: Math.max(1, Math.round(width * scale)),
+      height: Math.max(1, Math.round(height * scale)),
+    })
+    const png = insertTextChunks(resized.toPNG(), [
+      ['Thumb::URI', uri],
+      ['Thumb::MTime', String(Math.floor(st.mtimeMs / 1000))],
+      ['Thumb::Size', String(st.size)],
+      ['Software', 'file-manager'],
+    ])
+    await fsp.mkdir(path.dirname(file), { recursive: true })
+    await fsp.writeFile(file, png)
+    return 'data:image/png;base64,' + png.toString('base64')
+  } catch (error) {
+    return null
+  }
+}
+
+const thumbQueue: { imagePath: string; size: number; resolve: (uri: string | null) => void }[] = []
+let thumbBusy = false
+
+function enqueueThumbnail(imagePath: string, size: number): Promise<string | null> {
+  return new Promise((resolve) => {
+    thumbQueue.push({ imagePath, size, resolve })
+    drainThumbQueue()
+  })
+}
+
+async function drainThumbQueue() {
+  if (thumbBusy) return
+  thumbBusy = true
+  while (thumbQueue.length) {
+    const task = thumbQueue[0]
+    thumbQueue.shift()
+    task.resolve(await generateThumbnail(task.imagePath, task.size))
+    await new Promise((r) => setImmediate(r))
+  }
+  thumbBusy = false
+}
+
+ipcMain.handle('get-thumbnail', (event, imagePath: string, size: number) => enqueueThumbnail(imagePath, size))
 
 ipcMain.handle('get-dir-info', async (event, dirPath: string) => {
   try {

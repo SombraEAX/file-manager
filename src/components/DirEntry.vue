@@ -9,7 +9,7 @@
     @dblclick.stop="onDoubleClick"
     @contextmenu.prevent="onContextMenu"
   >
-    <EntryIcon :size="entryIconSize" :is-dir="params.type === 'directory'" :type="entryType" />
+    <EntryIcon :size="entryIconSize" :is-dir="params.type === 'directory'" :type="entryType" :preview="thumb" />
     <div class="label"
       v-for="(col,index) in columns"
       :key="col.colname"
@@ -37,7 +37,11 @@
   import type { Column } from '../types/domains'
   import theme from '../../theme.json'
   import prettyBytes from 'pretty-bytes'
-  import EntryIcon from './EntryIcon.vue'
+  import EntryIcon, { PreviewCell } from './EntryIcon.vue'
+  import filetypes from '../../filetypes.json'
+  import { requestThumbnail } from '../stores/thumbQueue'
+
+  const imageTypes = new Set(filetypes.image)
 
   const homedir = `/home/${window.electron.getUserName()}`
 
@@ -83,10 +87,15 @@
     },
     data(){
       return {
-        theme
+        theme,
+        thumb: [] as Array<string | PreviewCell>,
+        _thumbToken: 0,
       }
     },
     watch:{
+      thumbKey(){
+        this.loadThumb()
+      },
       renaming(val: boolean){
         if(val){
           this.$nextTick(()=>{
@@ -110,6 +119,16 @@
       entryType(): string {
         if (this.params.type === 'directory') return this.folderType(this.params.name)
         return this.params.ext || ''
+      },
+      isImageFile(): boolean {
+        return !!(this.params.ext && imageTypes.has(String(this.params.ext).toLowerCase()))
+      },
+      isRegularDir(): boolean {
+        return this.params.type === 'directory' && !this.entryType
+      },
+      thumbKey(): string {
+        const p = this.params.path || window.electron.join(this.address || '', this.params.name || '')
+        return `${this.view}|${this.entryIconSize}|${p}`
       },
       isCut(): boolean {
         if (this.clipboardMode !== 'cut' || !this.clipboardPaths.length) return false
@@ -144,6 +163,43 @@
       onClick($event: MouseEvent){
         this.$emit('click', $event)
       },
+      async loadThumb(): Promise<void> {
+        const token = ++this._thumbToken
+        if (this.view !== 'icons') {
+          this.thumb = []
+          return
+        }
+        const path = this.params.path || window.electron.join(this.address || '', this.params.name || '')
+        const size = Math.max(this.entryIconSize, 40)
+        if (this.params.type === 'directory') {
+          const uris = this.isRegularDir ? await this.loadFolderThumbs(path, size) : []
+          if (token === this._thumbToken) this.thumb = uris
+          return
+        }
+        if (!this.isImageFile) {
+          this.thumb = []
+          return
+        }
+        const uri = await requestThumbnail(path, size)
+        if (token === this._thumbToken) this.thumb = uri ? [uri] : []
+      },
+      async loadFolderThumbs(dirPath: string, size: number): Promise<PreviewCell[]> {
+        try {
+          const entries = await window.electron.readdir(dirPath)
+          const files = entries.filter(e => e.type === 'file').slice(0, 9)
+          const cells = await Promise.all(files.map(async e => {
+            const ext = String(e.ext || '').toLowerCase()
+            if (imageTypes.has(ext)) {
+              const uri = await requestThumbnail(e.path || window.electron.join(dirPath, e.name), size)
+              return { name: e.name, ext, uri: uri || undefined } as PreviewCell
+            }
+            return { name: e.name, ext } as PreviewCell
+          }))
+          return cells
+        } catch (e) {
+          return []
+        }
+      },
       columnStyle(col: Column, index: number): { width: string; minWidth?: string } {
         if(this.view !== 'table') return {width:'auto'}
         const w = (index ? col.width : col.width - 26) + 'px'
@@ -157,6 +213,9 @@
           default: return String(val)
         }
       }
+    },
+    mounted(){
+      this.loadThumb()
     }
   })
 </script>
