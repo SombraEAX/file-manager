@@ -252,6 +252,7 @@
     display:flex;
     align-items:center;
     justify-content:center;
+    overflow:hidden;
   }
   .entry-icon-wrap{
     position:relative;
@@ -278,26 +279,26 @@
   }
   .folder-back{
     position:absolute;
-    top:0;
-    left:5%;
-    width:90%;
-    height:65%;
+    top:6.25%;
+    left:9.375%;
+    width:81.25%;
+    height:62.5%;
     border-radius:12.5%;
     z-index:0;
     filter:brightness(0.75);
   }
   .folder-back--root{
-    width:100%;
-    left:0;
+    width:87.5%;
+    left:6.25%;
     border-radius:12.5% / 17.31%;
     filter:brightness(1.2);
   }
   .folder-front{
     position:absolute;
-    bottom:0;
-    left:0;
-    width:100%;
-    height:90%;
+    bottom:6.25%;
+    left:6.25%;
+    width:87.5%;
+    height:81.25%;
     border-radius:12.5%;
     z-index:0;
     display:flex;
