@@ -11,7 +11,7 @@
 </template>
 <script lang="ts">
   import { defineComponent } from 'vue'
-  import theme from '../../theme.json'
+  import { theme } from '../stores/theme'
 
   export default defineComponent({
     name:'EntriesGroup',

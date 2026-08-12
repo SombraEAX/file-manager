@@ -14,7 +14,7 @@
   import { defineComponent } from 'vue'
   import type { MenuItemSpec } from '../types/ipc'
   import { openMenuBarSubmenu } from '../stores/menus'
-  import theme from '../../theme.json'
+  import { theme, themeState } from '../stores/theme'
   import { IS_WEB } from '../web'
 
   export default defineComponent({
@@ -46,6 +46,7 @@
       'toggleShowMenuBar',
       'toggleTabsInSidePanel',
       'toggleHtmlMenus',
+      'changeTheme',
       'selectAll',
       'invertSelection',
       'rename',
@@ -198,6 +199,11 @@
           case 'hotkeys': {
             this.$emit('hotkeys')
             break
+          }
+          default: {
+            if (id.startsWith('theme:')) {
+              this.$emit('changeTheme', id.slice(6))
+            }
           }
         }
       }
@@ -394,6 +400,15 @@
                 type: 'checkbox',
                 checked: this.tabsInSidePanel
               },
+              {
+                label: 'Theme',
+                submenu: themeState.list.map(name => ({
+                  label: name.charAt(0).toUpperCase() + name.slice(1),
+                  id: 'theme:' + name,
+                  type: 'radio' as const,
+                  checked: themeState.current === name
+                }))
+              },
               ...(IS_WEB ? [] : [{
                 label: 'HTML menus',
                 id: 'html-menus',
@@ -459,6 +474,6 @@
     border-radius:3px
   }
   .menu-item:hover{
-    background:rgba(0,0,0,0.08)
+    background:v-bind('theme.menu.itemHoverBackground')
   }
 </style>

@@ -68,7 +68,7 @@
 </template>
 <script lang="ts">
   import { defineComponent, PropType } from 'vue'
-  import theme from '../../theme.json'
+  import { theme } from '../stores/theme'
   import { openHistoryMenu } from '../stores/menus'
   import AddressBar from "./AddressBar.vue"
   import TasksWidget from "./TasksWidget.vue"
@@ -196,8 +196,8 @@
   .forward::before{ content:"\f054" }
   .up::before{ content:"\f077" }
   .history::before{ content:"\f0d7" }
-  button[disabled]{
-    filter: grayscale(1)
+  button:disabled{
+    color:v-bind('theme.topPanelIconDisabledColor')
   }
   .top-panel .icon{
     width:30px;

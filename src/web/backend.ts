@@ -741,6 +741,12 @@ export function createWebElectronApi(): ElectronAPI {
       if (node.content != null) return 'data:' + mime + ';base64,' + textToBase64(node.content)
       return null
     },
+    async listThemes() {
+      return ['light', 'dark']
+    },
+    async readTheme() {
+      return null
+    },
     openExternal(url: string) {
       window.open(url, '_blank', 'noopener')
     },

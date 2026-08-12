@@ -22,7 +22,7 @@
 <script lang="ts">
   import { defineComponent, PropType } from 'vue'
   import type { DirItem } from '../types/domains'
-  import theme from '../../theme.json'
+  import { theme } from '../stores/theme'
   import EntryIcon from './EntryIcon.vue'
 
   const homedir = `/home/${window.electron.getUserName()}`

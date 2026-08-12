@@ -143,7 +143,7 @@
 <script lang="ts">
 import { defineComponent } from 'vue'
 import type { EntryStats } from '../types/ipc'
-import theme from '../../theme.json';
+import { theme } from '../stores/theme';
 import DropDown from './DropDown.vue';
 import AppCheckbox from './AppCheckbox.vue';
 import EntryIcon from './EntryIcon.vue';
@@ -649,6 +649,7 @@ export default defineComponent({
   input {
     border:0px;
     background:transparent;
+    color:v-bind('theme.addressBar.textColor');
     flex:1;
     outline:none;
     min-width:0;
@@ -723,6 +724,7 @@ export default defineComponent({
     height:20px;
     border:0px;
     background-color:transparent;
+    color:v-bind('theme.addressBar.textColor');
     margin-right:5px;    
     cursor:pointer;
     display:inline-flex;

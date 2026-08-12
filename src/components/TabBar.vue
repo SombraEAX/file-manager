@@ -53,7 +53,7 @@ import { defineComponent, PropType } from 'vue'
 import type { MenuItemSpec } from '../types/ipc'
 import type { Tab } from '../types/domains'
 import { openMenu } from '../stores/menus'
-import theme from '../../theme.json';
+import { theme } from '../stores/theme';
 export default defineComponent({
   props: {
     tabs: { type: Array as PropType<Tab[]>, default: () => [] },

@@ -40,7 +40,7 @@
         v-if="type === 'source'"
         class="outer scrollbox"
       >
-        <pre v-html="text" class="inner source"></pre>
+        <pre v-html="text" class="inner source" :class="{ 'is-dark': theme.dark }"></pre>
       </div>
 
       <!-- unknown -->
@@ -52,7 +52,7 @@
 </template>
 <script lang="ts">
   import { defineComponent } from 'vue'
-  import theme from '../../theme.json'
+  import { theme } from '../stores/theme'
   import SideBar from './SideBar.vue'
   import hljs from 'highlight.js'
   import 'highlight.js/styles/default.css';
@@ -213,6 +213,72 @@
   }
   .markdown{
     font-family:sans-serif
+  }
+  .source{
+    background: v-bind('theme.code.background');
+    color:      v-bind('theme.code.textColor');
+    margin:0;
+    overflow:auto;
+    white-space:pre-wrap;
+  }
+  .markdown a{
+    color: v-bind('theme.linkHover')
+  }
+  .markdown pre,
+  .markdown code{
+    background: v-bind('theme.code.background');
+    color:      v-bind('theme.code.textColor');
+    border-radius:3px;
+    font-family: monospace;
+  }
+  .markdown pre{
+    padding:10px;
+    overflow:auto
+  }
+  .markdown code{
+    padding:1px 4px
+  }
+  .source.is-dark{
+    color:#d4d4d4
+  }
+  .source.is-dark :deep(.hljs-keyword),
+  .source.is-dark :deep(.hljs-selector-tag),
+  .source.is-dark :deep(.hljs-literal),
+  .source.is-dark :deep(.hljs-section),
+  .source.is-dark :deep(.hljs-link){
+    color:#c586c0
+  }
+  .source.is-dark :deep(.hljs-string),
+  .source.is-dark :deep(.hljs-regexp),
+  .source.is-dark :deep(.hljs-addition),
+  .source.is-dark :deep(.hljs-attribute),
+  .source.is-dark :deep(.hljs-meta .hljs-string){
+    color:#ce9178
+  }
+  .source.is-dark :deep(.hljs-attr),
+  .source.is-dark :deep(.hljs-variable),
+  .source.is-dark :deep(.hljs-template-variable),
+  .source.is-dark :deep(.hljs-type),
+  .source.is-dark :deep(.hljs-selector-class),
+  .source.is-dark :deep(.hljs-selector-attr),
+  .source.is-dark :deep(.hljs-selector-pseudo){
+    color:#d7ba7d
+  }
+  .source.is-dark :deep(.hljs-number),
+  .source.is-dark :deep(.hljs-symbol),
+  .source.is-dark :deep(.hljs-bullet){
+    color:#b5cea8
+  }
+  .source.is-dark :deep(.hljs-title),
+  .source.is-dark :deep(.hljs-name){
+    color:#61afef
+  }
+  .source.is-dark :deep(.hljs-built_in),
+  .source.is-dark :deep(.hljs-comment),
+  .source.is-dark :deep(.hljs-quote),
+  .source.is-dark :deep(.hljs-deletion),
+  .source.is-dark :deep(.hljs-meta){
+    color:#6a9955
   }
   .outer{
     align-content:flex-start;

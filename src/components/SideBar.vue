@@ -13,7 +13,7 @@
 </template>
 <script lang="ts">
   import { defineComponent } from 'vue'
-  import theme from '../../theme.json'
+  import { theme } from '../stores/theme'
   export default defineComponent({
     props: {
       position: {
@@ -68,7 +68,8 @@
 <style scoped>
   .sidebar{
     display: flex;
-    position: relative; 
+    position: relative;
+    background: v-bind('theme.background');
   }
 
   .sidebar-left { 

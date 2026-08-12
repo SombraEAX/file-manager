@@ -36,7 +36,7 @@
 <script lang="ts">
   import { defineComponent } from 'vue'
   import prettyBytes from 'pretty-bytes'
-  import theme from '../../theme.json'
+  import { theme } from '../stores/theme'
 
   export default defineComponent({
     emits: ['changeView', 'scaling'],

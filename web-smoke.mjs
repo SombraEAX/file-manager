@@ -57,6 +57,22 @@ await page.keyboard.press('Escape')
 await page.waitForTimeout(300)
 console.log('OK HTML menus toggle hidden in View menu')
 
+await page.click('.menu-bar .menu-item >> text=View')
+await page.waitForSelector('.menu-popup .menu-item >> text=Theme', { timeout: 5000 })
+await page.hover('.menu-popup .menu-item >> text=Theme')
+await page.waitForSelector('.menu-popup .menu-popup .menu-item >> text=Dark', { timeout: 5000 })
+const themeText = await page.textContent('.menu-popup .menu-popup')
+if (!themeText.includes('Light') || !themeText.includes('Dark')) {
+  throw new Error('Theme submenu missing built-in themes')
+}
+await page.click('.menu-popup .menu-popup .menu-item >> text=Dark')
+await page.waitForTimeout(300)
+const activeTheme = await page.evaluate(() => localStorage.getItem('theme'))
+if (activeTheme !== 'dark') throw new Error('Dark theme not persisted, got: ' + activeTheme)
+await page.keyboard.press('Escape')
+await page.waitForTimeout(300)
+console.log('OK theme switched to dark via View menu')
+
 const helloRow = page.locator('div.main[data-variant]').filter({ hasText: 'hello.js' }).first()
 await helloRow.waitFor({ timeout: 5000 })
 await helloRow.click({ button: 'right' })

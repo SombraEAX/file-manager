@@ -189,6 +189,8 @@ export interface ElectronAPI {
   readFile: (path: string, encoding?: string) => Promise<string>
   getImageDataUri: (path: string) => Promise<string>
   getThumbnail: (path: string, size: number) => Promise<string | null>
+  listThemes: () => Promise<string[]>
+  readTheme: (name: string) => Promise<string | null>
   openExternal: (url: string) => void
   trashPath: string
   trashDirs: () => TrashDirs

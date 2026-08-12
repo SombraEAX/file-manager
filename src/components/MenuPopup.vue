@@ -42,7 +42,7 @@
   import { defineComponent, PropType } from 'vue'
   import type { MenuItemSpec } from '../types/ipc'
   import type { MenuSelectPayload } from '../stores/menus'
-  import theme from '../../theme.json'
+  import { theme } from '../stores/theme'
 
   export default defineComponent({
     name: 'MenuPopup',

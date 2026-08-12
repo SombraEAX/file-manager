@@ -35,7 +35,7 @@
 <script lang="ts">
   import { defineComponent, PropType } from 'vue'
   import type { Column } from '../types/domains'
-  import theme from '../../theme.json'
+  import { theme } from '../stores/theme'
   import prettyBytes from 'pretty-bytes'
   import EntryIcon, { PreviewCell } from './EntryIcon.vue'
   import filetypes from '../../filetypes.json'
@@ -304,13 +304,16 @@
     font-size:16px;
     line-height:16px;
     padding:0 2px;
-    border:1px solid #4a90d9;
+    border:1px solid v-bind('theme.input.borderColor');
     border-radius:2px;
     outline:none;
-    background:#fff;
-    color:#000;
+    background: v-bind('theme.input.background');
+    color: v-bind('theme.input.textColor');
     width:100%;
     box-sizing:border-box;
+  }
+  .rename-input:focus{
+    border-color: v-bind('theme.input.borderColorActive');
   }
   .main:hover{
     background: v-bind('theme.fileIcon.hover.background');

@@ -23,7 +23,7 @@
 <script lang="ts">
   import { defineComponent, PropType } from 'vue'
   import type { DropDownOption } from '../types/domains'
-  import theme from '../../theme.json';
+  import { theme } from '../stores/theme';
   import AppCheckbox from './AppCheckbox.vue';
   export default defineComponent({
     components: { AppCheckbox },
@@ -279,6 +279,8 @@
   	border:0px;
   	outline:none;
   	font-size:inherit;
-  	font-family:inherit
+  	font-family:inherit;
+  	background:transparent;
+  	color:v-bind('theme.dropDown.textColor')
   }
 </style>

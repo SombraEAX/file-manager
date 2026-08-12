@@ -126,7 +126,7 @@
 <script lang="ts">
 import { defineComponent } from 'vue'
 import type { Task } from '../stores/tasks'
-import theme from '../../theme.json'
+import { theme } from '../stores/theme'
 import { tasks, formatTime } from '../stores/tasks'
 import { emit } from '../stores/events'
 
@@ -375,7 +375,7 @@ export default defineComponent({
   scrollbar-gutter: stable;
 }
 .task-list::-webkit-scrollbar-thumb {
-  background: #fff;
+  background: rgba(150, 150, 150, 0.6);
 }
 .popup-inner:hover .task-list::-webkit-scrollbar-thumb {
   background-color: rgba(150, 150, 150, 0.6);
@@ -397,7 +397,7 @@ export default defineComponent({
   align-items: center;
   gap: 8px;
   padding: 8px 12px;
-  border-bottom: 1px solid rgba(0,0,0,0.06);
+  border-bottom: 1px solid v-bind('theme.dividerColor');
   height: 56px;
   box-sizing: border-box;
 }
@@ -673,7 +673,7 @@ export default defineComponent({
   align-items: center;
   justify-content: space-between;
   padding: 10px 14px;
-  border-bottom: 1px solid rgba(0,0,0,0.08);
+  border-bottom: 1px solid v-bind('theme.dividerColor');
   flex-shrink: 0;
 }
 .info-title {
@@ -717,7 +717,7 @@ export default defineComponent({
 }
 .log-entry {
   padding: 2px 0;
-  border-bottom: 1px solid rgba(0,0,0,0.04);
+  border-bottom: 1px solid v-bind('theme.dividerColor');
   word-break: break-all;
 }
 .log-entry:last-child {
@@ -733,7 +733,7 @@ export default defineComponent({
   align-items: center;
   justify-content: space-between;
   padding: 8px 12px;
-  border-top: 1px solid rgba(0,0,0,0.08);
+  border-top: 1px solid v-bind('theme.dividerColor');
   flex-shrink: 0;
 }
 .stats-text {

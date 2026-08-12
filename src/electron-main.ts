@@ -345,6 +345,7 @@ async function getDirInfo(dirPath: string): Promise<{ size: number; count: numbe
 
 const THUMB_BASE = path.join(os.homedir(), '.cache', 'thumbnails')
 const THUMB_DIRS: Record<number, string> = { 128: 'normal', 256: 'large', 512: 'x-large' }
+const THEMES_DIR = path.join(__dirname, '../themes')
 
 function crc32(buf: Buffer): number {
   let c: number
@@ -456,6 +457,16 @@ async function drainThumbQueue() {
 }
 
 ipcMain.handle('get-thumbnail', (event, imagePath: string, size: number) => enqueueThumbnail(imagePath, size))
+
+ipcMain.handle('list-themes', async () => {
+  const names = await fsp.readdir(THEMES_DIR).catch(() => [] as string[])
+  return names.filter(name => name.endsWith('.json')).map(name => name.replace(/\.json$/, ''))
+})
+
+ipcMain.handle('read-theme', async (event, name: string) => {
+  if (!/^[A-Za-z0-9_-]+$/.test(String(name || ''))) return null
+  return await fsp.readFile(path.join(THEMES_DIR, name + '.json'), 'utf-8').catch(() => null)
+})
 
 ipcMain.handle('get-dir-info', async (event, dirPath: string) => {
   try {

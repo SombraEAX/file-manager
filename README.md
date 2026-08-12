@@ -71,5 +71,22 @@ npm test
 npm run test:e2e
 ```
 
+## Themes
+
+Themes live in the `themes/` folder at the project root. Each theme is a single
+`.json` file with the same structure as `themes/light.json`. The app ships with
+two built-in themes:
+
+- `light` — `themes/light.json`
+- `dark` — `themes/dark.json`
+
+To add your own theme, drop a `mytheme.json` file into `themes/` and restart the
+app; it will appear in **View → Theme**. The chosen theme is remembered between
+sessions. Color values follow the same keys as the built-in themes (e.g.
+`background`, `fontColor`, `menu.background`, `tabBar.activeBackground`, …).
+Partial themes are merged over the light theme defaults, so you only have to
+override the keys you care about. Set `"dark": true` to opt into dark-optimized
+styling such as syntax highlighting colors in the file preview.
+
 ### Customize configuration
 See [Configuration Reference](https://cli.vuejs.org/config/).

@@ -55,7 +55,7 @@
   import type { Tab, Section, DirItem, DirContextMenuEvent } from '../types/domains'
   import type { MenuItemSpec } from '../types/ipc'
   import { openMenu } from '../stores/menus'
-  import theme from '../../theme.json'
+  import { theme } from '../stores/theme'
   import DirectoryList from './DirectoryList.vue'
   import SideBar from './SideBar.vue'
 

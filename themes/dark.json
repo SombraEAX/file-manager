@@ -1,0 +1,153 @@
+{
+	"background":                 "#1e1e1e",
+	"fontColor":                  "#e0e0e0",
+	"borderColor":                "#3a3a3a",
+	"dividerColor":               "#3a3a3a",
+	"font":                       "sans-serif",
+	"dark":                       true,
+	"linkHover":                  "#4da3ff",
+	"selected":                   "#4da3ff",
+	"textBoxesBorderColor":       "#555",
+	"textBoxesBorderColorActive": "#ff9800",
+	"fileIcon":{
+		"hover":{
+			"background":"#3a6ea5",
+			"fontColor":"#fff"
+		},
+		"selected":{
+			"background":"#2d4a66",
+			"fontColor":"#fff"			
+		}	
+	},
+	"tableRow":{
+		"name":   "#e0e0e0",
+		"params": "grey"
+	},
+	"groupTitle":{
+		"fontColor":"#d0d0d0",
+		"hoverFontColor":"#fff",
+		"hoverBackgroundColor":"#3a3a3a"
+	},
+	"tableHeader":{
+		"bottomBorder":"#444",
+		"button":{
+			"normal":{
+				"background": "#3a3a3a",
+				"fontColor":  "#e0e0e0"
+			},
+			"hover":{
+				"background": "#4a4a4a",
+				"fontColor":  "#fff"
+			},
+			"active":{
+				"background": "#5a5a5a",
+				"fontColor":  "#fff"
+			}
+		},
+		"delimiter":{
+			"normal":"#444",
+			"hover":"#ff9800",
+			"active":"red",
+			"insert":"red"
+		}
+	},
+	"checkbox":{
+		"background":"#333",
+		"borderColor":"#777",
+		"checkedBackground":"#4da3ff",
+		"checkmarkColor":"#fff"
+	},
+	"dropDown":{
+		"background":"#2d2d2d",
+		"textColor":"#e0e0e0",
+		"borderColor":"#555",
+		"itemHoverBackground":"#3a3a3a",
+		"itemSelectedBackground":"#3a6ea5",
+		"itemSelectedTextColor":"#fff"
+	},
+	"menu":{
+		"background":"#2d2d2d",
+		"textColor":"#e0e0e0",
+		"borderColor":"#444",
+		"itemHoverBackground":"#3a3a3a",
+		"separatorColor":"#444",
+		"accentColor":"#4da3ff",
+		"disabledTextColor":"#777",
+		"shadowColor":"rgba(0,0,0,0.5)",
+		"borderRadius":"4px",
+		"font":"sans-serif"
+	},
+	"searchMode":{
+		"background":"#3a3a3a",
+		"textColor":"#e0e0e0",
+		"progressColor":"#4caf50",
+		"progressTrack":"rgba(255,255,255,0.1)"
+	},
+	"addressBar":{
+		"background":"#3a3a3a",
+		"textColor":"#e0e0e0",
+		"borderRadius":"5px",
+		"shadowColor":"rgba(0,0,0,0.4)",
+		"activeItem":{
+			"background":"#3a6ea5",
+			"textColor":"#fff"													
+		},
+		"inlineButton":{
+			"borderRadius":"3px",
+			"normal":{
+				"background":"#4da3ff",
+				"textColor":"#fff"									
+			},
+			"hover":{
+				"background":"#66b3ff",
+				"textColor":"#fff"													
+			},
+			"disabled":{
+				"background":"#555",
+				"textColor":"#bbb"				
+			}
+		}
+	},
+	"sidebarBg": "#262626",
+	"sidebarTextColor": "#888",
+	"topPanelIconColor": "#4da3ff",
+	"topPanelIconHoverColor": "#ff6b6b",
+	"topPanelIconDisabledColor": "#666",
+	"bookmarkColor": "#4da3ff",
+	"treeExpandIconColor": "#4da3ff",
+	"sidebarSectionTitleColor": "#888",
+	"tabBar":{
+		"borderRadius":"5px",
+		"font":"sans-serif",
+		"height":"30px",
+		"activeBackground":"#3a3a3a",
+		"activeTextColor":"#fff",
+		"inactiveBackground":"#262626",
+		"inactiveTextColor":"#bbb",
+		"inactiveHoverBackground":"#333",
+		"dividerColor":"#444",
+		"closeHoverColor":"#ff6b6b"
+	},
+	"trashPanel":{
+		"background":"#3a3a3a",
+		"borderRadius":"5px",
+		"shadowColor":"rgba(0,0,0,0.4)",
+		"textColor":"#e0e0e0",
+		"linkColor":"#4da3ff",
+		"linkHoverColor":"#66b3ff",
+		"deleteColor":"#ff6b6b",
+		"deleteHoverColor":"#ff4444",
+		"restoreColor":"#4caf50",
+		"restoreHoverColor":"#66bb6a"
+	},
+	"input":{
+		"background":"#3a3a3a",
+		"textColor":"#e0e0e0",
+		"borderColor":"#555",
+		"borderColorActive":"#ff9800"
+	},
+	"code":{
+		"background":"#1e1e1e",
+		"textColor":"#e0e0e0"
+	}
+}

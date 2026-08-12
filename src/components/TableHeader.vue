@@ -32,7 +32,7 @@
   import type { Column } from '../types/domains'
   import type { MenuItemSpec } from '../types/ipc'
   import { openMenu } from '../stores/menus'
-  import theme from '../../theme.json'
+  import { theme } from '../stores/theme'
   import TableHeaderButton from './TableHeaderButton.vue'
   
   export default defineComponent({

@@ -35,6 +35,7 @@
           @toggleShowMenuBar = "showMenuBar = !showMenuBar"
           @toggleTabsInSidePanel = "tabsInSidePanel = !tabsInSidePanel"
           @toggleHtmlMenus = "toggleHtmlMenus"
+          @changeTheme = "changeTheme"
           @selectAll       = "selectAllEntries"
           @invertSelection = "invertSelection"
           @rename          = "renameSelected"
@@ -291,7 +292,7 @@
 <script lang="ts">
   import { defineComponent } from 'vue'
   import DirectoryTree from './components/DirectoryTree.vue'
-  import theme from '../theme.json'
+  import { theme, themeState, applyTheme, loadThemes } from './stores/theme'
   import TopPanel from './components/TopPanel.vue'
   import WorkZone from './components/WorkZone.vue'
   import PreviewPanel from './components/PreviewPanel.vue'
@@ -402,10 +403,16 @@
 
     created(){
       this._undoThrottle = createThrottledRunner()
+      applyTheme(themeState.current)
+      loadThemes()
     },
     
     methods:{
     
+      changeTheme(name: string){
+        applyTheme(name)
+      },
+
       async openDir(dirname: string){
         if(this.isTrash) return
         const absolute = dirname.startsWith('/')
@@ -2291,7 +2298,7 @@
   
   body{
     user-select: none;
-    font-family:v-bind('theme.font')
+    font-family:v-bind('theme.font');
   }
 
   .global-wrapper{
@@ -2299,7 +2306,10 @@
     max-height:100%;
     display:flex;
     flex-direction:column;
-    position:relative
+    position:relative;
+    font-family: v-bind('theme.font');
+    background: v-bind('theme.background');
+    color: v-bind('theme.fontColor');
   }
 
   .main{
@@ -2335,7 +2345,7 @@
     left:0;
     right:0;
     z-index:1;
-    background:#fff;
+    background: v-bind('theme.background');
     transform:translateY(-100%);
     transition:transform .15s ease;
     padding-bottom:6px
@@ -2374,7 +2384,7 @@
     z-index:101 !important;
     transform:translateX(-100%);
     transition:transform .15s ease;
-    background:#fff
+    background: v-bind('theme.background')
   }
   .left-panel-container.autohide.panel-visible .tree{
     transform:translateX(0);

@@ -3,8 +3,8 @@ import { mount } from '@vue/test-utils'
 import TasksWidget from '../TasksWidget.vue'
 import type { Task } from '../../stores/tasks'
 
-vi.mock('../../theme.json', () => ({
-  default: {
+vi.mock('../../stores/theme', () => ({
+  theme: {
     font: 'sans-serif',
     fontColor: '#333',
     topPanelIconColor: '#666',
@@ -12,6 +12,7 @@ vi.mock('../../theme.json', () => ({
     tableRow: { params: '#999' },
     searchMode: { progressColor: '#4CAF50' },
     dropDown: { background: '#fff', borderColor: '#ddd' },
+    dividerColor: '#e8e8e8',
   },
 }))
 

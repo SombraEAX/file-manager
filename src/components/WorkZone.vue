@@ -88,7 +88,7 @@
 </template>
 <script lang="ts">
   import { defineComponent } from 'vue'
-  import theme from '../../theme.json'
+  import { theme } from '../stores/theme'
   import TableHeader from './TableHeader.vue'
   import DirEntry from './DirEntry.vue'
   import type { Group, Column, VirtualItem, VirtualEntry, VirtualRow, EntryRect, RubberBand, ContextMenuEvent } from '../types/domains'

@@ -2,7 +2,9 @@
 	"background":                 "#fff",
 	"fontColor":                  "#000",
 	"borderColor":                "#ccc",
+	"dividerColor":               "#e8e8e8",
 	"font":                       "sans-serif",
+	"dark":                       false,
 	"linkHover":                  "red",
 	"selected":                   "blue",
 	"textBoxesBorderColor":       "lightblue",
@@ -110,6 +112,7 @@
 	"sidebarTextColor": "#999",
 	"topPanelIconColor": "#3498db",
 	"topPanelIconHoverColor": "#e74c3c",
+	"topPanelIconDisabledColor": "#999",
 	"bookmarkColor": "#3498db",
 	"treeExpandIconColor": "#3498db",
 	"sidebarSectionTitleColor": "#999",
@@ -136,5 +139,15 @@
 		"deleteHoverColor":"#990000",
 		"restoreColor":"#228822",
 		"restoreHoverColor":"#116611"
+	},
+	"input":{
+		"background":"#fff",
+		"textColor":"#000",
+		"borderColor":"lightblue",
+		"borderColorActive":"orange"
+	},
+	"code":{
+		"background":"#f8f8f8",
+		"textColor":"#333"
 	}
 }
