@@ -28,7 +28,8 @@ A file manager built with **Electron** and **Vue 3**.
 - **Themes** — built-in Light, Dark and high-contrast Contrast-dark themes, plus
   support for your own `themes/*.json` files. The chosen theme is remembered.
 - **Customizable chrome** — auto-hide the top and left panels, show hidden
-  files, choose between native or themed HTML menus.
+  files, choose between native or themed HTML menus, and switch between the
+  native OS frame and a custom in-app frame with window controls.
 - **Hotkeys** — keyboard-first navigation (see [Hotkeys](#hotkeys)).
 
 ## Tech stack

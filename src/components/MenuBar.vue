@@ -1,5 +1,10 @@
 <template>
-  <div class="menu-bar" v-if="items.length">
+  <div
+    class="menu-bar"
+    :class="{ drag: customFrame && !menuState.open }"
+    v-if="items.length"
+    @dblclick="onDblClick"
+  >
     <div
       class="menu-item"
       v-for="item in items"
@@ -8,17 +13,21 @@
     >
       {{ item.label }}
     </div>
+    <window-controls v-if="customFrame && !IS_WEB" />
   </div>
 </template>
 <script lang="ts">
   import { defineComponent } from 'vue'
   import type { MenuItemSpec } from '../types/ipc'
-  import { openMenuBarSubmenu } from '../stores/menus'
+  import { openMenuBarSubmenu, menuState } from '../stores/menus'
   import { theme, themeState } from '../stores/theme'
   import { IS_WEB } from '../web'
+  import WindowControls from './WindowControls.vue'
 
   export default defineComponent({
     name: 'MenuBar',
+
+    components: { WindowControls },
 
     props: {
       view:       String,
@@ -32,7 +41,8 @@
       showMenuBar: Boolean,
       tabsInSidePanel: Boolean,
       hasSelection: Boolean,
-      useHtmlMenus: Boolean
+      useHtmlMenus: Boolean,
+      customFrame: Boolean
     },
 
     emits: [
@@ -46,6 +56,7 @@
       'toggleShowMenuBar',
       'toggleTabsInSidePanel',
       'toggleHtmlMenus',
+      'toggleCustomFrame',
       'changeTheme',
       'selectAll',
       'invertSelection',
@@ -65,7 +76,7 @@
     ],
 
     data(){
-      return { theme }
+      return { theme, IS_WEB }
     },
 
     methods: {
@@ -81,6 +92,13 @@
         openMenuBarSubmenu(this.items, x, y).then(id => {
           if (id) this.itemClick(id)
         })
+      },
+
+      onDblClick(event: MouseEvent){
+        if(!this.customFrame || IS_WEB) return
+        const target = event.target as HTMLElement | null
+        if(target && target.closest('.menu-item')) return
+        window.electron.ipcRenderer.send('window-controls-maximize')
       },
 
       itemClick(id: string){
@@ -138,6 +156,10 @@
           }
           case 'html-menus': {
             this.$emit('toggleHtmlMenus')
+            break
+          }
+          case 'custom-frame': {
+            this.$emit('toggleCustomFrame')
             break
           }
           case 'select-all': {
@@ -210,6 +232,9 @@
     },
 
     computed: {
+      menuState() {
+        return menuState
+      },
       items(): MenuItemSpec[] {
         return [
           {
@@ -394,6 +419,12 @@
                 type: 'checkbox',
                 checked: this.showMenuBar
               },
+              ...(IS_WEB ? [] : [{
+                label: 'Custom window frame',
+                id: 'custom-frame',
+                type: 'checkbox' as const,
+                checked: this.customFrame
+              }]),
               {
                 label: 'Tabs in side panel',
                 id: 'tabs-in-side-panel',
@@ -459,10 +490,17 @@
     display:flex;
     height:22px;
     background:transparent;
-    flex-shrink:0
+    flex-shrink:0;
+    align-items:stretch
   }
   .menu-bar.hidden{
     display:none
+  }
+  .menu-bar.drag{
+    -webkit-app-region:drag
+  }
+  .menu-bar.drag .menu-item{
+    -webkit-app-region:no-drag
   }
   .menu-item{
     padding:2px 10px;

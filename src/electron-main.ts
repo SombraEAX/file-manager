@@ -25,23 +25,52 @@ function errCode(e: unknown): string | undefined {
 console.log('[fs-sim] SLOW_FS throttling =', SLOW_FS, "(enable with SLOW_FS=1)")
 
 let mainWindow: BrowserWindow | null = null
+let isRecreatingWindow = false
 
 const APP_ICON_PATH = path.join(
   __dirname,
   isDev ? '../public/icons/256.png' : '../dist/icons/256.png'
 )
 
+const SETTINGS_PATH = path.join(app.getPath('userData'), 'settings.json')
+
+interface AppSettings {
+  customFrame: boolean
+}
+
+function loadSettings(): AppSettings {
+  try {
+    const raw = fs.readFileSync(SETTINGS_PATH, 'utf-8')
+    const data = JSON.parse(raw)
+    return { customFrame: data && data.customFrame === true }
+  } catch (e) {
+    return { customFrame: false }
+  }
+}
+
+function saveSettings(settings: AppSettings): void {
+  try {
+    fs.mkdirSync(path.dirname(SETTINGS_PATH), { recursive: true })
+    fs.writeFileSync(SETTINGS_PATH, JSON.stringify(settings), 'utf-8')
+  } catch (e) {
+    console.error('failed to save settings:', e)
+  }
+}
+
 function createWindow() {
-  mainWindow = new BrowserWindow({
+  const { customFrame } = loadSettings()
+  const win = new BrowserWindow({
     width: 800,
     height: 600,
     title: 'Sombra Manager',
     icon: APP_ICON_PATH,
+    frame: !customFrame,
     webPreferences: {
       nodeIntegration: true,
       preload: path.join(__dirname, 'preload.js')
     }
   })
+  mainWindow = win
 
   const localPath = url.format({
     pathname: path.join(__dirname, `../dist/index.html`),
@@ -49,15 +78,69 @@ function createWindow() {
     slashes: true
   })
   const urlAddress = isDev ? 'http://localhost:8081/' : localPath
-  mainWindow.loadURL(urlAddress)
+  win.loadURL(urlAddress)
 
-  //mainWindow.webContents.openDevTools();
+  //win.webContents.openDevTools();
 
-  mainWindow.on('closed', function () {
-    mainWindow = null
+  win.on('closed', function () {
+    if (mainWindow === win) mainWindow = null
+  })
+
+  win.on('maximize', () => {
+    if (mainWindow === win) mainWindow.webContents.send('window-maximized-changed', true)
+  })
+
+  win.on('unmaximize', () => {
+    if (mainWindow === win) mainWindow.webContents.send('window-maximized-changed', false)
   })
 
 }
+
+function setWindowFrame(custom: boolean) {
+  const win = mainWindow
+  if (!win || win.isDestroyed()) return
+  if (loadSettings().customFrame === custom) return
+  saveSettings({ customFrame: custom })
+  const wasMaximized = win.isMaximized()
+  const bounds = win.getBounds()
+  isRecreatingWindow = true
+  mainWindow = null
+  win.destroy()
+  createWindow()
+  const next = mainWindow as BrowserWindow | null
+  if (next) {
+    if (wasMaximized) next.maximize()
+    else next.setBounds(bounds)
+  }
+  setImmediate(() => { isRecreatingWindow = false })
+}
+
+ipcMain.on('window-controls-minimize', () => {
+  mainWindow?.minimize()
+})
+
+ipcMain.on('window-controls-maximize', () => {
+  const win = mainWindow
+  if (!win) return
+  if (win.isMaximized()) win.unmaximize()
+  else win.maximize()
+})
+
+ipcMain.on('window-controls-close', () => {
+  mainWindow?.close()
+})
+
+ipcMain.on('set-window-frame', (event, custom: boolean) => {
+  setWindowFrame(custom === true)
+})
+
+ipcMain.handle('window-controls-is-maximized', () => {
+  return !!(mainWindow && mainWindow.isMaximized())
+})
+
+ipcMain.handle('get-window-frame', () => {
+  return loadSettings().customFrame
+})
 
 app.on('ready', () => {
   Menu.setApplicationMenu(null)
@@ -68,6 +151,7 @@ app.on('ready', () => {
 })
 
 app.on('window-all-closed', function () {
+  if (isRecreatingWindow) return
   if (process.platform !== 'darwin') app.quit()
 })
 

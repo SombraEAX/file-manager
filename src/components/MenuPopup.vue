@@ -108,12 +108,18 @@
         }
         this.ready = true
         if (this.parent) this.focusRoot()
-        else document.addEventListener('click', this.onOutsideClick, true)
+        else {
+          document.addEventListener('click', this.onOutsideClick, true)
+          document.addEventListener('pointerdown', this.onOutsideClick, true)
+        }
       })
     },
 
     beforeUnmount() {
-      if (!this.parent) document.removeEventListener('click', this.onOutsideClick, true)
+      if (!this.parent) {
+        document.removeEventListener('click', this.onOutsideClick, true)
+        document.removeEventListener('pointerdown', this.onOutsideClick, true)
+      }
     },
 
     methods: {

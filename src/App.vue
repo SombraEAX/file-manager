@@ -1,16 +1,16 @@
 <template>
-  <div class="global-wrapper">
-    <div 
-      class="top-panel-container"
-      :class="{ autohide: autohideTopPanel, 'panel-visible': topPanelVisible }"
-    >
-      <div class="top-panel-trigger" v-if="autohideTopPanel"
-        @mouseenter="showTopPanel"
-      ></div>
-      <div class="top-panel-inner"
-        @mouseenter="showTopPanel"
-      >
+  <div class="global-wrapper" :class="{ 'custom-frame': customFrame }">
+      <div class="top-panel-container">
+        <div
+          class="title-bar"
+          v-if="titleBarVisible"
+          :class="{ 'menu-open': menuState.open }"
+          @dblclick="toggleWindowMaximize"
+        >
+          <window-controls />
+        </div>
         <menu-bar
+          v-if="customFrame"
           ref               = "menuBar"
           :class            = "{ hidden: !showMenuBar }"
           :view             = "view"
@@ -25,6 +25,7 @@
           :tabsInSidePanel   = "tabsInSidePanel"
           :hasSelection      = "hasSelection"
           :useHtmlMenus      = "menuState.useHtmlMenus"
+          :customFrame       = "customFrame"
           @changeView       = "ev => view = ev"
           @changeSortColumn = "ev => sortColumn = ev"
           @changeSortOrder  = "ev => sortOrder = ev"
@@ -35,7 +36,63 @@
           @toggleShowMenuBar = "showMenuBar = !showMenuBar"
           @toggleTabsInSidePanel = "tabsInSidePanel = !tabsInSidePanel"
           @toggleHtmlMenus = "toggleHtmlMenus"
+          @toggleCustomFrame = "toggleCustomFrame"
           @changeTheme = "changeTheme"
+        @selectAll       = "selectAllEntries"
+        @invertSelection = "invertSelection"
+        @rename          = "renameSelected"
+        @moveToTrash     = "moveToTrashFromMenu"
+        @copy            = "onCopy"
+        @cut             = "onCut"
+        @paste           = "onPaste"
+        @createFile      = "createNewFile"
+        @createFolder    = "createNewFolder"
+        @open            = "menuOpen"
+        @openInNewTab    = "menuOpenInNewTab"
+        @properties      = "menuProperties"
+        @about           = "openAbout"
+        @github          = "openGithub"
+        @hotkeys         = "openHotkeys"
+      />
+        <div
+          class="top-panel-slider"
+          :class="{ autohide: autohideTopPanel, 'panel-visible': topPanelVisible }"
+        >
+          <div class="top-panel-trigger" v-if="autohideTopPanel"
+            @mouseenter="showTopPanel"
+          ></div>
+          <div class="top-panel-inner"
+            @mouseenter="showTopPanel"
+          >
+          <menu-bar
+            v-if="!customFrame"
+            ref               = "menuBar"
+            :class            = "{ hidden: !showMenuBar }"
+            :view             = "view"
+            :sortColumn       = "sortColumn"
+            :sortOrder        = "sortOrder"
+            :groupBy          = "groupBy"
+            :isDev            = "isDev"
+            :autohideLeftPanel = "autohideLeftPanel"
+            :autohideTopPanel  = "autohideTopPanel"
+            :showHidden        = "showHidden"
+            :showMenuBar       = "showMenuBar"
+            :tabsInSidePanel   = "tabsInSidePanel"
+            :hasSelection      = "hasSelection"
+            :useHtmlMenus      = "menuState.useHtmlMenus"
+            :customFrame       = "customFrame"
+            @changeView       = "ev => view = ev"
+            @changeSortColumn = "ev => sortColumn = ev"
+            @changeSortOrder  = "ev => sortOrder = ev"
+            @changeGroup      = "ev => groupBy = ev"
+            @toggleAutohideLeftPanel = "autohideLeftPanel = !autohideLeftPanel"
+            @toggleAutohideTopPanel  = "autohideTopPanel = !autohideTopPanel"
+            @toggleShowHidden = "showHidden = !showHidden"
+            @toggleShowMenuBar = "showMenuBar = !showMenuBar"
+            @toggleTabsInSidePanel = "tabsInSidePanel = !tabsInSidePanel"
+            @toggleHtmlMenus = "toggleHtmlMenus"
+            @toggleCustomFrame = "toggleCustomFrame"
+            @changeTheme = "changeTheme"
           @selectAll       = "selectAllEntries"
           @invertSelection = "invertSelection"
           @rename          = "renameSelected"
@@ -51,39 +108,45 @@
           @about           = "openAbout"
           @github          = "openGithub"
           @hotkeys         = "openHotkeys"
-        />
-        <tab-bar
-          v-if         = "!tabsInSidePanel"
-          :tabs        = "tabs"
-          :active-index = "activeTabIndex"
-          @select      = "switchTab"
-          @close       = "closeTab"
-        />
-        <top-panel
-          ref="topPanel"
-          :autohideTopPanel   = "autohideTopPanel"
-          :address            = "currentDir"
-          :history            = "tabs[activeTabIndex]?.history || []"
-          :historyIndex       = "tabs[activeTabIndex]?.historyIndex ?? -1"
-          :search-version     = "searchVersion"
-          @back               = "ev => tabs[activeTabIndex].historyIndex--"
-          @forward            = "ev => tabs[activeTabIndex].historyIndex++"
-          @up                 = "up"
-          @jump               = "jump"
-          @changeHistoryIndex = "ev => tabs[activeTabIndex].historyIndex = ev"
-          @search             = "onSearchResults"
-          :view               = "view"
-          @changeView         = "ev => view = ev"
-          :scale              = "iconSize"
-          @scaling            = "ev => iconSize = ev"
-          @togglePreviewPanel = "rightPanelVisible = !rightPanelVisible"
-          :previewPanelVisible="rightPanelVisible"
-          :showMenuBar        = "showMenuBar"
-          :bookmarks          = "bookmarks"
-          :isBookmarked       = "isBookmarked"
-          @toggleBookmark     = "toggleBookmark"
-          @openRootMenu       = "onOpenRootMenu"
-        />
+          />
+          <div class="tab-bar-row" v-if="!tabsInSidePanel">
+            <tab-bar
+              :tabs        = "tabs"
+              :active-index = "activeTabIndex"
+              @select      = "switchTab"
+              @close       = "closeTab"
+            />
+            <window-controls
+              v-if="controlsInTabBar"
+              class="tab-bar-window-controls"
+            />
+          </div>
+          <top-panel
+            ref="topPanel"
+            :autohideTopPanel   = "autohideTopPanel"
+            :address            = "currentDir"
+            :history            = "tabs[activeTabIndex]?.history || []"
+            :historyIndex       = "tabs[activeTabIndex]?.historyIndex ?? -1"
+            :search-version     = "searchVersion"
+            @back               = "ev => tabs[activeTabIndex].historyIndex--"
+            @forward            = "ev => tabs[activeTabIndex].historyIndex++"
+            @up                 = "up"
+            @jump               = "jump"
+            @changeHistoryIndex = "ev => tabs[activeTabIndex].historyIndex = ev"
+            @search             = "onSearchResults"
+            :view               = "view"
+            @changeView         = "ev => view = ev"
+            :scale              = "iconSize"
+            @scaling            = "ev => iconSize = ev"
+            @togglePreviewPanel = "rightPanelVisible = !rightPanelVisible"
+            :previewPanelVisible="rightPanelVisible"
+            :showMenuBar        = "showMenuBar"
+            :bookmarks          = "bookmarks"
+            :isBookmarked       = "isBookmarked"
+            @toggleBookmark     = "toggleBookmark"
+            @openRootMenu       = "onOpenRootMenu"
+          />
+        </div>
       </div>
     </div>
     <div class="main" @mouseenter="scheduleHideTopPanel">
@@ -299,6 +362,7 @@
   import MenuBar from './components/MenuBar.vue'
   import MenuHost from './components/MenuHost.vue'
   import TabBar from './components/TabBar.vue'
+  import WindowControls from './components/WindowControls.vue'
   import aboutHeader from './assets/about-header.png'
   import pkg from '../package.json'
   import prettyBytes from 'pretty-bytes'
@@ -308,6 +372,7 @@
   import type { Tab, Group, PropsInfo, SelectEvent, ContextMenuEvent, BackgroundContextMenuEvent, DirItem, SearchResultsEvent } from './types/domains'
   import { on, off } from './stores/events'
   import { menuState, toggleHtmlMenus, openMenu } from './stores/menus'
+  import { IS_WEB } from './web'
 
   const username = window.electron.getUserName()
   const homedir  = `/home/${username}`
@@ -334,7 +399,8 @@
       TopPanel,
       PreviewPanel,
       TabBar,
-      MenuHost
+      MenuHost,
+      WindowControls
     },
     
     data(){      
@@ -378,6 +444,7 @@
         rightPanelVisible: localStorage.getItem('rightPanelVisible') !== 'false',
         showHidden: localStorage.getItem('showHidden') === 'true',
         showMenuBar: localStorage.getItem('showMenuBar') !== 'false',
+        customFrame: IS_WEB ? false : localStorage.getItem('customFrame') === 'true',
         tabsInSidePanel: localStorage.getItem('tabsInSidePanel') === 'true',
         bookmarks: JSON.parse(localStorage.getItem('bookmarks') || '[]') as string[],
         selectedMap: {} as Record<string, boolean>,
@@ -398,6 +465,8 @@
         _undoThrottle: createThrottledRunner(),
         _onKeydown: null as ((e: KeyboardEvent) => void) | null,
         _allEntries: [] as EntryStats[],
+        windowMaximized: false,
+        _onWindowMaximized: null as ((...args: unknown[]) => void) | null,
       }
     },
 
@@ -915,7 +984,8 @@
         this.clipboardMode = 'copy'
       },
       onOpenRootMenu(x: number, y: number){
-        (this.$refs.menuBar as MenuBarRef).openRootMenu(x, y)
+        const mb = this.$refs.menuBar as MenuBarRef | undefined
+        if (mb) mb.openRootMenu(x, y)
       },
       onCut(){
         if(this.isTrash) return
@@ -2021,11 +2091,40 @@
 
       toggleHtmlMenus(){
         toggleHtmlMenus()
+      },
+
+      toggleCustomFrame(){
+        this.customFrame = !this.customFrame
+        localStorage.setItem('customFrame', String(this.customFrame))
+        window.electron.ipcRenderer.send('set-window-frame', this.customFrame)
+      },
+
+      toggleWindowMaximize(){
+        if(IS_WEB) return
+        window.electron.ipcRenderer.send('window-controls-maximize')
+      },
+
+      syncCustomFrame(){
+        if(IS_WEB) return
+        window.electron.ipcRenderer.invoke('get-window-frame')
+          .then(v => { this.customFrame = !!v })
+          .catch(() => {})
+      },
+
+      syncWindowMaximized(){
+        if(IS_WEB) return
+        window.electron.ipcRenderer.invoke('window-controls-is-maximized')
+          .then(v => { this.windowMaximized = !!v })
+          .catch(() => {})
+        this._onWindowMaximized = (_e: unknown, v: unknown) => { this.windowMaximized = !!v }
+        window.electron.ipcRenderer.on('window-maximized-changed', this._onWindowMaximized)
       }
     },
     
     async mounted(){
       window.__tasks = { tasks, createTask, updateTask, cancelTask, removeTask, pauseTask, resumeTask }
+      this.syncCustomFrame()
+      this.syncWindowMaximized()
       this.tabs.push({ id: ++this.tabIdCounter, history: [], historyIndex: -1, scrollTop: 0 });
       this.activeTabIndex = 0;
       await this.jump(homedir)
@@ -2110,11 +2209,21 @@
       off('task-pause', this.onTaskPause)
       off('task-resume', this.onTaskResume)
       off('task-retry-failed', this.onTaskRetryFailed)
+      if(this._onWindowMaximized){
+        window.electron.ipcRenderer.removeListener('window-maximized-changed', this._onWindowMaximized)
+        this._onWindowMaximized = null
+      }
     },
     
     computed:{
       menuState(){
         return menuState
+      },
+      titleBarVisible(){
+        return this.customFrame && !this.showMenuBar && (this.autohideTopPanel || !(this.windowMaximized && !this.tabsInSidePanel))
+      },
+      controlsInTabBar(){
+        return this.customFrame && !this.showMenuBar && !this.autohideTopPanel && this.windowMaximized && !this.tabsInSidePanel
       },
       groups(){
         const source = this.isSearchMode && this.searchResults ? this.searchResults : this.entries;
@@ -2310,6 +2419,21 @@
     font-family: v-bind('theme.font');
     background: v-bind('theme.background');
     color: v-bind('theme.fontColor');
+    --title-bar-height:30px;
+  }
+  .global-wrapper.custom-frame{
+    box-sizing:border-box;
+    border:1px solid v-bind('theme.borderColor');
+    overflow:hidden;
+  }
+  .tab-bar-row{
+    display:flex;
+    align-items:stretch;
+    flex-shrink:0;
+  }
+  .tab-bar-row > .tab-bar{
+    flex:1 1 auto;
+    min-width:0;
   }
 
   .main{
@@ -2325,7 +2449,29 @@
   .top-panel-container{
     flex-shrink:0
   }
-  .top-panel-container.autohide{
+  .title-bar{
+    height:var(--title-bar-height);
+    display:flex;
+    align-items:stretch;
+    justify-content:flex-end;
+    -webkit-app-region:drag;
+    flex-shrink:0;
+    position:relative;
+    z-index:360;
+    background: v-bind('theme.background');
+  }
+  .global-wrapper.custom-frame .menu-bar{
+    position:relative;
+    z-index:360;
+    background: v-bind('theme.background');
+  }
+  .title-bar .window-controls{
+    -webkit-app-region:no-drag;
+  }
+  .title-bar.menu-open{
+    -webkit-app-region:no-drag;
+  }
+  .top-panel-slider.autohide{
     height:0;
     overflow:visible;
     position:relative;
@@ -2339,7 +2485,7 @@
     height:4px;
     cursor:default
   }
-  .top-panel-container.autohide .top-panel-inner{
+  .top-panel-slider.autohide .top-panel-inner{
     position:absolute;
     top:0;
     left:0;
@@ -2350,9 +2496,15 @@
     transition:transform .15s ease;
     padding-bottom:6px
   }
-  .top-panel-container.autohide.panel-visible .top-panel-inner{
+  .top-panel-slider.autohide.panel-visible .top-panel-inner{
     transform:translateY(0);
     box-shadow:0 2px 8px rgba(0,0,0,.3)
+  }
+  .global-wrapper.custom-frame .top-panel-slider.autohide .top-panel-inner{
+    transform:translateY(calc(-100% - var(--title-bar-height)));
+  }
+  .global-wrapper.custom-frame .top-panel-slider.autohide.panel-visible .top-panel-inner{
+    transform:translateY(0);
   }
   .left-panel-container{
     display:flex;

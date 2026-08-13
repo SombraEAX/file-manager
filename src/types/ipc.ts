@@ -143,8 +143,13 @@ export interface ElectronIpc {
   send(channel: TaskControlChannel, taskId: string | number): void
   send(channel: TaskPauseChannel, taskId: string | number): void
   send(channel: TaskResumeChannel, taskId: string | number): void
+  send(channel: 'window-controls-minimize'): void
+  send(channel: 'window-controls-maximize'): void
+  send(channel: 'window-controls-close'): void
+  send(channel: 'set-window-frame', custom: boolean): void
 
   on(channel: 'show-menu-bar-submenu-reply', listener: (event: IpcRendererEvent, id: string) => void): this
+  on(channel: 'window-maximized-changed', listener: (event: IpcRendererEvent, isMaximized: boolean) => void): this
   on(channel: 'show-menu-reply', listener: (event: IpcRendererEvent, index: number) => void): this
   on(channel: 'show-history-menu-reply', listener: (event: IpcRendererEvent, index: number) => void): this
   on(channel: 'move-progress', listener: (event: IpcRendererEvent, data: MoveProgress) => void): this
@@ -152,6 +157,7 @@ export interface ElectronIpc {
   on(channel: 'trash-permanent-delete-progress', listener: (event: IpcRendererEvent, data: PermanentDeleteProgress) => void): this
 
   once(channel: 'show-menu-bar-submenu-reply', listener: (event: IpcRendererEvent, id: string) => void): this
+  once(channel: 'window-maximized-changed', listener: (event: IpcRendererEvent, isMaximized: boolean) => void): this
   once(channel: 'show-menu-reply', listener: (event: IpcRendererEvent, index: number) => void): this
   once(channel: 'show-history-menu-reply', listener: (event: IpcRendererEvent, index: number) => void): this
   once(channel: 'move-progress', listener: (event: IpcRendererEvent, data: MoveProgress) => void): this
@@ -160,6 +166,8 @@ export interface ElectronIpc {
 
   invoke(channel: 'open-directory-dialog'): Promise<string | null>
   invoke(channel: 'get-from-clipboard'): Promise<string>
+  invoke(channel: 'window-controls-is-maximized'): Promise<boolean>
+  invoke(channel: 'get-window-frame'): Promise<boolean>
   invoke(channel: 'open-file', pathname: string): Promise<{ error: string }>
   invoke(channel: 'get-dir-info', dirPath: string): Promise<DirInfo>
   invoke(channel: 'move-file', src: string, dest: string, taskId: string | number): Promise<MoveResult>
