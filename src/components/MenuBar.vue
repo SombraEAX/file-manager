@@ -41,6 +41,8 @@
       showMenuBar: Boolean,
       tabsInSidePanel: Boolean,
       hasSelection: Boolean,
+      openNewTabEnabled: Boolean,
+      openWithEnabled: Boolean,
       useHtmlMenus: Boolean,
       customFrame: Boolean
     },
@@ -262,12 +264,12 @@
               {
                 label: 'Open in new tab',
                 id: 'open-in-new-tab',
-                enabled: this.hasSelection
+                enabled: this.openNewTabEnabled
               },
               {
                 label: 'Open with...',
                 id: 'open-with',
-                enabled: this.hasSelection
+                enabled: this.openWithEnabled
               },
               { type: 'separator' },
               {

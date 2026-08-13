@@ -24,6 +24,8 @@
           :showMenuBar       = "showMenuBar"
           :tabsInSidePanel   = "tabsInSidePanel"
           :hasSelection      = "hasSelection"
+          :openNewTabEnabled = "canOpenInNewTab"
+          :openWithEnabled   = "canOpenWith"
           :useHtmlMenus      = "menuState.useHtmlMenus"
           :customFrame       = "customFrame"
           @changeView       = "ev => view = ev"
@@ -79,7 +81,9 @@
             :showHidden        = "showHidden"
             :showMenuBar       = "showMenuBar"
             :tabsInSidePanel   = "tabsInSidePanel"
-            :hasSelection      = "hasSelection"
+          :hasSelection      = "hasSelection"
+          :openNewTabEnabled = "canOpenInNewTab"
+          :openWithEnabled   = "canOpenWith"
             :useHtmlMenus      = "menuState.useHtmlMenus"
             :customFrame       = "customFrame"
             @changeView       = "ev => view = ev"
@@ -2312,6 +2316,18 @@
 
       hasSelection(){
         return Object.keys(this.selectedMap).length > 0
+      },
+
+      canOpenInNewTab(){
+        const path = this.focusedPath()
+        if(!path) return false
+        return this._entryType(path) === 'directory'
+      },
+
+      canOpenWith(){
+        const path = this.focusedPath()
+        if(!path) return false
+        return this._entryType(path) === 'file'
       },
 
       trashSelectedCount(){
