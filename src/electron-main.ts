@@ -26,11 +26,17 @@ console.log('[fs-sim] SLOW_FS throttling =', SLOW_FS, "(enable with SLOW_FS=1)")
 
 let mainWindow: BrowserWindow | null = null
 
+const APP_ICON_PATH = path.join(
+  __dirname,
+  isDev ? '../public/icons/256.png' : '../dist/icons/256.png'
+)
+
 function createWindow() {
   mainWindow = new BrowserWindow({
     width: 800,
     height: 600,
     title: 'Sombra Manager',
+    icon: APP_ICON_PATH,
     webPreferences: {
       nodeIntegration: true,
       preload: path.join(__dirname, 'preload.js')
@@ -55,6 +61,9 @@ function createWindow() {
 
 app.on('ready', () => {
   Menu.setApplicationMenu(null)
+  if (process.platform === 'darwin') {
+    app.dock?.setIcon(nativeImage.createFromPath(APP_ICON_PATH))
+  }
   createWindow()
 })
 
