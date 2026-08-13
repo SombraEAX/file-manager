@@ -23,7 +23,10 @@
         @click.stop="onItemClick(item, index)"
         @mouseenter="onItemMouseEnter(item, index)"
       >
-        <span class="menu-icon">{{ itemIcon(item) }}</span>
+        <span class="menu-icon">
+          <span v-if="item.checked && item.type === 'radio'" class="menu-radio"></span>
+          <span v-else-if="item.checked" class="menu-check">✓</span>
+        </span>
         <span class="menu-label">{{ item.label }}</span>
         <span v-if="item.submenu && item.submenu.length" class="menu-arrow">›</span>
       </div>
@@ -117,10 +120,6 @@
       setItemRef(el: HTMLElement | null, index: number) {
         if (el) this.itemEls[index] = el
         else delete this.itemEls[index]
-      },
-      itemIcon(item: MenuItemSpec): string {
-        if (item.checked) return item.type === 'radio' ? '●' : '✓'
-        return ''
       },
       focusRoot() {
         const el = this.$refs.popupRoot as HTMLElement | undefined
@@ -276,6 +275,18 @@
     flex-shrink:0;
     text-align:center;
     color:v-bind('theme.menu.accentColor');
+    font-size:12px;
+  }
+  .menu-radio{
+    display:inline-block;
+    width:7px;
+    height:7px;
+    border-radius:50%;
+    background:v-bind('theme.menu.accentColor');
+    vertical-align:middle;
+  }
+  .menu-check{
+    font-size:12px;
   }
   .menu-label{
     flex:1;

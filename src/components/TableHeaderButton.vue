@@ -132,7 +132,8 @@
     font-size:16px;
   	height:20px;
     box-sizing:border-box;
-    padding-top:2px;
+    display:flex;
+    align-items:center;
     padding-left:10px;
     z-index:100;
     padding-right:10px;

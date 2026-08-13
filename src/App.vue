@@ -2617,7 +2617,7 @@
   }
   .about-row{
     display:flex;
-    gap:16px;
+    gap:8px;
     padding:4px 0;
     font-family:v-bind('theme.font');
     font-size:13px;

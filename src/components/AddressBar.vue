@@ -18,16 +18,16 @@
             class="triangle-wrap"
             @click.stop="toggleDropdown(-1)"
           >
-            <span class="triangle" :class="{ open: openDropdownIdx === -1 }"> ▸ </span>
+            <span class="triangle" :class="{ open: openDropdownIdx === -1 }"></span>
           </span>
-          <span v-for="(part, index) in breadcrumbParts" :key="index">
+          <span v-for="(part, index) in breadcrumbParts" :key="index" class="crumb-seg">
             <span class="breadcrumb" @click.stop="goToSegment(index)">{{ part }}</span>
             <span
               v-if="index < breadcrumbParts.length - 1"
               class="triangle-wrap"
               @click.stop="toggleDropdown(index)"
             >
-              <span class="triangle" :class="{ open: openDropdownIdx === index }"> ▸ </span>
+              <span class="triangle" :class="{ open: openDropdownIdx === index }"></span>
             </span>
           </span>
         </div>
@@ -581,6 +581,8 @@ export default defineComponent({
     margin:auto;
     display: flex;
     flex-wrap: nowrap;
+    align-items: center;
+    line-height:16px;
   }
   
   .breadcrumb {
@@ -588,11 +590,17 @@ export default defineComponent({
     color: v-bind('theme.addressBar.textColor');
     padding: 0 5px;
     cursor: pointer;
+    display: inline-flex;
+    align-items: center;
   }
   
   .breadcrumb:hover {
     text-decoration: underline;
     color: v-bind('theme.linkHover');
+  }
+
+  .crumb-seg{
+    display:contents;
   }
   
   .breadcrumb-root {
@@ -632,11 +640,18 @@ export default defineComponent({
   .triangle-wrap{
     position:relative;
     display:inline-flex;
+    align-items:center;
+    justify-content:center;
+    padding:0 3px;
   }
   .triangle{
     cursor:pointer;
     transition: transform 0.2s;
-    display:inline-block;
+    width:0;
+    height:0;
+    border-left:5px solid currentColor;
+    border-top:4px solid transparent;
+    border-bottom:4px solid transparent;
   }
   .triangle.open{
     transform: rotate(90deg);

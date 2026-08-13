@@ -134,7 +134,8 @@
   }
   .dir-label{
     display:flex;
-    flex-direction:row
+    flex-direction:row;
+    align-items:center;
   }
   .dir-icon{
     cursor:pointer
