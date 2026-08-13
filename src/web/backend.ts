@@ -755,6 +755,12 @@ export function createWebElectronApi(): ElectronAPI {
     async openFile(pathname: string) {
       return openFile(pathname)
     },
+    async openWithList() {
+      return { mimeType: '', apps: [] }
+    },
+    async openWith() {
+      return { error: 'Not supported in web mode' }
+    },
     async getDirInfo(pathname: string) {
       return getDirInfo(pathname)
     },
@@ -787,6 +793,8 @@ export function createWebElectronApi(): ElectronAPI {
   ipc.handle('open-directory-dialog', () => HOME_DIR)
   ipc.handle('get-from-clipboard', () => clipboard.text)
   ipc.handle('open-file', (event, pathname: string) => openFile(pathname))
+  ipc.handle('open-with-list', () => ({ mimeType: '', apps: [] }))
+  ipc.handle('open-with', () => ({ error: 'Not supported in web mode' }))
   ipc.handle('get-dir-info', (event, dirPath: string) => getDirInfo(dirPath))
   ipc.handle('move-file', (event, src: string, dest: string, taskId: string | number) => moveFile(src, dest, taskId))
   ipc.handle('trash-items', (event, paths: string[], taskId: string | number) => trashItems(paths, taskId))

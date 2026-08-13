@@ -279,6 +279,8 @@ const api: ElectronAPI = {
   trashPath: TRASH_PATH,
   trashDirs,
   openFile: async pathname => ipcRenderer.invoke('open-file', pathname),
+  openWithList: async pathname => ipcRenderer.invoke('open-with-list', pathname),
+  openWith: async (pathname, exec) => ipcRenderer.invoke('open-with', pathname, exec),
   getDirInfo: async pathname => ipcRenderer.invoke('get-dir-info', pathname),
   getUserName(): string {
     return os.userInfo().username

@@ -2,6 +2,7 @@ import { app, BrowserWindow, ipcMain, Menu, MenuItem, clipboard, dialog, shell, 
 import type { MenuItemConstructorOptions } from 'electron'
 import { spawn } from 'child_process'
 import { createHash } from 'crypto'
+import * as zlib from 'zlib'
 import * as url from 'url'
 import * as path from 'path'
 import * as os from 'os'
@@ -271,6 +272,331 @@ ipcMain.handle('open-file', async (event, pathname: string) => {
   let error = ''
   try {
     error = await openWithSystemHandler(pathname)
+  } catch (e) {
+    error = errMessage(e)
+  }
+  return { error }
+});
+
+interface DesktopEntry {
+  id: string
+  name: string
+  exec: string
+  icon: string
+  mimeTypes: string[]
+  noDisplay: boolean
+  hidden: boolean
+}
+
+const DESKTOP_DIRS = [
+  path.join(os.homedir(), '.local', 'share', 'applications'),
+  '/usr/local/share/applications',
+  '/usr/share/applications'
+]
+
+const ICON_SIZE_DIRS = ['scalable', '256x256', '128x128', '64x64', '48x48', '32x32', '24x24']
+const ICON_EXTS = ['svg', 'png', 'xpm', 'jpg', 'jpeg', 'gif']
+
+function resolveIconPath(icon: string): string {
+  if (!icon) return ''
+  const candidates: string[] = []
+  if (icon.startsWith('/')) {
+    candidates.push(icon)
+  } else {
+    const name = /\.(svg|png|xpm|jpg|jpeg|gif)$/i.test(icon)
+      ? icon.replace(/\.[^.]+$/, '')
+      : icon
+    const userIcons = path.join(os.homedir(), '.local', 'share', 'icons')
+    const hicolor = '/usr/share/icons/hicolor'
+    const pixmaps = '/usr/share/pixmaps'
+    for (const size of ICON_SIZE_DIRS) {
+      for (const ext of ICON_EXTS) {
+        candidates.push(path.join(userIcons, 'hicolor', size, 'apps', `${name}.${ext}`))
+        candidates.push(path.join(hicolor, size, 'apps', `${name}.${ext}`))
+      }
+    }
+    for (const ext of ICON_EXTS) {
+      candidates.push(path.join(pixmaps, `${name}.${ext}`))
+    }
+  }
+  for (const candidate of candidates) {
+    if (fs.existsSync(candidate)) return candidate
+  }
+  return ''
+}
+
+function parseDesktopFile(id: string, content: string): DesktopEntry | null {
+  let name = ''
+  let exec = ''
+  let icon = ''
+  let noDisplay = false
+  let hidden = false
+  const mimeTypes: string[] = []
+  let inEntry = false
+  for (const rawLine of content.split(/\r?\n/)) {
+    const line = rawLine.trim()
+    if (line.startsWith('[')) {
+      inEntry = line === '[Desktop Entry]'
+      continue
+    }
+    if (!inEntry || line === '' || line.startsWith('#')) continue
+    const eq = line.indexOf('=')
+    if (eq < 0) continue
+    const key = line.slice(0, eq).trim()
+    const value = line.slice(eq + 1).trim()
+    if (key === 'Name' && !name) name = value
+    else if (key === 'Exec') exec = value
+    else if (key === 'Icon') icon = value
+    else if (key === 'NoDisplay') noDisplay = value === 'true'
+    else if (key === 'Hidden') hidden = value === 'true'
+    else if (key === 'MimeType') mimeTypes.push(...value.split(';').map(s => s.trim()).filter(Boolean))
+  }
+  if (!name || !exec || noDisplay || hidden) return null
+  return { id, name, exec, icon, mimeTypes, noDisplay, hidden }
+}
+
+async function listDesktopEntries(): Promise<DesktopEntry[]> {
+  const seen = new Set<string>()
+  const entries: DesktopEntry[] = []
+  for (const dir of DESKTOP_DIRS) {
+    let files: string[]
+    try {
+      files = await fsp.readdir(dir)
+    } catch (e) {
+      continue
+    }
+    for (const file of files) {
+      if (!file.endsWith('.desktop') || seen.has(file)) continue
+      seen.add(file)
+      try {
+        const content = await fsp.readFile(path.join(dir, file), 'utf-8')
+        const entry = parseDesktopFile(file, content)
+        if (entry) entries.push(entry)
+      } catch (e) {
+        // ignore unreadable desktop files
+      }
+    }
+  }
+  return entries
+}
+
+function runCommand(query: string, args: string[]): Promise<string> {
+  return new Promise((resolve) => {
+    const child = spawn(query, args)
+    let out = ''
+    child.stdout.on('data', (chunk) => { out += String(chunk) })
+    child.on('error', () => resolve(''))
+    child.on('close', () => resolve(out.trim()))
+  })
+}
+
+async function getMimeType(pathname: string): Promise<string> {
+  if (process.platform !== 'linux') return 'application/octet-stream'
+  const out = await runCommand('xdg-mime', ['query', 'filetype', pathname])
+  return out || 'application/octet-stream'
+}
+
+async function getDefaultApps(mime: string): Promise<string[]> {
+  if (process.platform !== 'linux') return []
+  const out = await runCommand('xdg-mime', ['query', 'default', mime])
+  return out ? out.split(';').filter(Boolean) : []
+}
+
+function pngChunk(type: string, data: Buffer): Buffer {
+  const len = Buffer.alloc(4)
+  len.writeUInt32BE(data.length, 0)
+  const typeBuf = Buffer.from(type, 'latin1')
+  const crcBuf = Buffer.alloc(4)
+  crcBuf.writeUInt32BE(crc32(Buffer.concat([typeBuf, data])), 0)
+  return Buffer.concat([len, typeBuf, data, crcBuf])
+}
+
+function parseXpmColor(value: string): { r: number; g: number; b: number; a: number } | null {
+  const v = value.trim()
+  if (v === 'None' || v === 'none') return { r: 0, g: 0, b: 0, a: 0 }
+  const hex = v.match(/^#([0-9a-fA-F]+)$/)
+  if (hex) {
+    const s = hex[1]
+    if (s.length === 3) {
+      return { r: parseInt(s[0] + s[0], 16), g: parseInt(s[1] + s[1], 16), b: parseInt(s[2] + s[2], 16), a: 255 }
+    }
+    if (s.length === 6) {
+      return { r: parseInt(s.slice(0, 2), 16), g: parseInt(s.slice(2, 4), 16), b: parseInt(s.slice(4, 6), 16), a: 255 }
+    }
+    if (s.length === 8) {
+      return { r: parseInt(s.slice(0, 2), 16), g: parseInt(s.slice(2, 4), 16), b: parseInt(s.slice(4, 6), 16), a: parseInt(s.slice(6, 8), 16) }
+    }
+  }
+  const rgb = v.match(/^rgb:([0-9a-fA-F]{1,4})\/([0-9a-fA-F]{1,4})\/([0-9a-fA-F]{1,4})$/)
+  if (rgb) {
+    const scale = (s: string) => {
+      const value = parseInt(s, 16)
+      if (s.length === 1) return value * 17
+      if (s.length === 4) return Math.round(value / 0xffff * 255)
+      return Math.round(value / (Math.pow(16, s.length) - 1) * 255)
+    }
+    return { r: scale(rgb[1]), g: scale(rgb[2]), b: scale(rgb[3]), a: 255 }
+  }
+  return null
+}
+
+function xpmToPng(xpm: string): Buffer | null {
+  const lines = xpm.split(/\r?\n/)
+  let headerIdx = -1
+  let width = 0
+  let height = 0
+  let ncolors = 0
+  let cpp = 0
+  for (let i = 0; i < lines.length; i++) {
+    const m = lines[i].match(/"\s*(\d+)\s+(\d+)\s+(\d+)\s+(\d+)/)
+    if (m) {
+      width = parseInt(m[1], 10)
+      height = parseInt(m[2], 10)
+      ncolors = parseInt(m[3], 10)
+      cpp = parseInt(m[4], 10)
+      headerIdx = i + 1
+      break
+    }
+  }
+  if (headerIdx < 0 || width <= 0 || height <= 0 || cpp <= 0) return null
+
+  const palette = new Map<string, { r: number; g: number; b: number; a: number }>()
+  for (let i = headerIdx; i < headerIdx + ncolors && i < lines.length; i++) {
+    const q = lines[i].match(/^"([^"]+)",?\s*$/)
+    if (!q) continue
+    const m = q[1].match(new RegExp(`^(.{${cpp}})\\s+c\\s+(\\S+)`))
+    if (m) {
+      const color = parseXpmColor(m[2]) || { r: 0, g: 0, b: 0, a: 0 }
+      palette.set(m[1], color)
+    }
+  }
+
+  const rows: string[] = []
+  for (let i = headerIdx + ncolors; i < lines.length; i++) {
+    const m = lines[i].match(/"([^"]*)"\s*,?\s*$/)
+    if (m) {
+      rows.push(m[1])
+      if (rows.length >= height) break
+    }
+  }
+
+  const raw = Buffer.alloc((width * 4 + 1) * height)
+  let o = 0
+  for (let y = 0; y < height; y++) {
+    raw[o++] = 0
+    const row = rows[y] || ''
+    for (let x = 0; x < width; x++) {
+      const key = row.slice(x * cpp, (x + 1) * cpp)
+      const c = palette.get(key) || { r: 0, g: 0, b: 0, a: 0 }
+      raw[o++] = c.r
+      raw[o++] = c.g
+      raw[o++] = c.b
+      raw[o++] = c.a
+    }
+  }
+
+  const ihdr = Buffer.alloc(13)
+  ihdr.writeUInt32BE(width, 0)
+  ihdr.writeUInt32BE(height, 4)
+  ihdr[8] = 8
+  ihdr[9] = 6
+  ihdr[10] = 0
+  ihdr[11] = 0
+  ihdr[12] = 0
+  return Buffer.concat([
+    Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
+    pngChunk('IHDR', ihdr),
+    pngChunk('IDAT', zlib.deflateSync(raw)),
+    pngChunk('IEND', Buffer.alloc(0))
+  ])
+}
+
+function iconDataUrl(iconPath: string): string {
+  if (!iconPath) return ''
+  try {
+    const ext = path.extname(iconPath).slice(1).toLowerCase()
+    if (ext === 'xpm') {
+      const png = xpmToPng(fs.readFileSync(iconPath, 'utf-8'))
+      return png ? `data:image/png;base64,${png.toString('base64')}` : ''
+    }
+    const buf = fs.readFileSync(iconPath)
+    const mime = ext === 'svg' ? 'image/svg+xml'
+      : ext === 'jpg' || ext === 'jpeg' ? 'image/jpeg'
+      : ext === 'gif' ? 'image/gif'
+      : 'image/png'
+    return `data:${mime};base64,${buf.toString('base64')}`
+  } catch (e) {
+    return ''
+  }
+}
+
+ipcMain.handle('open-with-list', async (event, pathname: string) => {
+  const mimeType = await getMimeType(pathname)
+  const isDir = await fsp.stat(pathname).then(s => s.isDirectory()).catch(() => false)
+  const defaults = new Set(await getDefaultApps(mimeType))
+  const entries = await listDesktopEntries()
+  const apps: { id: string; name: string; exec: string; icon: string; isDefault: boolean }[] = []
+  for (const entry of entries) {
+    const isDefault = defaults.has(entry.id)
+    if (!isDefault && entry.mimeTypes.length && !entry.mimeTypes.includes(mimeType) && !entry.mimeTypes.includes('application/octet-stream') && !(isDir && entry.mimeTypes.includes('inode/directory'))) continue
+    const iconPath = resolveIconPath(entry.icon)
+    apps.push({ id: entry.id, name: entry.name, exec: entry.exec, icon: iconPath ? iconDataUrl(iconPath) : '', isDefault })
+  }
+  apps.sort((a, b) => (b.isDefault ? 1 : 0) - (a.isDefault ? 1 : 0) || a.name.localeCompare(b.name))
+  return { mimeType, apps }
+})
+
+function expandExec(execTemplate: string, pathname: string): string {
+  const quoted = `'${pathname}'`
+  return execTemplate
+    .replace(/%[fFuU]/g, quoted)
+    .replace(/%[iDdNnmv]/g, '')
+    .replace(/%[ck]/g, '')
+    .replace(/%%/g, '%')
+}
+
+function parseCommandLine(cmd: string): string[] {
+  const args: string[] = []
+  const re = /"([^"]*)"|'([^']*)'|(\S+)/g
+  let m: RegExpExecArray | null
+  while ((m = re.exec(cmd))) {
+    args.push(m[1] !== undefined ? m[1] : m[2] !== undefined ? m[2] : m[3])
+  }
+  return args
+}
+
+function openWithApp(pathname: string, execTemplate: string): Promise<string> {
+  return new Promise((resolve) => {
+    const cmd = parseCommandLine(expandExec(execTemplate, pathname))
+    if (!cmd.length) {
+      resolve('Empty command')
+      return
+    }
+    const [bin, ...args] = cmd
+    const child = spawn(bin, args, {
+      detached: true,
+      stdio: ['ignore', 'ignore', 'pipe']
+    })
+    let stderr = ''
+    child.stderr.on('data', (chunk) => { stderr += String(chunk) })
+    let settled = false
+    const settle = (msg: string) => {
+      if (settled) return
+      settled = true
+      resolve(msg)
+    }
+    child.on('error', (e: Error) => settle(e.message || String(e)))
+    child.on('exit', (code) => {
+      settle(code === 0 ? '' : (stderr.trim() || `Failed to launch (exit code ${code})`))
+    })
+    setTimeout(() => settle(''), 3000)
+  })
+}
+
+ipcMain.handle('open-with', async (event, pathname: string, exec: string) => {
+  let error = ''
+  try {
+    error = await openWithApp(pathname, exec)
   } catch (e) {
     error = errMessage(e)
   }

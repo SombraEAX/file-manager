@@ -69,6 +69,7 @@
       'createFolder',
       'open',
       'openInNewTab',
+      'openWith',
       'properties',
       'about',
       'github',
@@ -206,6 +207,10 @@
             this.$emit('openInNewTab')
             break
           }
+          case 'open-with': {
+            this.$emit('openWith')
+            break
+          }
           case 'properties': {
             this.$emit('properties')
             break
@@ -257,6 +262,11 @@
               {
                 label: 'Open in new tab',
                 id: 'open-in-new-tab',
+                enabled: this.hasSelection
+              },
+              {
+                label: 'Open with...',
+                id: 'open-with',
                 enabled: this.hasSelection
               },
               { type: 'separator' },

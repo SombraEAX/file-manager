@@ -56,6 +56,19 @@ export interface MenuRequest {
   y: number
 }
 
+export interface OpenWithApp {
+  id: string
+  name: string
+  exec: string
+  icon: string
+  isDefault: boolean
+}
+
+export interface OpenWithListResult {
+  mimeType: string
+  apps: OpenWithApp[]
+}
+
 export interface HistoryMenuRequest {
   history: string[]
   current: number
@@ -169,6 +182,8 @@ export interface ElectronIpc {
   invoke(channel: 'window-controls-is-maximized'): Promise<boolean>
   invoke(channel: 'get-window-frame'): Promise<boolean>
   invoke(channel: 'open-file', pathname: string): Promise<{ error: string }>
+  invoke(channel: 'open-with-list', pathname: string): Promise<OpenWithListResult>
+  invoke(channel: 'open-with', pathname: string, exec: string): Promise<{ error: string }>
   invoke(channel: 'get-dir-info', dirPath: string): Promise<DirInfo>
   invoke(channel: 'move-file', src: string, dest: string, taskId: string | number): Promise<MoveResult>
   invoke(channel: 'trash-items', paths: string[], taskId: string | number): Promise<TaskResult>
@@ -203,6 +218,8 @@ export interface ElectronAPI {
   trashPath: string
   trashDirs: () => TrashDirs
   openFile: (pathname: string) => Promise<{ error: string }>
+  openWithList: (pathname: string) => Promise<OpenWithListResult>
+  openWith: (pathname: string, exec: string) => Promise<{ error: string }>
   getDirInfo: (pathname: string) => Promise<DirInfo>
   getUserName: () => string
   isDir: (pathname: string) => Promise<boolean>

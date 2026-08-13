@@ -49,6 +49,7 @@
         @createFolder    = "createNewFolder"
         @open            = "menuOpen"
         @openInNewTab    = "menuOpenInNewTab"
+        @openWith        = "openWithMenu"
         @properties      = "menuProperties"
         @about           = "openAbout"
         @github          = "openGithub"
@@ -104,6 +105,7 @@
           @createFolder    = "createNewFolder"
           @open            = "menuOpen"
           @openInNewTab    = "menuOpenInNewTab"
+          @openWith        = "openWithMenu"
           @properties      = "menuProperties"
           @about           = "openAbout"
           @github          = "openGithub"
@@ -296,6 +298,12 @@
       </div>
     </transition>
 
+    <open-with-popup
+      :path = "openWithPath"
+      :visible = "openWithPopupVisible"
+      @close = "openWithPopupVisible = false"
+    />
+
     <menu-host />
 
     <transition name="trash-popup-fade">
@@ -363,6 +371,7 @@
   import MenuHost from './components/MenuHost.vue'
   import TabBar from './components/TabBar.vue'
   import WindowControls from './components/WindowControls.vue'
+  import OpenWithPopup from './components/OpenWithPopup.vue'
   import aboutHeader from './assets/about-header.png'
   import pkg from '../package.json'
   import prettyBytes from 'pretty-bytes'
@@ -400,7 +409,8 @@
       PreviewPanel,
       TabBar,
       MenuHost,
-      WindowControls
+      WindowControls,
+      OpenWithPopup
     },
     
     data(){      
@@ -458,6 +468,8 @@
         trashActionPaths: [] as string[],
         propsPopupVisible: false,
         propsInfo: {} as PropsInfo,
+        openWithPopupVisible: false,
+        openWithPath: '',
         aboutPopupVisible: false,
         hotkeysPopupVisible: false,
         clipboardPaths: [] as string[],
@@ -650,7 +662,7 @@
         }
         const items: MenuItemSpec[] = isDir
           ? [{ label: 'Open' }, { label: 'Open in new tab' }, { type: 'separator' }, { label: 'Rename' }, { label: 'Copy' }, { label: 'Cut' }, { type: 'separator' }, { label: 'Move to Trash' }, { type: 'separator' }, { label: 'Properties' }]
-          : [{ label: 'Open' }, { type: 'separator' }, { label: 'Rename' }, { label: 'Copy' }, { label: 'Cut' }, { type: 'separator' }, { label: 'Move to Trash' }, { type: 'separator' }, { label: 'Properties' }]
+          : [{ label: 'Open' }, { label: 'Open with...' }, { type: 'separator' }, { label: 'Rename' }, { label: 'Copy' }, { label: 'Cut' }, { type: 'separator' }, { label: 'Move to Trash' }, { type: 'separator' }, { label: 'Properties' }]
         const pasteIndex = items.length
         if(this.clipboardPaths.length){
           items.push({ label: 'Paste' })
@@ -685,25 +697,26 @@
             else if(idx === 6) this.showProperties(path)
           }else{
             if(idx === 0) this.openFile(path)
-            else if(idx === 1) this.startRename(path)
-            else if(idx === 2){
+            else if(idx === 1) this.showOpenWith(path)
+            else if(idx === 2) this.startRename(path)
+            else if(idx === 3){
               const paths = Object.keys(this.selectedMap)
               if(!paths.includes(path)) paths.push(path)
               this.clipboardPaths = paths
               this.clipboardMode = 'copy'
             }
-            else if(idx === 3){
+            else if(idx === 4){
               const paths = Object.keys(this.selectedMap)
               if(!paths.includes(path)) paths.push(path)
               this.clipboardPaths = paths
               this.clipboardMode = 'cut'
             }
-            else if(idx === 4){
+            else if(idx === 5){
               const paths = Object.keys(this.selectedMap)
               if(!paths.includes(path)) paths.push(path)
               this.confirmMoveToTrash(paths)
             }
-            else if(idx === 5) this.showProperties(path)
+            else if(idx === 6) this.showProperties(path)
           }
         })
       },
@@ -969,6 +982,14 @@
       menuProperties(){
         const path = this.focusedPath() || this.currentDir
         if(path) this.showProperties(path)
+      },
+      openWithMenu(){
+        const path = this.focusedPath()
+        if(path) this.showOpenWith(path)
+      },
+      showOpenWith(path: string){
+        this.openWithPath = path
+        this.openWithPopupVisible = true
       },
       moveToTrashFromMenu(){
         if(this.isTrash) return
