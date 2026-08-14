@@ -33,7 +33,7 @@
             <span v-else-if="officeLetter" class="office-letter" :style="{ fontSize: iconFontSize + 'px' }">{{ officeLetter }}</span>
             <span v-if="size >= 32 && type !== 'txt' && type !== 'js' && type !== 'ts' && !officeLetter && !(type === 'dotfile' && size < 44)" class="file-ext" :style="{ fontSize: extFontSize + 'px' }">{{ type }}</span>
           </div>
-          <span v-else-if="type" class="ext-text" :style="{ fontSize: iconSize + 'px' }">{{ type }}</span>
+          <span v-else class="ext-text" :style="{ fontSize: fallbackFontSize + 'px' }">{{ unknownLabel }}</span>
         </template>
       </template>
     </div>
@@ -170,6 +170,14 @@
       iconSize() {
         if (this.hasIcon) return Math.round(this.size * 0.68)
         return Math.round(this.size * 0.3)
+      },
+      unknownLabel(): string {
+        if (!this.type) return '?'
+        return this.type.length <= 3 ? this.type : '?'
+      },
+      fallbackFontSize(): number {
+        if (this.unknownLabel === '?') return Math.round(this.size * 0.55)
+        return this.iconSize
       },
       officeLetter(): string {
         if (!this.type) return ''
