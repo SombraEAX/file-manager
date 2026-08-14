@@ -31,7 +31,7 @@
             <span v-if="iconChar" class="nerd-icon" :style="{ fontSize: iconFontSize + 'px' }">{{ iconChar }}</span>
             <span v-else-if="type === 'pdf'" class="nerd-icon nerd-icon--pdf" :style="{ fontSize: iconFontSize + 'px' }"></span>
             <span v-else-if="officeLetter" class="office-letter" :style="{ fontSize: iconFontSize + 'px' }">{{ officeLetter }}</span>
-            <span v-if="size >= 32 && type !== 'txt' && type !== 'js' && type !== 'ts' && !officeLetter && !(type === 'dotfile' && size < 44)" class="file-ext" :style="{ fontSize: extFontSize + 'px' }">{{ type }}</span>
+            <span v-if="size >= 39 && type !== 'txt' && type !== 'js' && type !== 'ts' && !officeLetter && !(type === 'dotfile' && size < 44)" class="file-ext" :style="{ fontSize: extFontSize + 'px' }">{{ type }}</span>
           </div>
           <span v-else class="ext-text" :style="{ fontSize: fallbackFontSize + 'px' }">{{ unknownLabel }}</span>
         </template>
