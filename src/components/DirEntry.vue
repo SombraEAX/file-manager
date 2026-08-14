@@ -22,8 +22,8 @@
         ref="renameInput"
         :value="renamingValue"
         @input="$emit('update:renamingValue', $event.target.value)"
-        @keydown.enter="$emit('confirmRename', $event.target.value)"
-        @keydown.esc="$emit('cancelRename')"
+        @keydown.enter.stop="$emit('confirmRename', $event.target.value)"
+        @keydown.esc.stop="$emit('cancelRename')"
         @blur="$emit('confirmRename', $event.target.value)"
         @click.stop
       />
