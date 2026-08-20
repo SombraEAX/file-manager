@@ -587,6 +587,14 @@
   .outer.table-mode .scroll-wrap{
     top:5px;
   }
+  .outer.table-mode .inner{
+    bottom:-12px;
+    padding-bottom:12px;
+  }
+  .outer.table-mode .scroll-wrap:hover .inner{
+    bottom:0px;
+    padding-bottom:0px;
+  }
   .trash-bottom-spacer{
     height:55px;
   }
