@@ -63,6 +63,8 @@ function createWindow() {
   const win = new BrowserWindow({
     width: 800,
     height: 600,
+    minWidth: 300,
+    minHeight: 200,
     title: 'Sombra Manager',
     icon: APP_ICON_PATH,
     frame: !customFrame,
@@ -133,6 +135,10 @@ ipcMain.on('window-controls-close', () => {
 
 ipcMain.on('set-window-frame', (event, custom: boolean) => {
   setWindowFrame(custom === true)
+})
+
+ipcMain.on('toggle-dev-tools', () => {
+  mainWindow?.webContents.toggleDevTools()
 })
 
 ipcMain.handle('window-controls-is-maximized', () => {

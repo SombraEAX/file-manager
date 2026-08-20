@@ -160,6 +160,7 @@ export interface ElectronIpc {
   send(channel: 'window-controls-maximize'): void
   send(channel: 'window-controls-close'): void
   send(channel: 'set-window-frame', custom: boolean): void
+  send(channel: 'toggle-dev-tools'): void
 
   on(channel: 'show-menu-bar-submenu-reply', listener: (event: IpcRendererEvent, id: string) => void): this
   on(channel: 'window-maximized-changed', listener: (event: IpcRendererEvent, isMaximized: boolean) => void): this

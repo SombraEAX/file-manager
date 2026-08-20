@@ -7,11 +7,18 @@
   >
     <div
       class="menu-item"
-      v-for="item in items"
+      v-for="item in visibleItems"
       :key="item.label"
       @click="openMenu(item, $event)"
     >
       {{ item.label }}
+    </div>
+    <div
+      v-if="moreItems.length"
+      class="menu-item menu-item-more"
+      @click="openMoreMenu($event)"
+    >
+      …
     </div>
     <window-controls v-if="customFrame && !IS_WEB" />
   </div>
@@ -44,7 +51,9 @@
       openNewTabEnabled: Boolean,
       openWithEnabled: Boolean,
       useHtmlMenus: Boolean,
-      customFrame: Boolean
+      customFrame: Boolean,
+      compact: Boolean,
+      isBookmarked: Boolean
     },
 
     emits: [
@@ -75,7 +84,9 @@
       'properties',
       'about',
       'github',
-      'hotkeys'
+      'hotkeys',
+      'toggleBookmark',
+      'toggleDevTools'
     ],
 
     data(){
@@ -93,6 +104,13 @@
 
       openRootMenu(x: number, y: number){
         openMenuBarSubmenu(this.items, x, y).then(id => {
+          if (id) this.itemClick(id)
+        })
+      },
+
+      openMoreMenu(event: MouseEvent){
+        const rect = (event.currentTarget as HTMLElement).getBoundingClientRect()
+        openMenuBarSubmenu(this.moreItems, rect.x, rect.y + rect.height).then(id => {
           if (id) this.itemClick(id)
         })
       },
@@ -229,6 +247,14 @@
             this.$emit('hotkeys')
             break
           }
+          case 'toggle-bookmark': {
+            this.$emit('toggleBookmark')
+            break
+          }
+          case 'toggle-dev-tools': {
+            this.$emit('toggleDevTools')
+            break
+          }
           default: {
             if (id.startsWith('theme:')) {
               this.$emit('changeTheme', id.slice(6))
@@ -241,6 +267,12 @@
     computed: {
       menuState() {
         return menuState
+      },
+      visibleItems(): MenuItemSpec[] {
+        return this.compact ? this.items.slice(0, 1) : this.items
+      },
+      moreItems(): MenuItemSpec[] {
+        return this.compact ? this.items.slice(1) : []
       },
       items(): MenuItemSpec[] {
         return [
@@ -270,6 +302,11 @@
                 label: 'Open with...',
                 id: 'open-with',
                 enabled: this.openWithEnabled
+              },
+              { type: 'separator' },
+              {
+                label: this.isBookmarked ? 'Remove from bookmarks' : 'Add to bookmarks',
+                id: 'toggle-bookmark'
               },
               { type: 'separator' },
               {
@@ -471,7 +508,7 @@
                 type: 'checkbox',
                 checked: this.autohideTopPanel
               },
-              { role: 'toggleDevTools', visible: this.isDev }              
+              { role: 'toggleDevTools', id: 'toggle-dev-tools', label: 'Toggle Developer Tools', visible: this.isDev }              
             ]
           },
           {

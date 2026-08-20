@@ -2,7 +2,7 @@
     <side-bar
       @resize="(ev) => $emit('resize',ev)"
       :width="width"
-      :minWidth="300"
+      :minWidth="200"
       position="right"
     >
       <div class="preview-wrap">

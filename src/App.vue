@@ -28,6 +28,8 @@
           :openWithEnabled   = "canOpenWith"
           :useHtmlMenus      = "menuState.useHtmlMenus"
           :customFrame       = "customFrame"
+          :compact           = "menuBarCompact"
+          :isBookmarked      = "isBookmarked"
           @changeView       = "ev => view = ev"
           @changeSortColumn = "ev => sortColumn = ev"
           @changeSortOrder  = "ev => sortOrder = ev"
@@ -56,6 +58,8 @@
         @about           = "openAbout"
         @github          = "openGithub"
         @hotkeys         = "openHotkeys"
+        @toggleBookmark = "toggleBookmark"
+        @toggleDevTools = "toggleDevTools"
       />
         <div
           class="top-panel-slider"
@@ -86,6 +90,8 @@
           :openWithEnabled   = "canOpenWith"
             :useHtmlMenus      = "menuState.useHtmlMenus"
             :customFrame       = "customFrame"
+            :compact           = "menuBarCompact"
+            :isBookmarked      = "isBookmarked"
             @changeView       = "ev => view = ev"
             @changeSortColumn = "ev => sortColumn = ev"
             @changeSortOrder  = "ev => sortOrder = ev"
@@ -114,6 +120,8 @@
           @about           = "openAbout"
           @github          = "openGithub"
           @hotkeys         = "openHotkeys"
+          @toggleBookmark = "toggleBookmark"
+          @toggleDevTools = "toggleDevTools"
           />
           <div class="tab-bar-row" v-if="!tabsInSidePanel">
             <tab-bar
@@ -131,36 +139,40 @@
             ref="topPanel"
             :autohideTopPanel   = "autohideTopPanel"
             :address            = "currentDir"
-            :history            = "tabs[activeTabIndex]?.history || []"
-            :historyIndex       = "tabs[activeTabIndex]?.historyIndex ?? -1"
-            :search-version     = "searchVersion"
-            @back               = "ev => tabs[activeTabIndex].historyIndex--"
-            @forward            = "ev => tabs[activeTabIndex].historyIndex++"
-            @up                 = "up"
-            @jump               = "jump"
-            @changeHistoryIndex = "ev => tabs[activeTabIndex].historyIndex = ev"
-            @search             = "onSearchResults"
-            :view               = "view"
-            @changeView         = "ev => view = ev"
-            :scale              = "iconSize"
-            @scaling            = "ev => iconSize = ev"
-            @togglePreviewPanel = "rightPanelVisible = !rightPanelVisible"
-            :previewPanelVisible="rightPanelVisible"
-            :showMenuBar        = "showMenuBar"
-            :bookmarks          = "bookmarks"
-            :isBookmarked       = "isBookmarked"
-            @toggleBookmark     = "toggleBookmark"
-            @openRootMenu       = "onOpenRootMenu"
-          />
+            :compact            = "compact"
+            :nav-compact        = "navCompact"
+            :menu-compact       = "menuCompact"
+            :menu-bar-compact   = "menuBarCompact"
+          :history            = "tabs[activeTabIndex]?.history || []"
+          :historyIndex       = "tabs[activeTabIndex]?.historyIndex ?? -1"
+          :search-version     = "searchVersion"
+          @back               = "ev => tabs[activeTabIndex].historyIndex--"
+          @forward            = "ev => tabs[activeTabIndex].historyIndex++"
+          @up                 = "up"
+          @jump               = "jump"
+          @changeHistoryIndex = "ev => tabs[activeTabIndex].historyIndex = ev"
+          @search             = "onSearchResults"
+          :view               = "view"
+          @changeView         = "ev => view = ev"
+          :scale              = "iconSize"
+          @scaling            = "ev => iconSize = ev"
+          @togglePreviewPanel = "rightPanelVisible = !rightPanelVisible"
+          :previewPanelVisible="rightPanelVisible"
+          :showMenuBar        = "showMenuBar"
+          :bookmarks          = "bookmarks"
+          :isBookmarked       = "isBookmarked"
+          @toggleBookmark     = "toggleBookmark"
+          @openRootMenu       = "onOpenRootMenu"
+        />
         </div>
       </div>
     </div>
     <div class="main" @mouseenter="scheduleHideTopPanel">
       <div 
         class="left-panel-container"
-        :class="{ autohide: autohideLeftPanel, 'panel-visible': leftPanelVisible }"
+        :class="{ autohide: effectiveAutohideLeftPanel, 'panel-visible': leftPanelVisible }"
       >
-        <div class="left-panel-trigger" v-if="autohideLeftPanel"
+        <div class="left-panel-trigger" v-if="effectiveAutohideLeftPanel"
           @mouseenter="showLeftPanel"
           @mouseleave="scheduleHideLeftPanel"
         ></div>
@@ -221,7 +233,7 @@
         </div>
       </transition>
       <preview-panel
-        v-show="rightPanelVisible"
+        v-show="rightPanelVisible && !compact"
         :path   = "previewPath"
         :width  = "rightPanelWidth"
         @resize = "w => rightPanelWidth = w"
@@ -460,6 +472,18 @@
         showMenuBar: localStorage.getItem('showMenuBar') !== 'false',
         customFrame: IS_WEB ? false : localStorage.getItem('customFrame') === 'true',
         tabsInSidePanel: localStorage.getItem('tabsInSidePanel') === 'true',
+        compact: window.innerWidth < 650,
+        _compactMq: null as MediaQueryList | null,
+        _onCompactChange: null as ((e: MediaQueryListEvent) => void) | null,
+        navCompact: window.innerWidth < 400,
+        _navCompactMq: null as MediaQueryList | null,
+        _onNavCompactChange: null as ((e: MediaQueryListEvent) => void) | null,
+        menuCompact: window.innerWidth < 400,
+        _menuCompactMq: null as MediaQueryList | null,
+        _onMenuCompactChange: null as ((e: MediaQueryListEvent) => void) | null,
+        menuBarCompact: window.innerWidth < 500,
+        _menuBarCompactMq: null as MediaQueryList | null,
+        _onMenuBarCompactChange: null as ((e: MediaQueryListEvent) => void) | null,
         bookmarks: JSON.parse(localStorage.getItem('bookmarks') || '[]') as string[],
         selectedMap: {} as Record<string, boolean>,
         lastClickedPath: null as string | null,
@@ -483,6 +507,7 @@
         _allEntries: [] as EntryStats[],
         windowMaximized: false,
         _onWindowMaximized: null as ((...args: unknown[]) => void) | null,
+        _onResize: null as ((e: UIEvent) => void) | null,
       }
     },
 
@@ -2118,6 +2143,11 @@
         toggleHtmlMenus()
       },
 
+      toggleDevTools(){
+        if(IS_WEB) return
+        window.electron.ipcRenderer.send('toggle-dev-tools')
+      },
+
       toggleCustomFrame(){
         this.customFrame = !this.customFrame
         localStorage.setItem('customFrame', String(this.customFrame))
@@ -2143,6 +2173,15 @@
           .catch(() => {})
         this._onWindowMaximized = (_e: unknown, v: unknown) => { this.windowMaximized = !!v }
         window.electron.ipcRenderer.on('window-maximized-changed', this._onWindowMaximized)
+      },
+
+      ensureWorkZone(){
+        const left = this.effectiveAutohideLeftPanel ? 0 : this.leftPanelWidth
+        const right = (this.rightPanelVisible && !this.compact) ? this.rightPanelWidth : 0
+        if(window.innerWidth - left - right < 300){
+          if(this.leftPanelWidth > 150) this.leftPanelWidth = 150
+          if(this.rightPanelWidth > 200) this.rightPanelWidth = 200
+        }
       }
     },
     
@@ -2150,6 +2189,21 @@
       window.__tasks = { tasks, createTask, updateTask, cancelTask, removeTask, pauseTask, resumeTask }
       this.syncCustomFrame()
       this.syncWindowMaximized()
+      this._compactMq = window.matchMedia('(max-width: 649px)')
+      this._onCompactChange = (e) => { this.compact = e.matches; this.ensureWorkZone() }
+      this._compactMq.addEventListener('change', this._onCompactChange)
+      this._navCompactMq = window.matchMedia('(max-width: 399px)')
+      this._onNavCompactChange = (e) => { this.navCompact = e.matches }
+      this._navCompactMq.addEventListener('change', this._onNavCompactChange)
+      this._menuCompactMq = window.matchMedia('(max-width: 399px)')
+      this._onMenuCompactChange = (e) => { this.menuCompact = e.matches }
+      this._menuCompactMq.addEventListener('change', this._onMenuCompactChange)
+      this._menuBarCompactMq = window.matchMedia('(max-width: 499px)')
+      this._onMenuBarCompactChange = (e) => { this.menuBarCompact = e.matches }
+      this._menuBarCompactMq.addEventListener('change', this._onMenuBarCompactChange)
+      this._onResize = () => this.ensureWorkZone()
+      window.addEventListener('resize', this._onResize)
+      this.ensureWorkZone()
       this.tabs.push({ id: ++this.tabIdCounter, history: [], historyIndex: -1, scrollTop: 0 });
       this.activeTabIndex = 0;
       await this.jump(homedir)
@@ -2227,6 +2281,26 @@
     },
     beforeUnmount(){
       document.removeEventListener('keydown', this._onKeydown as (e: KeyboardEvent) => void)
+      if(this._compactMq && this._onCompactChange){
+        this._compactMq.removeEventListener('change', this._onCompactChange)
+        this._compactMq = null
+        this._onCompactChange = null
+      }
+      if(this._navCompactMq && this._onNavCompactChange){
+        this._navCompactMq.removeEventListener('change', this._onNavCompactChange)
+        this._navCompactMq = null
+        this._onNavCompactChange = null
+      }
+      if(this._menuCompactMq && this._onMenuCompactChange){
+        this._menuCompactMq.removeEventListener('change', this._onMenuCompactChange)
+        this._menuCompactMq = null
+        this._onMenuCompactChange = null
+      }
+      if(this._menuBarCompactMq && this._onMenuBarCompactChange){
+        this._menuBarCompactMq.removeEventListener('change', this._onMenuBarCompactChange)
+        this._menuBarCompactMq = null
+        this._onMenuBarCompactChange = null
+      }
       off('task-cancel', this.onTaskCancel)
       off('task-retry', this.onTaskRetry)
       off('task-undo', this.onTaskUndo)
@@ -2238,11 +2312,18 @@
         window.electron.ipcRenderer.removeListener('window-maximized-changed', this._onWindowMaximized)
         this._onWindowMaximized = null
       }
+      if(this._onResize){
+        window.removeEventListener('resize', this._onResize)
+        this._onResize = null
+      }
     },
     
     computed:{
       menuState(){
         return menuState
+      },
+      effectiveAutohideLeftPanel(){
+        return this.autohideLeftPanel || this.compact
       },
       titleBarVisible(){
         return this.customFrame && !this.showMenuBar && (this.autohideTopPanel || !(this.windowMaximized && !this.tabsInSidePanel))
@@ -2370,6 +2451,7 @@
       autohideLeftPanel(val){
         localStorage.setItem('autohideLeftPanel', val)
         if(val) this.leftPanelVisible = false
+        this.ensureWorkZone()
       },
       autohideTopPanel(val){
         localStorage.setItem('autohideTopPanel', val)
@@ -2377,6 +2459,17 @@
       },
       rightPanelVisible(val){
         localStorage.setItem('rightPanelVisible', val)
+        this.ensureWorkZone()
+      },
+      leftPanelWidth(val){
+        const right = (this.rightPanelVisible && !this.compact) ? this.rightPanelWidth : 0
+        const maxLeft = Math.max(150, window.innerWidth - right - 300)
+        if(val > maxLeft) this.leftPanelWidth = maxLeft
+      },
+      rightPanelWidth(val){
+        const left = this.effectiveAutohideLeftPanel ? 0 : this.leftPanelWidth
+        const maxRight = Math.max(200, window.innerWidth - left - 300)
+        if(val > maxRight) this.rightPanelWidth = maxRight
       },
       showHidden(val){
         localStorage.setItem('showHidden', val)

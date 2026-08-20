@@ -1,36 +1,26 @@
 <template>
   <div class="outer" @click.stop>
     <div class="inner">
-      <div class="row first" :data-editing="isEditing" :data-search="isExecutingSearch" :data-results="isSearchResults" @click="enableEdit" :class="{ shadow: dropdownScrolled }">
+      <div class="row first" :data-editing="isEditing" :data-search="isExecutingSearch" :data-results="isSearchResults" @click="onRowClick" :class="{ shadow: dropdownScrolled }">
         <div v-if="isExecutingSearch" class="search-mode-bar">
           <span class="search-mode-icon"></span>
           <span class="search-mode-text" v-if="!isSearchResults">Search «{{ searchQuery }}» in {{ selectedLocation }}</span>
           <span class="search-mode-text" v-if="isSearchResults">Search results for «{{ searchQuery }}»</span>
           <div v-if="!isSearchResults" class="search-progress"></div>
         </div>
-        <div v-if="!isEditing && !isExecutingSearch" class="breadcrumbs">
+        <template v-if="!isEditing && !isExecutingSearch">
           <span class="breadcrumb-root" @click.stop="goToRoot">
             <EntryIcon :size="16" is-dir :type="currentFolderType" />
-            <span class="breadcrumb-root-label">{{ isTrash ? 'Trash' : 'root' }}</span>
           </span>
-          <span
-            v-if="breadcrumbParts.length > 0"
-            class="triangle-wrap"
-            @click.stop="toggleDropdown(-1)"
-          >
-            <span class="triangle" :class="{ open: openDropdownIdx === -1 }"></span>
-          </span>
-          <span v-for="(part, index) in breadcrumbParts" :key="index" class="crumb-seg">
-            <span class="breadcrumb" @click.stop="goToSegment(index)">{{ part }}</span>
-            <span
-              v-if="index < breadcrumbParts.length - 1"
-              class="triangle-wrap"
-              @click.stop="toggleDropdown(index)"
-            >
-              <span class="triangle" :class="{ open: openDropdownIdx === index }"></span>
-            </span>
-          </span>
-        </div>
+          <BreadCrumbs
+            class="breadcrumbs-component"
+            :address="breadcrumbAddress"
+            :activeDelimiter="activeDelimiterForBreadcrumbs"
+            @segmentClick="onBreadCrumbSegmentClick"
+            @delimiterClick="onBreadCrumbDelimiterClick"
+            @ellipsisClick="onBreadCrumbEllipsisClick"
+          />
+        </template>
 
         <input
           v-if="isEditing"
@@ -43,7 +33,7 @@
 
         <button
           class="button"
-          v-if="isEditing"
+          v-if="isEditing && !compact"
           :disabled="!hasClipboardText"
           @click.stop="pasteAndGo"
         >
@@ -51,12 +41,11 @@
         </button>
 
         <button
-          class="button"
-          v-if="isEditing"
+          class="button copy-path"
+          v-if="isEditing && !compact"
           @click="copyPath"
-        >
-          Copy path
-        </button>      
+          title="Copy path"
+        ></button>      
 
         <button
           :data-search="isSearch"
@@ -68,8 +57,9 @@
 
         <button
           class="bookmark-star"
+          ref="starBtn"
           :class="{ filled: isBookmarked }"
-          v-if="!isEditing && !isExecutingSearch"
+          v-if="!isEditing && !isExecutingSearch && !menuBarCompact"
           @click.stop="$emit('toggleBookmark')"
           :title="isBookmarked ? 'Remove from bookmarks' : 'Add to bookmarks'"
         ></button>
@@ -121,7 +111,7 @@
       </div>
       </div>
 
-      <div class="items-outer breadcrumb-dropdown" v-if="!isEditing && openDropdownIdx !== null">
+      <div class="items-outer breadcrumb-dropdown" v-if="!isEditing && (openDropdownIdx !== null || openEllipsis)">
       <div class="items-inner" @scroll="onDropdownScroll">
       <div class="items">
         <div
@@ -147,6 +137,7 @@ import { theme } from '../stores/theme';
 import DropDown from './DropDown.vue';
 import AppCheckbox from './AppCheckbox.vue';
 import EntryIcon from './EntryIcon.vue';
+import BreadCrumbs from './BreadCrumbs.vue';
 const homedir = `/home/${window.electron.getUserName()}`
 
 let xdgCache: Record<string, string> | null = null
@@ -165,10 +156,12 @@ function getXdgDirs(): Record<string, string> {
 }
 
 export default defineComponent({
-  components: { DropDown, AppCheckbox, EntryIcon },
+  components: { DropDown, AppCheckbox, EntryIcon, BreadCrumbs },
   props: {
     address: String,
     searchVersion: Number,
+    compact: Boolean,
+    menuBarCompact: Boolean,
     bookmarks: {
       type: Array,
       default: () => []
@@ -185,7 +178,10 @@ export default defineComponent({
       filetypesOptions: ['Documents', 'Code', 'Images', 'Video', 'Audio'],
       isEditing: false,
       openDropdownIdx: null as number | null,
+      openDropdownPath: null as string | null,
       dropdownItems: [] as string[],
+      dropdownPaths: [] as string[],
+      openEllipsis: false,
       hasClipboardText: false,
     selectedSearchOption: 'Filenames',
     selectedLocation: this.address || homedir,
@@ -206,6 +202,13 @@ export default defineComponent({
     };
   },
   computed: {
+    activeDelimiterForBreadcrumbs() {
+      return this.openDropdownIdx
+    },
+    dropdownBasePath(): string {
+      const p = (this.openDropdownPath || '/').replace(/\/+$/, '')
+      return p === '' ? '/' : p
+    },
     locationOptions(){
       return [
         { label: 'Current directory', value: this.address },
@@ -222,11 +225,8 @@ export default defineComponent({
     isTrash(){
       return this.address === 'trash://'
     },
-    breadcrumbParts() {
-      if(this.isTrash) return []
-      const breadcrumbs = this.tmp ? this.tmp.split('/').filter(part => part) : [];
-      breadcrumbs.unshift()
-      return breadcrumbs
+    breadcrumbAddress() {
+      return this.isTrash ? 'Trash' : this.address
     },
     dirItems() {
       return this._dirItems
@@ -240,6 +240,38 @@ export default defineComponent({
     }
   },
   methods: {
+    onRowClick(e: MouseEvent) {
+      const target = e.target as HTMLElement
+      if (target.closest('.label') || target.closest('.triangle-wrap') || target.closest('.breadcrumb-root')) return
+      this.enableEdit()
+    },
+    onBreadCrumbSegmentClick(path: string) {
+      this.closeDropdown();
+      if(this.isTrash){
+        this.tmp = 'trash://';
+        this.$emit('jump', 'trash://');
+        return;
+      }
+      const cleanPath = path.replace(/\/$/, '') || '/'
+      this.tmp = cleanPath
+      this.$emit('jump', cleanPath)
+    },
+    onBreadCrumbDelimiterClick({ path, index }: { path: string, index: number }) {
+      this.toggleDropdown(path || '/', index)
+    },
+    onBreadCrumbEllipsisClick(collapsedSegments: {caption: string, path?: string}[]) {
+      this.dropdownScrolled = false;
+      if (this.openEllipsis) {
+        this.closeDropdown();
+        return;
+      }
+      this.openDropdownIdx = null;
+      this.openDropdownPath = null;
+      this.openEllipsis = true;
+      this.dropdownItems = collapsedSegments.map(e => e.caption);
+      this.dropdownPaths = collapsedSegments.map(e => e.path || '');
+      document.addEventListener('click', this.dropdownOutsideHandler);
+    },
     folderType(name: string): string {
       const nameMap: Record<string, string> = {
         'home': 'home', 'desktop': 'desktop', 'documents': 'documents',
@@ -319,27 +351,17 @@ export default defineComponent({
       this.tmp = "/";
       this.$emit("jump", "/");
     },
-    goToSegment(index: number) {
-      this.closeDropdown();
-      if(this.isTrash){
-        this.tmp = "trash://";
-        this.$emit("jump", "trash://");
-        return;
-      }
-      const newPath = '/' + this.breadcrumbParts.slice(0, index + 1).join('/');
-      this.tmp = newPath;
-      this.$emit("jump", newPath); 
-    },
-    async toggleDropdown(idx: number) {
+    async toggleDropdown(basePath: string, highlightIdx: number | null) {
       this.dropdownScrolled = false;
-      if (this.openDropdownIdx === idx) {
+      this.openEllipsis = false;
+      if (this.openDropdownPath === basePath) {
         this.closeDropdown();
         return;
       }
-      const path = idx === -1 ? '/' : '/' + this.breadcrumbParts.slice(0, idx + 1).join('/');
-      this.openDropdownIdx = idx;
+      this.openDropdownPath = basePath;
+      this.openDropdownIdx = highlightIdx;
       try {
-        const items = await window.electron.readdir(path)
+        const items = await window.electron.readdir(this.dropdownBasePath)
         this.dropdownItems = items.filter(item => item.type === 'directory').map(item => item.name)
       } catch(e) {
         this.dropdownItems = []
@@ -351,10 +373,11 @@ export default defineComponent({
     },
     dropdownNavigate(dir: string) {
       let path: string;
-      if (this.openDropdownIdx === -1) {
-        path = '/' + dir;
+      if (this.openEllipsis) {
+        const idx = this.dropdownItems.indexOf(dir);
+        path = this.dropdownPaths[idx] || dir;
       } else {
-        path = '/' + this.breadcrumbParts.slice(0, (this.openDropdownIdx as number) + 1).join('/') + '/' + dir;
+        path = window.electron.join(this.dropdownBasePath, dir);
       }
       this.closeDropdown();
       this.tmp = path;
@@ -363,7 +386,10 @@ export default defineComponent({
     closeDropdown() {
       document.removeEventListener('click', this.dropdownOutsideHandler);
       this.openDropdownIdx = null;
+      this.openDropdownPath = null;
+      this.openEllipsis = false;
       this.dropdownItems = [];
+      this.dropdownPaths = [];
       this.dropdownScrolled = false;
     },
     onSearchMessage(e: MessageEvent){
@@ -502,6 +528,7 @@ export default defineComponent({
     display:flex;
     align-items:center;
     flex-wrap:nowrap;
+    overflow:hidden;
   }
   .first[data-editing="true"]{
     border: 2px solid v-bind('theme.textBoxesBorderColorActive');	    
@@ -576,89 +603,21 @@ export default defineComponent({
     100%{left:100%}
   }
   
-  .breadcrumbs {
-    width:100%;
-    margin:auto;
-    display: flex;
-    flex-wrap: nowrap;
-    align-items: center;
-    line-height:16px;
-  }
-  
-  .breadcrumb {
-    font-size: 14px;
-    color: v-bind('theme.addressBar.textColor');
-    padding: 0 5px;
-    cursor: pointer;
-    display: inline-flex;
-    align-items: center;
-  }
-  
-  .breadcrumb:hover {
-    text-decoration: underline;
-    color: v-bind('theme.linkHover');
-  }
-
-  .crumb-seg{
-    display:contents;
-  }
-  
   .breadcrumb-root {
     cursor: pointer;
-    padding: 0 5px 0 7px;
+    padding: 0 0 0 7px;
     display: flex;
     align-items: center;
+    flex-shrink: 0;
   }
 
-  .breadcrumb-root-label {
-    font-size: 14px;
-    padding: 0 5px 0 4px;
-  }
-
-  .breadcrumb-root:hover .breadcrumb-root-label {
-    text-decoration: underline;
-    color: v-bind('theme.linkHover');
-  }
-  
   .breadcrumb-root:hover {
     filter: brightness(1.08);
   }
-  
-  .root-icon {
-    width: 16px;
-    height: 16px;
-    display:inline-flex;
-    align-items:center;
-    justify-content:center
-  }
-  .root-icon::before{
-    font-family:PureNerdFont,"Symbols Nerd Font Mono","Noto Sans Nerd Font","Meslo Nerd Font","FiraCode Nerd Font",sans-serif;
-    content:"\f07b";
-    font-size:14px
-  }
 
-  .triangle-wrap{
-    position:relative;
-    display:inline-flex;
-    align-items:center;
-    justify-content:center;
-    padding:0 3px;
-  }
-  .triangle{
-    cursor:pointer;
-    transition: transform 0.2s;
-    width:0;
-    height:0;
-    border-left:5px solid currentColor;
-    border-top:4px solid transparent;
-    border-bottom:4px solid transparent;
-  }
-  .triangle.open{
-    transform: rotate(90deg);
-  }
-  
-  .triangle:hover{
-    color: v-bind('theme.linkHover');	
+  .breadcrumbs-component {
+    flex: 1;
+    min-width: 0;
   }
 
   input {
@@ -685,6 +644,20 @@ export default defineComponent({
   .button[disabled]{
     background: v-bind('theme.addressBar.inlineButton.disabled.background');
     color:      v-bind('theme.addressBar.inlineButton.disabled.textColor');  	
+  }
+  
+  .copy-path{
+    width:20px;
+    padding:0;
+    display:inline-flex;
+    align-items:center;
+    justify-content:center;
+  }
+  .copy-path::before{
+    font-family:PureNerdFont,"Symbols Nerd Font Mono","Noto Sans Nerd Font","Meslo Nerd Font","FiraCode Nerd Font",sans-serif;
+    content:"\f0c5";
+    font-size:14px;
+    line-height:1;
   }
   
   .button:not([disabled]){
@@ -759,12 +732,11 @@ export default defineComponent({
     filter: hue-rotate(90deg);
   }
   .bookmark-star{
-    margin:auto;
+    margin:0 5px 0 auto;
     width:20px;
     height:20px;
     border:0px;
     background-color:transparent;
-    margin-right:5px;
     cursor:pointer;
     display:inline-flex;
     align-items:center;

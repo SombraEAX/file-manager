@@ -8,21 +8,33 @@
     <button
       class="history"
       ref="historyButton"
+      v-if="!navCompact"
       @click="showHistory"
     ></button>
     <button
       class="forward"
+      v-if="!navCompact"
       @click="$emit('forward')"
       :disabled="historyIndex == history.length - 1"
     ></button>
     <button
-      class="up"      
+      class="up"
+      v-if="!navCompact"
       @click="$emit('up')"
       :disabled="address == '/'"
+    ></button>
+    <button
+      class="compact-menu"
+      ref="compactMenuButton"
+      v-if="menuCompact"
+      @click="openCompactMenu"
+      title="More"
     ></button>
     <AddressBar
       ref="addressBar"
       :address="address"
+      :compact="compact"
+      :menu-bar-compact="menuBarCompact"
       :search-version="searchVersion"
       :bookmarks="bookmarks"
       :is-bookmarked="isBookmarked"
@@ -37,21 +49,25 @@
       @scaling="v => $emit('scaling', v)"
     />
     <button
+      v-if="!compact"
       class="icon icon-list"
       :class="{ active: view === 'list' }"
       @click="$emit('changeView', 'list')"
     ></button>
     <button
+      v-if="!compact"
       class="icon icon-icons"
       :class="{ active: view === 'icons' }"
       @click="$emit('changeView', 'icons')"
     ></button>
     <button
+      v-if="!compact"
       class="icon icon-table"
       :class="{ active: view === 'table' }"
       @click="$emit('changeView', 'table')"
     ></button>
     <button
+      v-if="!compact"
       class="icon icon-panel"
       :class="{ active: previewPanelVisible }"
       @click="$emit('togglePreviewPanel')"
@@ -69,7 +85,7 @@
 <script lang="ts">
   import { defineComponent, PropType } from 'vue'
   import { theme } from '../stores/theme'
-  import { openHistoryMenu } from '../stores/menus'
+  import { openHistoryMenu, openMenuBarSubmenu } from '../stores/menus'
   import AddressBar from "./AddressBar.vue"
   import TasksWidget from "./TasksWidget.vue"
   import ZoomButton from "./ZoomButton.vue"
@@ -97,6 +113,10 @@
       scale: Number,
       previewPanelVisible: Boolean,
       showMenuBar: Boolean,
+      compact: Boolean,
+      navCompact: Boolean,
+      menuCompact: Boolean,
+      menuBarCompact: Boolean,
       bookmarks: {
         type: Array as PropType<string[]>,
         default: () => []
@@ -116,10 +136,36 @@
       },
       showHistory(){
         const rect = (this.$refs.historyButton as HTMLElement).getBoundingClientRect()
-
-        openHistoryMenu([...this.history], this.historyIndex || 0, rect.x, rect.y + rect.height).then(index =>
+        this.showHistoryAt(rect.x, rect.y + rect.height)
+      },
+      showHistoryAt(x: number, y: number){
+        openHistoryMenu([...this.history], this.historyIndex || 0, x, y).then(index =>
           this.$emit('changeHistoryIndex', index)
         )
+      },
+      openCompactMenu(){
+        const rect = (this.$refs.compactMenuButton as HTMLElement).getBoundingClientRect()
+        const canForward = (this.historyIndex || 0) < this.history.length - 1
+        const canUp = this.address !== '/'
+        openMenuBarSubmenu([
+          { label: 'Forward', id: 'forward', enabled: canForward },
+          { label: 'Up', id: 'up', enabled: canUp },
+          { type: 'separator' },
+          {
+            label: 'History',
+            id: 'history',
+            submenu: this.history.map((pathname, i) => ({
+              label: pathname,
+              id: 'history:' + i,
+              type: 'radio',
+              checked: i === (this.historyIndex || 0)
+            }))
+          }
+        ], rect.x, rect.y + rect.height).then(id => {
+          if(id === 'forward' && canForward) this.$emit('forward')
+          else if(id === 'up' && canUp) this.$emit('up')
+          else if(id && id.startsWith('history:')) this.$emit('changeHistoryIndex', Number(id.slice(8)))
+        })
       },
       openMenu(){
         const rect = (this.$refs.menuButton as HTMLElement).getBoundingClientRect()
@@ -183,6 +229,7 @@
   .forward::before,
   .up::before,
   .history::before,
+  .compact-menu::before,
   .top-panel .icon::before{
     font-family:PureNerdFont,"Symbols Nerd Font Mono","Noto Sans Nerd Font","Meslo Nerd Font","FiraCode Nerd Font",sans-serif;
     font-size:16px;
@@ -196,6 +243,7 @@
   .forward::before{ content:"\f054" }
   .up::before{ content:"\f077" }
   .history::before{ content:"\f0d7" }
+  .compact-menu::before{ content:"\f141" }
   button:disabled{
     color:v-bind('theme.topPanelIconDisabledColor')
   }
