@@ -5,6 +5,8 @@ A file manager built with **Electron** and **Vue 3**.
 > **Linux only.** The app relies on the freedesktop Trash specification and
 > XDG user directories, so it targets Linux desktops.
 
+**Try the web demo:** <https://file-manager-kfee.onrender.com/>
+
 ![Screenshot](screenshot.png)
 
 ---
