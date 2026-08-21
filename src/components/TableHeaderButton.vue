@@ -2,12 +2,11 @@
   <div class="wrapper" :data-status="status">
     <div
       :data-red-line="redLine === 'left'"
-      class="header-button" 
+      class="header-button"
       :style="{width:width+'px'}"
       @mousedown.left="buttonMouseDown"
     >
-      {{arrow}}
-      {{caption}}
+      <span v-if="sort" class="sort-arrow" :data-dir="sort"></span>{{caption}}
     </div>
     <div
       class="header-delimiter"
@@ -82,13 +81,6 @@
         this.mousemove = true
         this.$emit('move', event.clientX)
       }
-    },
-    computed:{
-      arrow(){
-        if(this.sort == 'desc') return '▼'
-        if(this.sort == 'asc') return '▲'
-        return ''
-      }
     }
   })
 </script>
@@ -137,6 +129,19 @@
     padding-left:10px;
     z-index:100;
     padding-right:10px;
+  }
+  .sort-arrow{
+    width:0;
+    height:0;
+    flex-shrink:0;
+    margin-right:5px;
+    border-left:4px solid transparent;
+    border-right:4px solid transparent;
+    border-top:5px solid currentColor;
+  }
+  .sort-arrow[data-dir="asc"]{
+    border-top:0;
+    border-bottom:5px solid currentColor;
   }
   .delimiter[data-red-line="true"]{
     height:100%;
