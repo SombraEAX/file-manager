@@ -138,22 +138,8 @@ import DropDown from './DropDown.vue';
 import AppCheckbox from './AppCheckbox.vue';
 import EntryIcon from './EntryIcon.vue';
 import BreadCrumbs from './BreadCrumbs.vue';
+import { getXdgTypeByBasename } from '../xdg';
 const homedir = `/home/${window.electron.getUserName()}`
-
-let xdgCache: Record<string, string> | null = null
-function getXdgDirs(): Record<string, string> {
-  if (xdgCache) return xdgCache
-  xdgCache = {}
-  try {
-    const content = window.electron.readFileSync(window.electron.join(homedir, '.config/user-dirs.dirs'), 'utf8')
-    const map: Record<string, string> = { XDG_DOWNLOAD_DIR:'downloads', XDG_DOCUMENTS_DIR:'documents', XDG_MUSIC_DIR:'music', XDG_PICTURES_DIR:'pictures', XDG_VIDEOS_DIR:'videos', XDG_DESKTOP_DIR:'desktop', XDG_PUBLICSHARE_DIR:'public' }
-    for (const line of content.split('\n')) {
-      const m = line.match(/^(\w+)="?\$HOME\/(.+?)"?$/)
-      if (m && map[m[1]]) xdgCache[m[2]] = map[m[1]]
-    }
-  } catch(e) {}
-  return xdgCache
-}
 
 export default defineComponent({
   components: { DropDown, AppCheckbox, EntryIcon, BreadCrumbs },
@@ -279,10 +265,9 @@ export default defineComponent({
         'videos': 'videos', 'trash': 'trash', 'public': 'public',
         'npm': 'npm', 'node_modules': 'npm',
       }
-      const type = nameMap[name.toLowerCase()]
-      if (type) return type
-      const xdg = getXdgDirs()
-      return xdg[name] || ''
+        const type = nameMap[name.toLowerCase()]
+        if (type) return type
+        return getXdgTypeByBasename(name) || ''
     },
     dirItemClick(dir: string) {
       this.tmp = window.electron.join(this.address || '', dir);

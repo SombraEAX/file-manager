@@ -40,25 +40,11 @@
   import EntryIcon, { PreviewCell } from './EntryIcon.vue'
   import filetypes from '../../filetypes.json'
   import { requestThumbnail } from '../stores/thumbQueue'
+  import { getXdgTypeByBasename } from '../xdg'
 
   const imageTypes = new Set(filetypes.image)
 
   const homedir = `/home/${window.electron.getUserName()}`
-
-  let xdgCache: Record<string, string> | null = null
-  function getXdgDirs(): Record<string, string> {
-    if (xdgCache) return xdgCache
-    xdgCache = {}
-    try {
-      const content = window.electron.readFileSync(window.electron.join(homedir, '.config/user-dirs.dirs'), 'utf8')
-      const map: Record<string, string> = { XDG_DOWNLOAD_DIR:'downloads', XDG_DOCUMENTS_DIR:'documents', XDG_MUSIC_DIR:'music', XDG_PICTURES_DIR:'pictures', XDG_VIDEOS_DIR:'videos', XDG_DESKTOP_DIR:'desktop', XDG_PUBLICSHARE_DIR:'public' }
-      for (const line of content.split('\n')) {
-        const m = line.match(/^(\w+)="?\$HOME\/(.+?)"?$/)
-        if (m && map[m[1]]) xdgCache[m[2]] = map[m[1]]
-      }
-    } catch(e) {}
-    return xdgCache
-  }
 
   export default defineComponent({
     emits: ['openDir', 'openFile', 'contextMenu', 'click', 'confirmRename', 'cancelRename', 'update:renamingValue'],
@@ -148,8 +134,7 @@
         }
         const type = nameMap[name.toLowerCase()]
         if (type) return type
-        const xdg = getXdgDirs()
-        return xdg[name] || ''
+        return getXdgTypeByBasename(name) || ''
       },
       onDoubleClick(){
         if(this.params.type === 'directory')

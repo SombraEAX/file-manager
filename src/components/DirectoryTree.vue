@@ -56,11 +56,17 @@
   import type { MenuItemSpec } from '../types/ipc'
   import { openMenu } from '../stores/menus'
   import { theme } from '../stores/theme'
+  import { getXdgPath, getXdgBasename } from '../xdg'
   import DirectoryList from './DirectoryList.vue'
   import SideBar from './SideBar.vue'
 
   const homedir = `/home/${window.electron.getUserName()}`
   const username = window.electron.getUserName()
+
+  function place(key: string, fallbackName: string): DirItem {
+    const pathname = getXdgPath(key) || window.electron.join(homedir, fallbackName)
+    return { name: fallbackName, pathname, caption: getXdgBasename(pathname) }
+  }
 
   export default defineComponent({
     emits: ['select', 'resize', 'select-tab', 'close-tab', 'remove-bookmark', 'open-in-new-tab'],
@@ -82,13 +88,13 @@
     data(){
       const places: DirItem[] = [
         { name: 'home', pathname: homedir, caption: username },
-        { name: 'Desktop', pathname: window.electron.join(homedir, 'Desktop') },
-        { name: 'Documents', pathname: window.electron.join(homedir, 'Documents') },
-        { name: 'Downloads', pathname: window.electron.join(homedir, 'Downloads') },
-        { name: 'Music', pathname: window.electron.join(homedir, 'Music') },
-        { name: 'Pictures', pathname: window.electron.join(homedir, 'Pictures') },
-        { name: 'Public', pathname: window.electron.join(homedir, 'Public') },
-        { name: 'Videos', pathname: window.electron.join(homedir, 'Videos') },
+        place('desktop', 'Desktop'),
+        place('documents', 'Documents'),
+        place('downloads', 'Downloads'),
+        place('music', 'Music'),
+        place('pictures', 'Pictures'),
+        place('public', 'Public'),
+        place('videos', 'Videos'),
         { name: 'Trash', pathname: 'trash://', caption: 'Trash' },
         { name: '/', pathname: '/', caption: 'System root' }
       ]

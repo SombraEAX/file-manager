@@ -23,24 +23,8 @@
   import { defineComponent, PropType } from 'vue'
   import type { DirItem } from '../types/domains'
   import { theme } from '../stores/theme'
+  import { getXdgTypeByBasename } from '../xdg'
   import EntryIcon from './EntryIcon.vue'
-
-  const homedir = `/home/${window.electron.getUserName()}`
-
-  let xdgCache: Record<string, string> | null = null
-  function getXdgDirs(): Record<string, string> {
-    if (xdgCache) return xdgCache
-    xdgCache = {}
-    try {
-      const content = window.electron.readFileSync(window.electron.join(homedir, '.config/user-dirs.dirs'), 'utf8')
-      const map: Record<string, string> = { XDG_DOWNLOAD_DIR:'downloads', XDG_DOCUMENTS_DIR:'documents', XDG_MUSIC_DIR:'music', XDG_PICTURES_DIR:'pictures', XDG_VIDEOS_DIR:'videos', XDG_DESKTOP_DIR:'desktop', XDG_PUBLICSHARE_DIR:'public' }
-      for (const line of content.split('\n')) {
-        const m = line.match(/^(\w+)="?\$HOME\/(.+?)"?$/)
-        if (m && map[m[1]]) xdgCache[m[2]] = map[m[1]]
-      }
-    } catch(e) {}
-    return xdgCache
-  }
 
   export default defineComponent({
     emits: ['select', 'close', 'dir-context'],
@@ -77,8 +61,7 @@
         }
         const type = nameMap[dir.name.toLowerCase()]
         if (type) return type
-        const xdg = getXdgDirs()
-        return xdg[dir.name] || ''
+        return getXdgTypeByBasename(dir.name) || ''
       },
       async iconClick(dir: DirItem){
         dir.open = !dir.open
