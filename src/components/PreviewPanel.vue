@@ -215,7 +215,6 @@
     font-family:sans-serif
   }
   .source{
-    background: v-bind('theme.code.background');
     color:      v-bind('theme.code.textColor');
     margin:0;
     overflow:auto;
@@ -226,7 +225,6 @@
   }
   .markdown pre,
   .markdown code{
-    background: v-bind('theme.code.background');
     color:      v-bind('theme.code.textColor');
     border-radius:3px;
     font-family: monospace;
